@@ -1,5 +1,5 @@
 {
-  description = "aCeTotal/nixlypkgs – lightweight nixpkgs-style overlay repo";
+  description = "nixlypkgs – lightweight nixpkgs-style overlay repo";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -18,7 +18,7 @@
       packages = forAllSystems (system:
         let pkgs = import nixpkgs { inherit system; overlays = [ overlay ]; };
         in {
-          inherit (pkgs) nixly-hello;
+          inherit (pkgs) nixly-hello winboat;
           default = pkgs.nixly-hello;
         }
       );
@@ -37,4 +37,3 @@
         in pkgs.nixpkgs-fmt);
     };
 }
-
