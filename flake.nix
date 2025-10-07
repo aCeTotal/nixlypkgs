@@ -15,6 +15,15 @@
     in {
       overlays.default = overlay;
 
+      # Drop-in modules to enable the overlay system-wide or per-user
+      nixosModules.nixlypkgs = { ... }: {
+        nixpkgs.overlays = [ overlay ];
+      };
+
+      homeManagerModules.nixlypkgs = { ... }: {
+        nixpkgs.overlays = [ overlay ];
+      };
+
       packages = forAllSystems (system:
         let pkgs = import nixpkgs { inherit system; overlays = [ overlay ]; };
         in {
