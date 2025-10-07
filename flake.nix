@@ -18,7 +18,7 @@
       packages = forAllSystems (system:
         let pkgs = import nixpkgs { inherit system; overlays = [ overlay ]; };
         in {
-          inherit (pkgs) nixly-hello winboat;
+          inherit (pkgs) nixly-hello winboat winintegration winstripping;
           default = pkgs.nixly-hello;
         }
       );
