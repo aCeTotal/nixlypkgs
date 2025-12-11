@@ -109,6 +109,14 @@ customStdenv.mkDerivation (finalAttrs: {
     hash = "sha256-KAwcM3w98TxiGlBnWYxhTdHM1vZZhzeeXaEE647REZ0=";
   };
 
+  postPatch = ''
+    # Relax minimum deps to match nixpkgs versions currently in use
+    substituteInPlace CMakeLists.txt \
+      --replace "XKBCOMMON_MINIMUM_VERSION 1.11.0" "XKBCOMMON_MINIMUM_VERSION 1.8.1" \
+      --replace "WAYLAND_SERVER_PROTOCOLS_MINIMUM_VERSION 1.45" "WAYLAND_SERVER_PROTOCOLS_MINIMUM_VERSION 1.44" \
+      --replace "LIBINPUT_MINIMUM_VERSION 1.28" "LIBINPUT_MINIMUM_VERSION 1.27.1"
+  '';
+
   # variables used by build scripts and shown in `hyprctl version`
   GIT_BRANCH = info.branch;
   GIT_COMMITS = "0";
