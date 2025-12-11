@@ -26,11 +26,11 @@ stdenv.mkDerivation (finalAttrs: {
   pname = "nixly_renderer";
   version = "git";
 
-  src = aquamarineSrc or fetchFromGitHub {
-    owner = "hyprwm";
+  src = if aquamarineSrc != null then aquamarineSrc else fetchFromGitHub {
+    owner = "aCeTotal";
     repo = "aquamarine";
-    rev = "v0.9.5";
-    hash = "sha256-UNzYHLWfkSzLHDep5Ckb5tXc0fdxwPIrT+MY4kpQttM=";
+    rev = "a43bedcceced5c21ad36578ed823e6099af78214";
+    hash = "sha256-AjcMlM3UoavFoLzr0YrcvsIxALShjyvwe+o7ikibpCM=";
   };
 
   nativeBuildInputs = [

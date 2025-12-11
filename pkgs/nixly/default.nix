@@ -102,12 +102,12 @@ customStdenv.mkDerivation (finalAttrs: {
   pname = "nixly" + optionalString debug "-debug";
   version = "git";
 
-  src = hyprlandSrc or fetchFromGitHub {
-    owner = "hyprwm";
-    repo = "hyprland";
+  src = if hyprlandSrc != null then hyprlandSrc else fetchFromGitHub {
+    owner = "aCeTotal";
+    repo = "Hyprland";
     fetchSubmodules = true;
-    rev = "v0.52.1";
-    hash = "sha256-Lr8kwriXtUxjYsi1sGRMIR2LZilgrxYQA1TTmbpSJ+g=";
+    rev = "2ca7ad7efc1e20588af5c823ee46f23afad6cf91";
+    hash = "sha256-KAwcM3w98TxiGlBnWYxhTdHM1vZZhzeeXaEE647REZ0=";
   };
 
   postPatch = ''
