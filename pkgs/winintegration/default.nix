@@ -12,6 +12,7 @@
 , util-linux
 , findutils
 , freerdp3
+, curl
 , virt-viewer
 }:
 
@@ -19,15 +20,11 @@ stdenvNoCC.mkDerivation rec {
   pname = "winintegration";
   version = "0.1.0";
 
-  # Placeholder payload: replace URL + sha256 when known
-  src = fetchzip {
-    url = "https://example.com/path/to/windows-guest-payload.zip";
-    # Replace with the real hash when the URL is known
-    sha256 = lib.fakeSha256;
-    stripRoot = false;
-  };
+  # No external payload by default (avoid network); create empty store file
+  src = builtins.toFile "payload-empty" "";
 
   dontBuild = true;
+  dontUnpack = true;
 
   nativeBuildInputs = [ makeWrapper ];
 
@@ -36,26 +33,33 @@ stdenvNoCC.mkDerivation rec {
 
     mkdir -p $out/share/winintegration $out/bin
 
-    # Keep payload accessible at runtime; we do not assume its structure
-    cp -a "$src" "$out/share/winintegration/payload"
+    # Prepare optional payload dir (empty by default; no network fetch)
+    mkdir -p "$out/share/winintegration/payload"
 
     # Main orchestrator
     cat > $out/bin/winintegration <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
-VM_NAME="winintegration"
-CONN="${LIBVIRT_DEFAULT_URI:-qemu:///session}"
+VM_NAME="''${WIN_VM_NAME:-winintegration}"
+CONN="''${LIBVIRT_DEFAULT_URI:-qemu:///session}"
 
 XDG_DATA_HOME_DEFAULT="$HOME/.local/share"
 XDG_STATE_HOME_DEFAULT="$HOME/.local/state"
 XDG_CONFIG_HOME_DEFAULT="$HOME/.config"
 
-DATA_DIR="${XDG_DATA_HOME:-$XDG_DATA_HOME_DEFAULT}/winintegration"
-STATE_DIR="${XDG_STATE_HOME:-$XDG_STATE_HOME_DEFAULT}/winintegration"
-CONF_DIR="${XDG_CONFIG_HOME:-$XDG_CONFIG_HOME_DEFAULT}/winintegration"
+DATA_DIR="''${XDG_DATA_HOME:-$XDG_DATA_HOME_DEFAULT}/winintegration"
+STATE_DIR="''${XDG_STATE_HOME:-$XDG_STATE_HOME_DEFAULT}/winintegration"
+CONF_DIR="''${XDG_CONFIG_HOME:-$XDG_CONFIG_HOME_DEFAULT}/winintegration"
 
-PAYLOAD_DIR="${WININTEGRATION_PAYLOAD_DIR:-}"
+PAYLOAD_DIR="''${WININTEGRATION_PAYLOAD_DIR:-}"
+
+# Default Windows 11 ISO source (can be overridden)
+WIN_ISO_URL_DEFAULT="https://pfoprod.ddns.net/Adrian/nixly_win11.iso"
+WIN_ISO_PATH_DEFAULT="$DATA_DIR/win11.iso"
+
+# Optional host share directory (virtiofs)
+HOST_SHARE_DIR_DEFAULT="''${WIN_HOST_SHARE_DIR:-$HOME/Share/win}"
 
 mkdir -p "$DATA_DIR" "$STATE_DIR" "$CONF_DIR"
 
@@ -65,7 +69,7 @@ need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing required command: $
 
 find_ovmf() {
   # Resolve OVMF paths from EDK2_OVMF (provided by wrapper)
-  local base="${EDK2_OVMF:-}"
+  local base="''${EDK2_OVMF:-}"
   [ -n "$base" ] || die "EDK2_OVMF env not set (wrapper bug)"
   local code vars
   code=$(find "$base" -type f -name 'OVMF_CODE*.fd' | head -n1 || true)
@@ -77,12 +81,38 @@ find_ovmf() {
 
 find_virtio_win_iso() {
   # Optional: virtio-win ISO for drivers
-  local base="${VIRTIO_WIN:-}"
+  local base="''${VIRTIO_WIN:-}"
   [ -n "$base" ] || return 0
   local iso
   iso=$(find "$base" -type f -name '*.iso' | head -n1 || true)
   [ -n "$iso" ] || return 0
   echo "$iso"
+}
+
+resolve_win_iso_path() {
+  # Priority: WIN_ISO_FILE env -> config -> default path if file exists
+  if [ -n "''${WIN_ISO_FILE:-}" ] && [ -f "''${WIN_ISO_FILE}" ]; then
+    echo "''${WIN_ISO_FILE}"
+    return 0
+  fi
+  if [ -f "$CONF_DIR/win-iso.path" ]; then
+    local p
+    p=$(cat "$CONF_DIR/win-iso.path")
+    if [ -f "$p" ]; then
+      echo "$p"; return 0
+    fi
+  fi
+  if [ -f "$WIN_ISO_PATH_DEFAULT" ]; then
+    echo "$WIN_ISO_PATH_DEFAULT"; return 0
+  fi
+  return 1
+}
+
+resolve_win_iso_url() {
+  # Priority: WIN_ISO_URL env -> config -> default URL
+  if [ -n "''${WIN_ISO_URL:-}" ]; then echo "''${WIN_ISO_URL}"; return 0; fi
+  if [ -f "$CONF_DIR/win-iso.url" ]; then cat "$CONF_DIR/win-iso.url"; return 0; fi
+  echo "$WIN_ISO_URL_DEFAULT"
 }
 
 host_cpus() {
@@ -123,46 +153,73 @@ compose_domain_xml() {
   local cpus total_mem mem guest_mem iothreads
   cpus=$(host_cpus)
   total_mem=$(host_mem_mib)
-  # Heuristics: reserve 2 CPUs and 2 GiB for host
+  # Heuristics: reserve 2 CPUs for host
   [ "$cpus" -gt 2 ] && cpus=$((cpus-2)) || cpus=2
-  guest_mem=$(( total_mem - 2048 ))
-  [ "$guest_mem" -lt 4096 ] && guest_mem=4096
+
+  # Memory policy:
+  # - Max 8000 MiB, Min 1000 MiB by default (overridable via env)
+  # - We set currentMemory to max so guest sees full RAM, but avoid hogging
+  #   via lazy allocation and optional ballooning; min is expressed via memtune.
+  # - Clamp to host memory - 512 MiB minimum safety margin
+  local mem_max mem_min host_limit
+  mem_max="''${WIN_VM_MAX_MEM_MIB:-8000}"
+  mem_min="''${WIN_VM_MIN_MEM_MIB:-1000}"
+  host_limit=$(( total_mem - 512 ))
+  if [ "$host_limit" -lt 1024 ]; then host_limit=1024; fi
+  # Clamp max to host_limit and at least 1024
+  if [ "$mem_max" -gt "$host_limit" ]; then mem_max=$host_limit; fi
+  if [ "$mem_max" -lt 1024 ]; then mem_max=1024; fi
+  # Clamp min between 512 and mem_max
+  if [ "$mem_min" -lt 512 ]; then mem_min=512; fi
+  if [ "$mem_min" -gt "$mem_max" ]; then mem_min=$mem_max; fi
   iothreads=1
 
   local ovmf ovmf_code ovmf_vars vars_copy
   ovmf=$(find_ovmf)
-  ovmf_code="${ovmf%|*}"; ovmf_vars="${ovmf#*|}"
-  vars_copy="$DATA_DIR/OVMF_VARS_${VM_NAME}.fd"
+  ovmf_code="''${ovmf%|*}"; ovmf_vars="''${ovmf#*|}"
+  vars_copy="$DATA_DIR/OVMF_VARS_''${VM_NAME}.fd"
   if [ ! -f "$vars_copy" ]; then
     cp -f "$ovmf_vars" "$vars_copy"
   fi
 
   local disk; disk=$(ensure_disk)
   local virtio_iso; virtio_iso=$(find_virtio_win_iso || true)
+  local win_iso=""; win_iso=$(resolve_win_iso_path || true)
 
   # virtiofs share for payload if present
   local fs_xml=""; local fs_target="winintegration"
   if [ -n "$PAYLOAD_DIR" ] && [ -d "$PAYLOAD_DIR" ]; then
-    fs_xml="\n    <filesystem type='mount' accessmode='passthrough'>\n      <driver type='virtiofs'/>\n      <source dir='${PAYLOAD_DIR}'/>\n      <target dir='${fs_target}'/>\n    </filesystem>"
+    fs_xml="\n    <filesystem type='mount' accessmode='passthrough'>\n      <driver type='virtiofs'/>\n      <source dir='$PAYLOAD_DIR'/>\n      <target dir='$fs_target'/>\n    </filesystem>"
+  fi
+
+  # Optional host share directory
+  if [ -d "$HOST_SHARE_DIR_DEFAULT" ]; then
+    fs_xml+="\n    <filesystem type='mount' accessmode='passthrough'>\n      <driver type='virtiofs'/>\n      <source dir='$HOST_SHARE_DIR_DEFAULT'/>\n      <target dir='hostshare'/>\n    </filesystem>"
   fi
 
   local cdrom_virtio=""
   if [ -n "$virtio_iso" ]; then
-    cdrom_virtio="\n    <disk type='file' device='cdrom'>\n      <driver name='qemu' type='raw'/>\n      <source file='${virtio_iso}'/>\n      <target dev='sdc' bus='sata'/>\n      <readonly/>\n    </disk>"
+    cdrom_virtio="\n    <disk type='file' device='cdrom'>\n      <driver name='qemu' type='raw'/>\n      <source file='$virtio_iso'/>\n      <target dev='sdc' bus='sata'/>\n      <readonly/>\n    </disk>"
   fi
 
-  cat > "$CONF_DIR/${VM_NAME}.xml" <<XML
+  local cdrom_winiso=""
+  if [ -n "$win_iso" ] && [ -f "$win_iso" ]; then
+    cdrom_winiso="\n    <disk type='file' device='cdrom'>\n      <driver name='qemu' type='raw'/>\n      <source file='$win_iso'/>\n      <target dev='sdb' bus='sata'/>\n      <readonly/>\n    </disk>"
+  fi
+
+  cat > "$CONF_DIR/''${VM_NAME}.xml" <<XML
 <domain type='kvm'>
-  <name>${VM_NAME}</name>
-  <memory unit='MiB'>${guest_mem}</memory>
-  <currentMemory unit='MiB'>${guest_mem}</currentMemory>
-  <vcpu placement='static'>${cpus}</vcpu>
-  <iothreads>${iothreads}</iothreads>
+  <name>''${VM_NAME}</name>
+  <memory unit='MiB'>''${mem_max}</memory>
+  <currentMemory unit='MiB'>''${mem_max}</currentMemory>
+  <vcpu placement='static'>''${cpus}</vcpu>
+  <iothreads>''${iothreads}</iothreads>
   <os firmware='efi'>
     <type arch='x86_64' machine='q35'>hvm</type>
-    <loader readonly='yes' type='pflash'>${ovmf_code}</loader>
-    <nvram>${vars_copy}</nvram>
+    <loader readonly='yes' type='pflash'>''${ovmf_code}</loader>
+    <nvram>''${vars_copy}</nvram>
     <boot dev='hd'/>
+    <bootmenu enable='yes'/>
   </os>
   <features>
     <acpi/>
@@ -180,13 +237,14 @@ compose_domain_xml() {
       <synic state='on'/>
       <stimer state='on'/>
       <reset state='on'/>
-      <vendor_id state='on' value='KVMNvrdia'/>
+      <!-- vendor_id must be exactly 12 ASCII chars -->
+      <vendor_id state='on' value='KVMNvrdia01'/>
       <frequencies state='on'/>
       <reenlightenment state='on'/>
     </hyperv>
   </features>
   <cpu mode='host-passthrough' check='none'>
-    <topology sockets='1' dies='1' cores='${cpus}' threads='1'/>
+    <topology sockets='1' dies='1' cores='$cpus' threads='1'/>
   </cpu>
   <clock offset='localtime'>
     <timer name='rtc' tickpolicy='catchup'/>
@@ -194,15 +252,17 @@ compose_domain_xml() {
     <timer name='pit' tickpolicy='delay'/>
     <timer name='hypervclock' present='yes'/>
   </clock>
-  <memoryBacking>
-    <hugepages/>
-  </memoryBacking>
+  <!-- Avoid hugepages so memory is demand-allocated and balloon-friendly -->
+  <memoryBacking/>
+  <memtune>
+    <min_guarantee unit='MiB'>''${mem_min}</min_guarantee>
+  </memtune>
   <devices>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2' cache='none' io='native' discard='unmap'/>
-      <source file='${disk}'/>
+      <source file='$disk'/>
       <target dev='vda' bus='virtio'/>
-    </disk>${cdrom_virtio}
+    </disk>''${cdrom_winiso}''${cdrom_virtio}
     <controller type='pci' model='pcie-root'/>
     <controller type='sata' index='0'/>
     <controller type='usb' model='qemu-xhci'/>
@@ -224,9 +284,15 @@ compose_domain_xml() {
     <channel type='spicevmc'>
       <target type='virtio' name='com.redhat.spice.0'/>
     </channel>
+    <channel type='unix'>
+      <target type='virtio' name='org.qemu.guest_agent.0'/>
+    </channel>
+    <memballoon model='virtio'>
+      <stats period='10'/>
+    </memballoon>
     <graphics type='spice' autoport='yes' listen='127.0.0.1'>
       <image compression='off'/>
-    </graphics>${fs_xml}
+    </graphics>''${fs_xml}
   </devices>
 </domain>
 XML
@@ -247,8 +313,22 @@ cmd_define() {
   echo "==> Composing domain XML"
   compose_domain_xml
   echo "==> Defining domain $VM_NAME"
-  virsh --connect "$CONN" define "$CONF_DIR/${VM_NAME}.xml" >/dev/null
+  virsh --connect "$CONN" define "$CONF_DIR/''${VM_NAME}.xml" >/dev/null
   echo "Defined: $VM_NAME"
+}
+
+cmd_define_install() {
+  echo "==> Composing domain XML (install mode)"
+  compose_domain_xml
+  # Force boot from CDROM for first install boot
+  # Modify a temp XML to prefer CDROM
+  local tmp
+  tmp=$(mktemp)
+  sed "s#<boot dev='hd'/>#<boot dev='cdrom'/>#" "$CONF_DIR/''${VM_NAME}.xml" > "$tmp"
+  echo "==> Defining domain $VM_NAME (install)"
+  virsh --connect "$CONN" define "$tmp" >/dev/null
+  rm -f "$tmp"
+  echo "Defined (install): $VM_NAME"
 }
 
 cmd_start() {
@@ -289,7 +369,54 @@ cmd_rdp() {
   ip=$(vm_ip || true)
   [ -n "$ip" ] || die "Could not determine VM IP; ensure qemu-guest-agent or DHCP lease is available."
   echo "Connecting to $ip via FreeRDP"
-  exec wlfreerdp /u:"${RDP_USER:-Administrator}" /p:"${RDP_PASS:-}" /v:"$ip" /dynamic-resolution +clipboard /gfx-h264:avc444 +gfx-progressive /rfx
+  exec wlfreerdp /u:"''${RDP_USER:-Administrator}" /p:"''${RDP_PASS:-}" /v:"$ip" /dynamic-resolution +clipboard /gfx-h264:avc444 +gfx-progressive /rfx
+}
+
+cmd_rdp_app() {
+  local app="''${1:-}"
+  [ -n "$app" ] || die "Usage: winintegration rdp-app "'"APP_ALIAS_OR_PATH"'""
+  local ip; ip=$(vm_ip || true)
+  [ -n "$ip" ] || die "Could not determine VM IP; ensure RDP is enabled in guest."
+  echo "Launching RemoteApp '$app' on $ip"
+  exec wlfreerdp \
+    /u:"''${RDP_USER:-Administrator}" /p:"''${RDP_PASS:-}" /v:"$ip" \
+    /app:"''${app}" +clipboard /gfx-h264:avc444 +gfx-progressive /rfx /dynamic-resolution
+}
+
+cmd_rdp_explorer() {
+  # Common helper to open Windows Explorer as RemoteApp
+  cmd_rdp_app "||Explorer"
+}
+
+cmd_download_iso() {
+  local url path
+  url=$(resolve_win_iso_url)
+  path="''${1:-$WIN_ISO_PATH_DEFAULT}"
+  mkdir -p "$(dirname "$path")"
+  echo "==> Downloading Windows ISO from: $url"
+  need_cmd curl
+  if curl -L --fail --progress-bar "$url" -o "$path.part"; then
+    mv -f "$path.part" "$path"
+    echo "$path" > "$CONF_DIR/win-iso.path"
+    echo "$url" > "$CONF_DIR/win-iso.url"
+    echo "Saved ISO to: $path"
+  else
+    rm -f "$path.part"
+    die "Failed to download ISO"
+  fi
+}
+
+cmd_attach_iso() {
+  # Attach current ISO to running domain
+  local iso; iso=$(resolve_win_iso_path || true)
+  [ -n "$iso" ] && [ -f "$iso" ] || die "No ISO path configured. Use 'winintegration download-iso' or set WIN_ISO_FILE."
+  echo "==> Attaching ISO $iso"
+  virsh --connect "$CONN" change-media "$VM_NAME" sdb --insert --source "$iso" --update || die "change-media failed"
+}
+
+cmd_eject_iso() {
+  echo "==> Ejecting install ISO (sdb)"
+  virsh --connect "$CONN" change-media "$VM_NAME" sdb --eject --config || true
 }
 
 cmd_status() {
@@ -303,27 +430,39 @@ winintegration - orchestrate a high-performance Windows VM (libvirt/qemu)
 Commands:
   init              Prepare data dirs and disk (from payload if present)
   define            Generate and define libvirt domain with tuned defaults
+  define-install    Define domain preferring CDROM boot for installation
   start             Start the VM via libvirt
   autostart-on      Enable libvirt autostart for the VM
   autostart-off     Disable libvirt autostart for the VM
   viewer            Open SPICE viewer (virt-viewer)
-  rdp               Connect via FreeRDP (requires RDP enabled in guest)
+  rdp               Full desktop via FreeRDP (requires RDP in guest)
+  rdp-app APP       Launch a RemoteApp (e.g. '||Explorer' or exe path)
+  rdp-explorer      Launch Windows Explorer as RemoteApp
+  download-iso [P]  Download Windows ISO to path P (default: $WIN_ISO_PATH_DEFAULT)
+  attach-iso        Attach configured ISO to the VM (drive sdb)
+  eject-iso         Eject ISO from the VM (drive sdb)
   status            Show VM status via virsh
 
 Environment:
   LIBVIRT_DEFAULT_URI   Defaults to qemu:///session for user session
   RDP_USER, RDP_PASS    Used by 'rdp' command
+  WIN_ISO_URL           Overrides Windows ISO URL (default internal)
+  WIN_ISO_FILE          Overrides Windows ISO path used by define/attach
+  WIN_HOST_SHARE_DIR    Host dir to share via virtiofs (default: $HOME/Share/win)
 
 Notes:
-  - This package embeds a placeholder payload. Replace URL+hash in the
-    derivation to include your guest files (e.g. QCOW2, scripts, drivers).
-  - Per-app window integration is intended via RDP/RemoteApp in the guest.
-    Ensure your Windows payload enables RDP and RemoteApp publishing.
+  - For best integration: install virtio drivers, Spice Guest Tools and
+    QEMU Guest Agent from the attached virtio-win ISO inside Windows.
+  - To install: run 'winintegration download-iso', then 'define-install' and
+    'start'. After install completes, run 'eject-iso' and optionally 'define'
+    again to switch boot back to disk.
+  - Per-window integration in Hyprland is via RDP RemoteApp. Enable RDP in
+    Windows (including NLA), then use 'rdp-app' to launch specific apps.
 USAGE
 }
 
 main() {
-  local cmd="${1:-}"
+  local cmd="''${1:-}"
   case "$cmd" in
     init) shift; cmd_init "$@" ;;
     define) shift; cmd_define "$@" ;;
@@ -332,6 +471,11 @@ main() {
     autostart-off) shift; cmd_autostart_off "$@" ;;
     viewer) shift; cmd_viewer "$@" ;;
     rdp) shift; cmd_rdp "$@" ;;
+    rdp-app) shift; cmd_rdp_app "$@" ;;
+    rdp-explorer) shift; cmd_rdp_explorer "$@" ;;
+    download-iso) shift; cmd_download_iso "$@" ;;
+    attach-iso) shift; cmd_attach_iso "$@" ;;
+    eject-iso) shift; cmd_eject_iso "$@" ;;
     status) shift; cmd_status "$@" ;;
     -h|--help|help|"") usage ;;
     *) echo "Unknown command: $cmd"; usage; exit 2 ;;
@@ -347,7 +491,7 @@ EOF
 
   postFixup = ''
     wrapProgram "$out/bin/winintegration" \
-      --prefix PATH : ${lib.makeBinPath [ libvirt qemu virt-install unzip coreutils util-linux findutils freerdp3 virt-viewer ]} \
+      --prefix PATH : ${lib.makeBinPath [ libvirt qemu virt-install unzip coreutils util-linux findutils freerdp3 virt-viewer curl ]} \
       --set EDK2_OVMF "${edk2-ovmf}" \
       --set VIRTIO_WIN "${virtio-win}" \
       --set WININTEGRATION_PAYLOAD_DIR "$out/share/winintegration/payload"
