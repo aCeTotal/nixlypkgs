@@ -2,6 +2,8 @@ inputs: final: prev:
 let
   callPackage = final.callPackage;
 in {
+  # Override hyprutils to the version required by the nixly Hyprland/aquamarine forks
+  hyprutils = callPackage ../pkgs/hyprutils { };
   nixly-hello = callPackage ../pkgs/nixly-hello { };
   nixly_renderer = callPackage ../pkgs/nixly_renderer {
     aquamarineSrc = inputs."aquamarine-src";
