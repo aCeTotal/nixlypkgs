@@ -17,9 +17,11 @@
   hyprcursor,
   hyprgraphics,
   hyprland-qtutils,
+  hyprland-protocols,
   hyprlang,
   hyprutils,
   hyprwayland-scanner,
+  hyprwire,
   libGL,
   libdrm,
   libexecinfo,
@@ -33,6 +35,7 @@
   python3,
   muparser,
   re2,
+  udis86,
   systemd,
   tomlplusplus,
   wayland,
@@ -139,6 +142,7 @@ customStdenv.mkDerivation (finalAttrs: {
     wayland-scanner
     cmake
     python3
+    hyprwire
   ];
 
   outputs = [
@@ -156,7 +160,9 @@ customStdenv.mkDerivation (finalAttrs: {
       hyprcursor.dev
       hyprgraphics
       hyprlang
+      hyprland-protocols
       hyprutils
+      hyprwire
       libGL
       libdrm
       libinput
@@ -164,6 +170,7 @@ customStdenv.mkDerivation (finalAttrs: {
       libxkbcommon
       libgbm
       muparser
+      udis86
       pango
       pciutils
       re2

@@ -2,7 +2,7 @@
   lib,
   stdenv,
   fetchFromGitHub,
-  meson,
+  cmake,
   ninja,
 }:
 stdenv.mkDerivation (finalAttrs: {
@@ -17,7 +17,7 @@ stdenv.mkDerivation (finalAttrs: {
   };
 
   nativeBuildInputs = [
-    meson
+    cmake
     ninja
   ];
 
