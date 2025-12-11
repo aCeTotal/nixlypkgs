@@ -42,6 +42,7 @@ stdenv.mkDerivation (finalAttrs: {
   buildInputs = [
     hwdata
     hyprutils
+    hyprwayland-scanner
     libdisplay-info
     libdrm
     libffi

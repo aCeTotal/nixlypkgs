@@ -4,6 +4,7 @@ let
 in {
   # Override hyprutils to the version required by the nixly Hyprland/aquamarine forks
   hyprutils = callPackage ../pkgs/hyprutils { };
+  hyprwayland-scanner = callPackage ../pkgs/hyprwayland-scanner { };
   nixly-hello = callPackage ../pkgs/nixly-hello { };
   nixly_renderer = callPackage ../pkgs/nixly_renderer {
     aquamarineSrc = inputs."aquamarine-src";
