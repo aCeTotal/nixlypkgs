@@ -7,7 +7,6 @@
   pkg-config,
   makeWrapper,
   cmake,
-  meson,
   ninja,
   aquamarine,
   binutils,
@@ -32,6 +31,7 @@
   pciutils,
   pkgconf,
   python3,
+  muparser,
   re2,
   systemd,
   tomlplusplus,
@@ -56,7 +56,6 @@ let
     pathExists
     ;
   inherit (lib.asserts) assertMsg;
-  inherit (lib.attrsets) mapAttrsToList;
   inherit (lib.lists)
     concatLists
     optionals
@@ -64,12 +63,12 @@ let
   inherit (lib.strings)
     makeBinPath
     optionalString
-    mesonBool
-    mesonEnable
     ;
   inherit (lib.trivial)
     importJSON
     ;
+
+  cmakeBool = name: value: "-D${name}=${if value then "ON" else "OFF"}";
 
   infoPath = ./info.json;
   info = if pathExists infoPath then importJSON infoPath else {
@@ -110,22 +109,14 @@ customStdenv.mkDerivation (finalAttrs: {
     hash = "sha256-KAwcM3w98TxiGlBnWYxhTdHM1vZZhzeeXaEE647REZ0=";
   };
 
-  postPatch = ''
-    # Fix hardcoded paths to /usr installation
-    sed -i "s#/usr#$out#" src/render/OpenGL.cpp
-
-    # Remove extra @PREFIX@ to fix pkg-config paths
-    sed -i "s#@PREFIX@/##g" hyprland.pc.in
-  '';
-
-  # variables used by generateVersion.sh script, and shown in `hyprctl version`
-  BRANCH = info.branch;
-  COMMITS = info.commit_hash;
-  DATE = info.date;
-  DIRTY = "";
-  HASH = info.commit_hash;
-  MESSAGE = info.commit_message;
-  TAG = info.tag;
+  # variables used by build scripts and shown in `hyprctl version`
+  GIT_BRANCH = info.branch;
+  GIT_COMMITS = "0";
+  GIT_COMMIT_HASH = info.commit_hash;
+  GIT_COMMIT_MESSAGE = info.commit_message;
+  GIT_COMMIT_DATE = info.date;
+  GIT_DIRTY = "clean";
+  GIT_TAG = info.tag;
 
   depsBuildBuild = [
     # to find wayland-scanner when cross-compiling
@@ -135,11 +126,9 @@ customStdenv.mkDerivation (finalAttrs: {
   nativeBuildInputs = [
     hyprwayland-scanner
     makeWrapper
-    meson
     ninja
     pkg-config
     wayland-scanner
-    # for udis86
     cmake
     python3
   ];
@@ -166,6 +155,7 @@ customStdenv.mkDerivation (finalAttrs: {
       libuuid
       libxkbcommon
       libgbm
+      muparser
       pango
       pciutils
       re2
@@ -186,23 +176,19 @@ customStdenv.mkDerivation (finalAttrs: {
     (optionals withSystemd [ systemd ])
   ];
 
-  mesonBuildType = if debug then "debug" else "release";
+  cmakeBuildType = if debug then "Debug" else "Release";
 
   dontStrip = debug;
   strictDeps = true;
 
-  mesonFlags = concatLists [
-    (mapAttrsToList mesonEnable {
-      "xwayland" = enableXWayland;
-      "systemd" = withSystemd;
-      "uwsm" = false;
-      "hyprpm" = false;
-    })
-    (mapAttrsToList mesonBool {
-      # PCH provides no benefits when building with Nix
-      "b_pch" = false;
-      "tracy_enable" = false;
-    })
+  cmakeFlags = [
+    (cmakeBool "NO_XWAYLAND" (!enableXWayland))
+    (cmakeBool "NO_SYSTEMD" (!withSystemd))
+    "-DNO_HYPRPM=ON"
+    "-DNO_UWSM=ON"
+    "-DBUILD_TESTING=OFF"
+    "-DWITH_TESTS=OFF"
+    "-DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON"
   ];
 
   postInstall = ''
