@@ -3,6 +3,7 @@ let
   callPackage = final.callPackage;
 in {
   # Override hyprutils to the version required by the nixly Hyprland/aquamarine forks
+  hyprlang = callPackage ../pkgs/hyprlang { };
   hyprutils = callPackage ../pkgs/hyprutils { };
   hyprwayland-scanner = callPackage ../pkgs/hyprwayland-scanner { };
   nixly-hello = callPackage ../pkgs/nixly-hello { };
