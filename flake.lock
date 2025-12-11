@@ -1,5 +1,37 @@
 {
   "nodes": {
+    "aquamarine-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1764714051,
+        "narHash": "sha256-AjcMlM3UoavFoLzr0YrcvsIxALShjyvwe+o7ikibpCM=",
+        "owner": "aCeTotal",
+        "repo": "aquamarine",
+        "rev": "a43bedcceced5c21ad36578ed823e6099af78214",
+        "type": "github"
+      },
+      "original": {
+        "owner": "aCeTotal",
+        "repo": "aquamarine",
+        "type": "github"
+      }
+    },
+    "hyprland-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1765456802,
+        "narHash": "sha256-KAwcM3w98TxiGlBnWYxhTdHM1vZZhzeeXaEE647REZ0=",
+        "owner": "aCeTotal",
+        "repo": "Hyprland",
+        "rev": "2ca7ad7efc1e20588af5c823ee46f23afad6cf91",
+        "type": "github"
+      },
+      "original": {
+        "owner": "aCeTotal",
+        "repo": "Hyprland",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1759381078,
@@ -18,6 +50,8 @@
     },
     "root": {
       "inputs": {
+        "aquamarine-src": "aquamarine-src",
+        "hyprland-src": "hyprland-src",
         "nixpkgs": "nixpkgs"
       }
     }
