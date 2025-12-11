@@ -24,7 +24,7 @@ stdenv.mkDerivation (finalAttrs: {
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "hyprgraphics";
-    tag = "v${finalAttrs.version}";
+    rev = "8f1bec691b2d198c60cccabca7a94add2df4ed1a";
     hash = "sha256-JnET78yl5RvpGuDQy3rCycOCkiKoLr5DN1fPhRNNMco=";
   };
 

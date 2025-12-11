@@ -19,7 +19,7 @@ stdenv.mkDerivation (finalAttrs: {
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "hyprcursor";
-    tag = "v${finalAttrs.version}";
+    rev = "44e91d467bdad8dcf8bbd2ac7cf49972540980a5";
     hash = "sha256-lIqabfBY7z/OANxHoPeIrDJrFyYy9jAM4GQLzZ2feCM=";
   };
 

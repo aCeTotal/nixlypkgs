@@ -4,6 +4,8 @@ let
 in {
   # Override hyprutils to the version required by the nixly Hyprland/aquamarine forks
   hyprlang = callPackage ../pkgs/hyprlang { };
+  hyprcursor = callPackage ../pkgs/hyprcursor { };
+  hyprgraphics = callPackage ../pkgs/hyprgraphics { };
   hyprutils = callPackage ../pkgs/hyprutils { };
   hyprwayland-scanner = callPackage ../pkgs/hyprwayland-scanner { };
   nixly-hello = callPackage ../pkgs/nixly-hello { };
