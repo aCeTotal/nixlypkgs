@@ -2,6 +2,14 @@ inputs: final: prev:
 let
   callPackage = final.callPackage;
 in {
+  # Ensure pointer-warp protocol is present without pulling extra sources
+  wayland-protocols = prev.wayland-protocols.overrideAttrs (old: {
+    postInstall = (old.postInstall or "") + ''
+      install -Dm644 ${../pkgs/wayland-protocols/pointer-warp-v1.xml} \
+        $out/share/wayland-protocols/staging/pointer-warp/pointer-warp-v1.xml
+    '';
+  });
+
   # Override Hypr components to the nixly forks
   hyprlang = callPackage ../pkgs/hyprlang { };
   hyprcursor = callPackage ../pkgs/hyprcursor { };
