@@ -6,6 +6,7 @@
   pkg-config,
   wayland-scanner,
   wayland-protocols,
+  pugixml,
 }:
 
 stdenv.mkDerivation {
@@ -25,6 +26,7 @@ stdenv.mkDerivation {
   ];
 
   buildInputs = [
+    pugixml
     wayland-protocols
     wayland-scanner
   ];
