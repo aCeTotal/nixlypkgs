@@ -12,7 +12,7 @@ stdenv.mkDerivation (finalAttrs: {
   version = "0.11.0";
 
   src = fetchFromGitHub {
-    owner = "hyprwm";
+    owner = "aCeTotal";
     repo = "hyprutils";
     rev = "fe686486ac867a1a24f99c753bb40ffed338e4b0";
     hash = "sha256-rGbEMhTTyTzw4iyz45lch5kXseqnqcEpmrHdy+zHsfo=";
@@ -32,7 +32,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   meta = {
     description = "Utility library for the Hypr* ecosystem";
-    homepage = "https://github.com/hyprwm/hyprutils";
+    homepage = "https://github.com/aCeTotal/hyprutils";
     license = lib.licenses.bsd3;
     platforms = lib.platforms.linux ++ lib.platforms.freebsd;
   };

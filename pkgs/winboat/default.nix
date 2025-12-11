@@ -15,7 +15,7 @@ stdenv.mkDerivation rec {
   version = "0.8.5";
 
   src = fetchurl {
-    url = "https://github.com/TibixDev/winboat/releases/download/v${version}/winboat-${version}-x64.tar.gz";
+    url = "https://github.com/aCeTotal/winboat/releases/download/v${version}/winboat-${version}-x64.tar.gz";
     # Hash provided in the prompt; ensure it matches the chosen version
     sha256 = "1mvvd6y0wcpqh6wmjzpax7pkdpwcibhb9y7hnrd7x79fr0s5f3mp";
   };
@@ -97,7 +97,7 @@ EOF
     description = "WinBoat - Run Windows apps on Linux with seamless integration";
     license = licenses.mit;
     platforms = [ "x86_64-linux" ];
-    homepage = "https://github.com/TibixDev/winboat";
+    homepage = "https://github.com/aCeTotal/winboat";
     mainProgram = "winboat";
   };
 }
