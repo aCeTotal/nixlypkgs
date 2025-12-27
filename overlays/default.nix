@@ -30,3 +30,4 @@ in {
   winintegration = callPackage ../pkgs/winintegration { };
   winstripping = callPackage ../pkgs/winstripping { };
 }
+
