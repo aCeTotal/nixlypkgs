@@ -1,11 +1,8 @@
-final: prev:
+inputs: final: prev:
 let
-  pkgsUnstable = final.pkgsUnstable;
-in
-prev // {
-  winboat = final.callPackage ../pkgs/winboat {};
-  winstripping = final.callPackage ../pkgs/winstripping {};
+  callPackage = final.callPackage;
+in {
+  winboat = callPackage ../pkgs/winboat { };
+  winintegration = callPackage ../pkgs/winintegration { };
+  winstripping = callPackage ../pkgs/winstripping { };
 }
-
-
-
