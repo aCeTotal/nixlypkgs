@@ -5,4 +5,5 @@ in {
   winboat = callPackage ../pkgs/winboat { };
   winintegration = callPackage ../pkgs/winintegration { };
   winstripping = callPackage ../pkgs/winstripping { };
+  speedtree = callPackage ../pkgs/speedtree { };
 }
