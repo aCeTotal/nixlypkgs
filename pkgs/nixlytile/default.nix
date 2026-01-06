@@ -40,7 +40,7 @@ stdenv.mkDerivation rec {
 src = fetchgit {
   url = "https://github.com/aCeTotal/nixlytile.git";
   rev = "HEAD";
-  sha256 = sha256-T/MiyseHHbNB965GtAJpzmUKlMYytQZgD0tsu7M9NfA=;
+  sha256 = "sha256-T/MiyseHHbNB965GtAJpzmUKlMYytQZgD0tsu7M9NfA=";
 };
 
   nativeBuildInputs = [
