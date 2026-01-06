@@ -37,12 +37,11 @@ stdenv.mkDerivation rec {
   pname = "nixlytile";
   version = "git";
 
-  src = fetchgit {
-    url = "git@github.com:aCeTotal/nixlytile.git";
-    # pin commit når du vil være snill mot cache og fremtiden
-    rev = "HEAD";
-    sha256 = lib.fakeSha256;
-  };
+src = fetchgit {
+  url = "https://github.com/aCeTotal/nixlytile.git";
+  rev = "HEAD";
+  sha256 = lib.fakeSha256;
+};
 
   nativeBuildInputs = [
     pkg-config
