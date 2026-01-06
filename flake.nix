@@ -2,15 +2,6 @@
   description = "nixlypkgs – lightweight nixpkgs-style overlay repo";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  # Sources for the Hyprland fork ("nixly") and its renderer ("nixly_renderer")
-  inputs.hyprland-src = {
-    url = "github:aCeTotal/Hyprland?submodules=1";
-    flake = false;
-  };
-  inputs.aquamarine-src = {
-    url = "github:aCeTotal/aquamarine";
-    flake = false;
-  };
 
   outputs = inputs@{ self, nixpkgs, ... }:
     let
@@ -25,13 +16,12 @@
 
       overlays.default = import ./overlays/default.nix inputs;
 
-      # Expose a nixpkgs-style package set with the overlay applied
       legacyPackages = forAllSystems mkPkgs;
 
       packages = forAllSystems (system:
         let pkgs = self.legacyPackages.${system};
         in {
-          inherit (pkgs) nixly nixly_renderer nixly-hello winboat winintegration winstripping;
+          inherit (pkgs) nixly-hello winstripping speedtree;
           default = pkgs.nixly-hello;
         });
 
@@ -46,7 +36,6 @@
         nixlypkgs = { ... }: {
           nixpkgs.overlays = [ self.overlays.default ];
         };
-        win11vm = import ./modules/home/win11vm.nix;
       };
 
       devShells = forAllSystems (system:
