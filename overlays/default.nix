@@ -6,4 +6,5 @@ in {
   winintegration = callPackage ../pkgs/winintegration { };
   winstripping = callPackage ../pkgs/winstripping { };
   speedtree = callPackage ../pkgs/speedtree { };
+  nixlytile = callPackage ../pkgs/nixlytile { };
 }

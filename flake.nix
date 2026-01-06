@@ -21,7 +21,7 @@
       packages = forAllSystems (system:
         let pkgs = self.legacyPackages.${system};
         in {
-          inherit (pkgs) nixly-hello winstripping speedtree;
+          inherit (pkgs) nixly-hello winstripping speedtree nixlytile;
           default = pkgs.nixly-hello;
         });
 
