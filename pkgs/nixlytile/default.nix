@@ -37,6 +37,8 @@ stdenv.mkDerivation rec {
   pname = "nixlytile";
   version = "git";
 
+  passthru.providedSessions = [ "dwl" ];
+
 src = fetchgit {
   url = "https://github.com/aCeTotal/nixlytile.git";
   rev = "HEAD";
