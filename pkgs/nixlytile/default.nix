@@ -109,10 +109,11 @@ src = fetchgit {
     cat > $out/share/wayland-sessions/dwl.desktop <<EOF
 [Desktop Entry]
 Name=dwl
-Comment=DWM-style Wayland compositor (nixlytile)
-Exec=$out/bin/dwl
+Comment=Wayland compositor for NixlyOS (nixlytile), based on DWM/DWL.
+Exec=dwl
 Type=Application
 DesktopNames=dwl
+X-GDM-SessionRegisters=true
 EOF
 
     wrapProgram $out/bin/dwl \
