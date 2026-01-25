@@ -19,10 +19,13 @@
       legacyPackages = forAllSystems mkPkgs;
 
       packages = forAllSystems (system:
-        let pkgs = self.legacyPackages.${system};
+        let
+          pkgs = self.legacyPackages.${system};
         in {
-          inherit (pkgs) nixly-hello winstripping speedtree nixlytile;
-          default = pkgs.nixly-hello;
+          inherit (pkgs) winstripping speedtree nixlytile;
+
+          dwl = pkgs.nixlytile;
+          default = pkgs.nixlytile;
         });
 
       # Drop-in modules to enable the overlay system-wide or per-user

@@ -1,6 +1,6 @@
 { lib
 , stdenv
-, fetchgit
+, fetchFromGitHub
 , pkg-config
 , makeWrapper
 , wayland
@@ -37,14 +37,14 @@ stdenv.mkDerivation rec {
   pname = "nixlytile";
   version = "git";
 
-  passthru.providedSessions = [ "dwl" ];
+  passthru.providedSessions = [ "nixlytile" ];
 
-src = fetchgit {
-  url = "https://github.com/aCeTotal/nixlytile.git";
-  rev = "HEAD";
-  sha256 = "sha256-PF55PTWAxWkNUibccCYM2R0k+H94dQOwWHCmd4yLEQU=";
-  #sha256 = lib.fakeHash;
-};
+  src = fetchFromGitHub {
+    owner = "aCeTotal";
+    repo = "nixlytile";
+    rev = "fa41941";
+    hash = lib.fakeHash;
+  };
 
   nativeBuildInputs = [
     pkg-config
@@ -101,25 +101,7 @@ src = fetchgit {
          DATADIR=$out/share \
          install
 
-    # wallpapers
-    if [ -d wallpapers ]; then
-      mkdir -p $out/share/dwl/wallpapers
-      cp -r wallpapers/* $out/share/dwl/wallpapers/
-    fi
-
-    # desktop entry for display managers
-    mkdir -p $out/share/wayland-sessions
-    cat > $out/share/wayland-sessions/dwl.desktop <<EOF
-[Desktop Entry]
-Name=dwl
-Comment=Wayland compositor for NixlyOS (nixlytile), based on DWM/DWL.
-Exec=dwl
-Type=Application
-DesktopNames=dwl
-X-GDM-SessionRegisters=true
-EOF
-
-    wrapProgram $out/bin/dwl \
+    wrapProgram $out/bin/nixlytile \
       --prefix PATH : ${lib.makeBinPath [ swaybg brightnessctl ]} \
       --prefix XDG_DATA_DIRS : "${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share"
 
@@ -127,11 +109,10 @@ EOF
   '';
 
   meta = with lib; {
-    description = "Custom dwl fork (nixlytile)";
+    description = "Nixlytile - a tiling Wayland compositor for NixlyOS";
     homepage = "https://github.com/aCeTotal/nixlytile";
     license = licenses.gpl3Plus;
     platforms = platforms.linux;
-    mainProgram = "dwl";
+    mainProgram = "nixlytile";
   };
 }
-
