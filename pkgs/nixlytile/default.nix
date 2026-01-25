@@ -43,7 +43,7 @@ stdenv.mkDerivation rec {
     owner = "aCeTotal";
     repo = "nixlytile";
     rev = "fa41941";
-    hash = "sha256-hrEPsYVSIK4+CQRHlRsVhNk+ARufODiWvLzpenwWAT8=";
+    hash = "sha256-8bfBFRxSW8JXASxG7j2+T0e1RWq3G298oyv/clKSsbI=";
   };
 
   nativeBuildInputs = [
