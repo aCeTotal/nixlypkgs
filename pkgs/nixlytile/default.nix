@@ -26,6 +26,9 @@
 , papirus-icon-theme
 , libpng
 , libjpeg
+, ffmpeg
+, pipewire
+, libass
 , swaybg
 , brightnessctl
 }:
@@ -79,6 +82,9 @@ stdenv.mkDerivation rec {
     papirus-icon-theme
     libpng
     libjpeg
+    ffmpeg
+    pipewire
+    libass
   ];
 
   makeFlags = [
