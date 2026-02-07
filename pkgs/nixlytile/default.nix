@@ -3,7 +3,6 @@
 , fetchFromGitHub
 , pkg-config
 , makeWrapper
-, gawk
 , wayland
 , wayland-scanner
 , wayland-protocols
@@ -29,6 +28,7 @@
 , ffmpeg
 , pipewire
 , libass
+, libva
 , swaybg
 , brightnessctl
 }:
@@ -47,7 +47,7 @@ stdenv.mkDerivation rec {
     owner = "aCeTotal";
     repo = "nixlytile";
     rev = "main";
-    hash = "sha256-RLivDVYUsA+8/SBQSMsHzv5Nbfpx5AgA77SL3TfiiTw=";
+    hash = "sha256-fq2+AcwD/FtCppcyC8RRdg+O3d2r2Ns9yAtcMNcerCM=";
   };
 
   nativeBuildInputs = [
@@ -56,7 +56,6 @@ stdenv.mkDerivation rec {
     wayland-scanner
     wayland-protocols
     makeWrapper
-    gawk
   ];
 
   buildInputs = [
@@ -85,6 +84,7 @@ stdenv.mkDerivation rec {
     ffmpeg
     pipewire
     libass
+    libva
   ];
 
   makeFlags = [
@@ -108,44 +108,6 @@ stdenv.mkDerivation rec {
          MANDIR=$out/share/man \
          DATADIR=$out/share \
          install
-
-    # Generate game_params.conf from game_launch_params.h if it exists
-    if [ -f game_launch_params.h ]; then
-      echo "Generating game_params.conf from game_launch_params.h..."
-      mkdir -p $out/share/nixlytile
-      echo "# Auto-generated from game_launch_params.h" > $out/share/nixlytile/game_params.conf
-      echo "# Format: APPID|nvidia_params|amd_params|amd_amdvlk_params|intel_params" >> $out/share/nixlytile/game_params.conf
-      echo "" >> $out/share/nixlytile/game_params.conf
-
-      ${gawk}/bin/awk '
-        /\.game_id *= *"/ {
-          match($0, /"[^"]+"/);
-          game_id = substr($0, RSTART+1, RLENGTH-2)
-        }
-        /\.nvidia *= *"/ {
-          match($0, /"[^"]*"/);
-          nvidia = substr($0, RSTART+1, RLENGTH-2)
-        }
-        /\.amd *= *"/ && !/\.amd_amdvlk/ {
-          match($0, /"[^"]*"/);
-          amd = substr($0, RSTART+1, RLENGTH-2)
-        }
-        /\.amd_amdvlk *= *"/ {
-          match($0, /"[^"]*"/);
-          amdvlk = substr($0, RSTART+1, RLENGTH-2)
-        }
-        /\.intel *= *"/ {
-          match($0, /"[^"]*"/);
-          intel = substr($0, RSTART+1, RLENGTH-2)
-        }
-        /^\t\},$/ || /^\t\}$/ {
-          if (game_id != "" && game_id !~ /NULL/) {
-            print game_id "|" nvidia "|" amd "|" amdvlk "|" intel
-          }
-          game_id = ""; nvidia = ""; amd = ""; amdvlk = ""; intel = ""
-        }
-      ' game_launch_params.h >> $out/share/nixlytile/game_params.conf
-    fi
 
     wrapProgram $out/bin/nixlytile \
       --prefix PATH : ${lib.makeBinPath [ swaybg brightnessctl ]} \
