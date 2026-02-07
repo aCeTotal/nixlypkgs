@@ -7,4 +7,5 @@ in {
   winstripping = callPackage ../pkgs/winstripping { };
   speedtree = callPackage ../pkgs/speedtree { };
   nixlytile = callPackage ../pkgs/nixlytile { };
+  claude = callPackage ../pkgs/claude { };
 }
