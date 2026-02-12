@@ -22,7 +22,7 @@
         let
           pkgs = self.legacyPackages.${system};
         in {
-          inherit (pkgs) winstripping speedtree nixlytile;
+          inherit (pkgs) winstripping speedtree nixlytile nixlymediaserver;
 
           dwl = pkgs.nixlytile;
           default = pkgs.nixlytile;
@@ -33,6 +33,7 @@
         nixlypkgs = { ... }: {
           nixpkgs.overlays = [ self.overlays.default ];
         };
+        nixlymediaserver = import ./modules/nixlymediaserver.nix;
       };
 
       homeManagerModules = {

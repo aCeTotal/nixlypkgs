@@ -8,4 +8,5 @@ in {
   speedtree = callPackage ../pkgs/speedtree { };
   nixlytile = callPackage ../pkgs/nixlytile { };
   claude = callPackage ../pkgs/claude { };
+  nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
 }
