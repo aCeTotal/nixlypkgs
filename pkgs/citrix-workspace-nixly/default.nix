@@ -259,7 +259,7 @@ stdenv.mkDerivation {
         wrapProgram $out/opt/citrix-icaclient/${program} \
           ${lib.optionalString (icaFlag program != null) ''--add-flags "${icaFlag program} $ICAInstDir"''} \
           --set ICAROOT "$ICAInstDir" \
-          --set GDK_BACKEND "wayland,x11" \
+          --set GDK_BACKEND "x11" \
           --prefix GIO_EXTRA_MODULES : "${glib-networking}/lib/gio/modules" \
           --prefix XDG_DATA_DIRS : "${shared-mime-info}/share" \
           --prefix PATH : "${lib.makeBinPath [ xdg-utils xprop xdpyinfo ]}" \
@@ -394,6 +394,44 @@ stdenv.mkDerivation {
 
       CDMAllowed=True
       WFC
+        fi
+      fi
+
+      # --- Fullscreen & mouse accuracy fixes ---
+      # Disable TWI (Transparent Window Integration) to prevent double windows in fullscreen
+      if [ -f "$ICAInstDir/config/wfclient.ini" ]; then
+        if ! grep -q "TWIMode" "$ICAInstDir/config/wfclient.ini"; then
+          cat >> "$ICAInstDir/config/wfclient.ini" << 'TWI'
+
+      TWIMode=off
+      DesiredHRES=65535
+      DesiredVRES=65535
+      TWI
+        fi
+      fi
+
+      # Enable DPI matching so mouse coordinates align with display scaling
+      if [ -f "$ICAInstDir/config/All_Regions.ini" ]; then
+        if grep -q "\[Virtual Channels\\\\Thinwire Graphics\]" "$ICAInstDir/config/All_Regions.ini"; then
+          sed -i '/\[Virtual Channels\\Thinwire Graphics\]/a DPIMatchingEnabled=True' \
+            "$ICAInstDir/config/All_Regions.ini"
+        else
+          cat >> "$ICAInstDir/config/All_Regions.ini" << 'DPI'
+
+      [Virtual Channels\Thinwire Graphics]
+      DPIMatchingEnabled=True
+      DPI
+        fi
+      fi
+
+      # Set module.ini for proper fullscreen behavior
+      if [ -f "$ICAInstDir/config/module.ini" ]; then
+        if ! grep -q "\[ICA 3.0\]" "$ICAInstDir/config/module.ini"; then
+          cat >> "$ICAInstDir/config/module.ini" << 'ICA30'
+
+      [ICA 3.0]
+      TWIMode=off
+      ICA30
         fi
       fi
 
