@@ -259,7 +259,7 @@ stdenv.mkDerivation {
         wrapProgram $out/opt/citrix-icaclient/${program} \
           ${lib.optionalString (icaFlag program != null) ''--add-flags "${icaFlag program} $ICAInstDir"''} \
           --set ICAROOT "$ICAInstDir" \
-          --set GDK_BACKEND "x11" \
+          --set GDK_BACKEND "wayland" \
           --prefix GIO_EXTRA_MODULES : "${glib-networking}/lib/gio/modules" \
           --prefix XDG_DATA_DIRS : "${shared-mime-info}/share" \
           --prefix PATH : "${lib.makeBinPath [ xdg-utils xprop xdpyinfo ]}" \
@@ -373,6 +373,7 @@ stdenv.mkDerivation {
       update-desktop-database $out/share/applications || true
 
       # --- Client Drive Mapping (CDM) – Linux filesystem access ---
+      # module.ini: load the CDM virtual-channel driver
       if [ -f "$ICAInstDir/config/module.ini" ]; then
         if grep -q "\[ClientDrive\]" "$ICAInstDir/config/module.ini"; then
           sed -i '/\[ClientDrive\]/,/^\[/ {
@@ -382,26 +383,25 @@ stdenv.mkDerivation {
           cat >> "$ICAInstDir/config/module.ini" << 'CDM'
 
       [ClientDrive]
+      DriverName=VDCDM.DLL
       CDMAllowed=True
       CDM
         fi
       fi
 
-      # Map user home as drive H: in Citrix sessions
+      # wfclient.ini: inject drive mappings into the [WFClient] section
       if [ -f "$ICAInstDir/config/wfclient.ini" ]; then
         if ! grep -q "CDMAllowed" "$ICAInstDir/config/wfclient.ini"; then
-          cat >> "$ICAInstDir/config/wfclient.ini" << 'WFC'
-
-      CDMAllowed=True
-      DriveEnabledA=True
-      DrivePathA=/
-      DriveReadAccessA=3
-      DriveWriteAccessA=3
-      DriveEnabledH=True
-      DrivePathH=$HOME/
-      DriveReadAccessH=3
-      DriveWriteAccessH=3
-      WFC
+          sed -i '/^\[WFClient\]/a\
+CDMAllowed=True\
+DriveEnabledA=True\
+DrivePathA=\/\
+DriveReadAccessA=3\
+DriveWriteAccessA=3\
+DriveEnabledH=True\
+DrivePathH=$HOME\/\
+DriveReadAccessH=3\
+DriveWriteAccessH=3' "$ICAInstDir/config/wfclient.ini"
         fi
       fi
 
@@ -415,17 +415,33 @@ stdenv.mkDerivation {
         fi
       fi
 
-      # Thinwire Graphics – basic settings in All_Regions.ini
+      # Seamless Windows, CDM & Thinwire Graphics – All_Regions.ini
       if [ -f "$ICAInstDir/config/All_Regions.ini" ]; then
+        if ! grep -q "\[Virtual Channels\\\\Seamless Windows\]" "$ICAInstDir/config/All_Regions.ini"; then
+          cat >> "$ICAInstDir/config/All_Regions.ini" << 'SEAMLESS'
+
+      [Virtual Channels\Seamless Windows]
+      TWIMode=0
+      SEAMLESS
+        fi
+
+        if ! grep -q "\[Virtual Channels\\\\Client Drive Mapping\]" "$ICAInstDir/config/All_Regions.ini"; then
+          cat >> "$ICAInstDir/config/All_Regions.ini" << 'CDMREG'
+
+      [Virtual Channels\Client Drive Mapping]
+      CDMAllowed=True
+      CDMREG
+        fi
+
         if ! grep -q "\[Virtual Channels\\\\Thinwire Graphics\]" "$ICAInstDir/config/All_Regions.ini"; then
           cat >> "$ICAInstDir/config/All_Regions.ini" << 'TWGFX'
 
       [Virtual Channels\Thinwire Graphics]
-      DesiredColor=8
+      DesiredColor=*
       ApproximateColors=*
-      DesiredHRES=1024
-      DesiredVRES=768
-      ScreenPercent=*
+      DesiredHRES=*
+      DesiredVRES=*
+      ScreenPercent=0
       UseFullScreen=false
       TWIFullScreenMode=false
       NoWindowManager=false
