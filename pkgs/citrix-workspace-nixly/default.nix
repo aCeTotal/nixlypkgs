@@ -417,10 +417,7 @@ stdenv.mkDerivation {
 
       # Thinwire Graphics – basic settings in All_Regions.ini
       if [ -f "$ICAInstDir/config/All_Regions.ini" ]; then
-        if grep -q "\[Virtual Channels\\\\Thinwire Graphics\]" "$ICAInstDir/config/All_Regions.ini"; then
-          sed -i '/\[Virtual Channels\\Thinwire Graphics\]/a DesiredColor=8\nApproximateColors=*\nDesiredHRES=1024\nDesiredVRES=768\nScreenPercent=*\nUseFullScreen=false\nTWIFullScreenMode=false\nNoWindowManager=false' \
-            "$ICAInstDir/config/All_Regions.ini"
-        else
+        if ! grep -q "\[Virtual Channels\\\\Thinwire Graphics\]" "$ICAInstDir/config/All_Regions.ini"; then
           cat >> "$ICAInstDir/config/All_Regions.ini" << 'TWGFX'
 
       [Virtual Channels\Thinwire Graphics]
