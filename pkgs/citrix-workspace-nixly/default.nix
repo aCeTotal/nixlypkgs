@@ -413,8 +413,13 @@ stdenv.mkDerivation {
       # Enable DPI matching so mouse coordinates align with display scaling
       if [ -f "$ICAInstDir/config/All_Regions.ini" ]; then
         if grep -q "\[Virtual Channels\\\\Thinwire Graphics\]" "$ICAInstDir/config/All_Regions.ini"; then
-          sed -i '/\[Virtual Channels\\Thinwire Graphics\]/a DPIMatchingEnabled=True' \
-            "$ICAInstDir/config/All_Regions.ini"
+          if grep -q "DPIMatchingEnabled" "$ICAInstDir/config/All_Regions.ini"; then
+            sed -i 's/^DPIMatchingEnabled=.*/DPIMatchingEnabled=True/' \
+              "$ICAInstDir/config/All_Regions.ini"
+          else
+            sed -i '/\[Virtual Channels\\Thinwire Graphics\]/a DPIMatchingEnabled=True' \
+              "$ICAInstDir/config/All_Regions.ini"
+          fi
         else
           cat >> "$ICAInstDir/config/All_Regions.ini" << 'DPI'
 
