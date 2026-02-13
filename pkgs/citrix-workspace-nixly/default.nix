@@ -373,6 +373,9 @@ stdenv.mkDerivation {
       update-desktop-database $out/share/applications || true
 
       # --- Client Drive Mapping (CDM) – Linux filesystem access ---
+      # Make config files writable before modifying them
+      chmod -R u+w "$ICAInstDir/config/" || true
+
       # module.ini: load the CDM virtual-channel driver
       if [ -f "$ICAInstDir/config/module.ini" ]; then
         if grep -q "\[ClientDrive\]" "$ICAInstDir/config/module.ini"; then
@@ -392,16 +395,7 @@ stdenv.mkDerivation {
       # wfclient.ini: inject drive mappings into the [WFClient] section
       if [ -f "$ICAInstDir/config/wfclient.ini" ]; then
         if ! grep -q "CDMAllowed" "$ICAInstDir/config/wfclient.ini"; then
-          sed -i '/^\[WFClient\]/a\
-CDMAllowed=True\
-DriveEnabledA=True\
-DrivePathA=\/\
-DriveReadAccessA=3\
-DriveWriteAccessA=3\
-DriveEnabledH=True\
-DrivePathH=$HOME\/\
-DriveReadAccessH=3\
-DriveWriteAccessH=3' "$ICAInstDir/config/wfclient.ini"
+          sed -i '/^\[WFClient\]/a\CDMAllowed=True\nDriveEnabledA=True\nDrivePathA=\\/\nDriveReadAccessA=3\nDriveWriteAccessA=3\nDriveEnabledH=True\nDrivePathH=$HOME\\/\nDriveReadAccessH=3\nDriveWriteAccessH=3' "$ICAInstDir/config/wfclient.ini"
         fi
       fi
 
