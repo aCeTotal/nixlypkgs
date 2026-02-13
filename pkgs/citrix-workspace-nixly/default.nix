@@ -346,14 +346,29 @@ stdenv.mkDerivation {
       </mime-info>
       MIME
 
-      # --- Desktop files with MIME association ---
-      cp $ICAInstDir/desktop/* $out/share/applications/
+      # --- Desktop files ---
+      cp $ICAInstDir/desktop/* $out/share/applications/ || true
+
+      # Create a dedicated wfica desktop file that handles .ica files
+      cat > $out/share/applications/wfica.desktop << DESKTOP
+      [Desktop Entry]
+      Name=Citrix Workspace
+      Comment=Launch Citrix ICA sessions
+      Exec=$out/bin/wfica %f
+      Terminal=false
+      Type=Application
+      MimeType=application/x-ica;
+      Categories=Network;
+      Icon=$ICAInstDir/icons/000_Internal-Receiver.png
+      StartupNotify=true
+      DESKTOP
+
+      # Remove MimeType from selfservice desktop to avoid it hijacking .ica files
       for f in $out/share/applications/*.desktop; do
-        if ! grep -q "^MimeType=" "$f"; then
-          echo "MimeType=application/x-ica;" >> "$f"
-        elif ! grep -q "application/x-ica" "$f"; then
-          sed -i 's/^MimeType=.*/&application\/x-ica;/' "$f"
-        fi
+        case "$(basename "$f")" in
+          wfica.desktop) ;; # skip, we just created it
+          *) sed -i '/^MimeType=.*application\/x-ica/d' "$f" ;;
+        esac
       done
       update-desktop-database $out/share/applications || true
 
