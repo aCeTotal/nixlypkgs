@@ -387,30 +387,30 @@ stdenv.mkDerivation {
         fi
       fi
 
-      # Map user home as a drive in Citrix sessions
+      # Map user home as drive H: in Citrix sessions
       if [ -f "$ICAInstDir/config/wfclient.ini" ]; then
         if ! grep -q "CDMAllowed" "$ICAInstDir/config/wfclient.ini"; then
           cat >> "$ICAInstDir/config/wfclient.ini" << 'WFC'
 
       CDMAllowed=True
+      DriveEnabledA=True
+      DrivePathA=/
+      DriveReadAccessA=3
+      DriveWriteAccessA=3
+      DriveEnabledH=True
+      DrivePathH=$HOME/
+      DriveReadAccessH=3
+      DriveWriteAccessH=3
       WFC
         fi
       fi
 
-      # --- Basic graphics mode – 8-bit color, 1024x768, no TWI ---
+      # --- Disable TWI (graphics settings live in All_Regions.ini) ---
       if [ -f "$ICAInstDir/config/wfclient.ini" ]; then
         if ! grep -q "TWIMode" "$ICAInstDir/config/wfclient.ini"; then
           cat >> "$ICAInstDir/config/wfclient.ini" << 'BASIC'
 
       TWIMode=0
-      DesiredHRES=1024
-      DesiredVRES=768
-      DesiredColor=8
-      ApproximateColors=*
-      ScreenPercent=*
-      UseFullScreen=false
-      TWIFullScreenMode=false
-      NoWindowManager=false
       BASIC
         fi
       fi
