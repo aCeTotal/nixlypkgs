@@ -397,45 +397,52 @@ stdenv.mkDerivation {
         fi
       fi
 
-      # --- Fullscreen & mouse accuracy fixes ---
-      # Disable TWI (Transparent Window Integration) to prevent double windows in fullscreen
+      # --- Basic graphics mode – 8-bit color, 1024x768, no TWI ---
       if [ -f "$ICAInstDir/config/wfclient.ini" ]; then
         if ! grep -q "TWIMode" "$ICAInstDir/config/wfclient.ini"; then
-          cat >> "$ICAInstDir/config/wfclient.ini" << 'TWI'
+          cat >> "$ICAInstDir/config/wfclient.ini" << 'BASIC'
 
-      TWIMode=off
-      DesiredHRES=65535
-      DesiredVRES=65535
-      TWI
+      TWIMode=0
+      DesiredHRES=1024
+      DesiredVRES=768
+      DesiredColor=8
+      ApproximateColors=*
+      ScreenPercent=*
+      UseFullScreen=false
+      TWIFullScreenMode=false
+      NoWindowManager=false
+      BASIC
         fi
       fi
 
-      # Enable DPI matching so mouse coordinates align with display scaling
+      # Thinwire Graphics – basic settings in All_Regions.ini
       if [ -f "$ICAInstDir/config/All_Regions.ini" ]; then
         if grep -q "\[Virtual Channels\\\\Thinwire Graphics\]" "$ICAInstDir/config/All_Regions.ini"; then
-          if grep -q "DPIMatchingEnabled" "$ICAInstDir/config/All_Regions.ini"; then
-            sed -i 's/^DPIMatchingEnabled=.*/DPIMatchingEnabled=True/' \
-              "$ICAInstDir/config/All_Regions.ini"
-          else
-            sed -i '/\[Virtual Channels\\Thinwire Graphics\]/a DPIMatchingEnabled=True' \
-              "$ICAInstDir/config/All_Regions.ini"
-          fi
+          sed -i '/\[Virtual Channels\\Thinwire Graphics\]/a DesiredColor=8\nApproximateColors=*\nDesiredHRES=1024\nDesiredVRES=768\nScreenPercent=*\nUseFullScreen=false\nTWIFullScreenMode=false\nNoWindowManager=false' \
+            "$ICAInstDir/config/All_Regions.ini"
         else
-          cat >> "$ICAInstDir/config/All_Regions.ini" << 'DPI'
+          cat >> "$ICAInstDir/config/All_Regions.ini" << 'TWGFX'
 
       [Virtual Channels\Thinwire Graphics]
-      DPIMatchingEnabled=True
-      DPI
+      DesiredColor=8
+      ApproximateColors=*
+      DesiredHRES=1024
+      DesiredVRES=768
+      ScreenPercent=*
+      UseFullScreen=false
+      TWIFullScreenMode=false
+      NoWindowManager=false
+      TWGFX
         fi
       fi
 
-      # Set module.ini for proper fullscreen behavior
+      # module.ini – disable TWI
       if [ -f "$ICAInstDir/config/module.ini" ]; then
         if ! grep -q "\[ICA 3.0\]" "$ICAInstDir/config/module.ini"; then
           cat >> "$ICAInstDir/config/module.ini" << 'ICA30'
 
       [ICA 3.0]
-      TWIMode=off
+      TWIMode=0
       ICA30
         fi
       fi
