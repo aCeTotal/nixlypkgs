@@ -9,4 +9,5 @@ in {
   nixlytile = callPackage ../pkgs/nixlytile { };
   claude = callPackage ../pkgs/claude { };
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
+  citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };
 }
