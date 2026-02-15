@@ -180,6 +180,7 @@ in
       description = "Nixly Media Server";
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
+      path = [ pkgs.ffmpeg-headless ];
 
       serviceConfig = {
         Type = "simple";
