@@ -46,8 +46,8 @@ stdenv.mkDerivation rec {
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "74a611633cdf4d94aa5e3ceb1c7ad6efa5dadfb3";
-    hash = "sha256-eU29o8dyL1Byyi/ooUXY77gqhQHVrv9grJxoaVWn6iY=";
+    rev = "ebdd2fce35b2eabf64923a2de2e709f3fe178070";
+    hash = "sha256-q+eRSXo/wRkW8PIz4XKDgni+6aPv8j5vpx6fAhWYmcQ=";
   };
 
   nativeBuildInputs = [
