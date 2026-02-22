@@ -15,8 +15,8 @@ stdenv.mkDerivation rec {
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "5af6d51f4f81efa9439da6132e8f6f1c95e5c890";
-    hash = "sha256-er3dIw25tEQMdjZPSUMb833zqTWdUBe4mNC+kt9+E3M=";
+    rev = "bd979c05c94e52ed3299edaba2f93ade50b5139a";
+    hash = "sha256-D7fXVbJN2BPJvuinCLZgY8w+BaMaPk5hgHf23ejkQSg=";
   };
 
   sourceRoot = "${src.name}/Server";
