@@ -10,4 +10,5 @@ in {
   claude = callPackage ../pkgs/claude { };
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };
+  nixly_steam = callPackage ../pkgs/nixly_steam { };
 }
