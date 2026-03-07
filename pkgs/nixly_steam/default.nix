@@ -11,7 +11,7 @@
 let
   configureProton = writeScript "nixly-steam-configure-proton" ''
     #!${python3}/bin/python3
-    """Auto-configure Proton Experimental (Bleeding Edge) for Steam."""
+    """Auto-configure Nixly_Proton as default Proton for Steam."""
     import os, re, sys, shutil
 
     def find_config():
@@ -93,23 +93,15 @@ let
         changed = False
         steam_cfg = ensure(data, ["InstallConfigStore", "Software", "Valve", "Steam"])
 
-        # Global default: Proton Experimental
+        # Global default: Nixly_Proton
         compat = ensure(steam_cfg, ["CompatToolMapping"])
         if "0" not in compat or not isinstance(compat.get("0"), dict):
             compat["0"] = {}
         entry = compat["0"]
-        if entry.get("name") != "proton_experimental":
-            entry["name"] = "proton_experimental"
+        if entry.get("name") != "Nixly_Proton":
+            entry["name"] = "Nixly_Proton"
             entry["config"] = ""
             entry["priority"] = "250"
-            changed = True
-
-        # Proton Experimental (appid 1493710) -> bleeding_edge beta
-        apps = ensure(steam_cfg, ["Apps"])
-        if "1493710" not in apps or not isinstance(apps.get("1493710"), dict):
-            apps["1493710"] = {}
-        if apps["1493710"].get("BetaKey") != "bleeding_edge":
-            apps["1493710"]["BetaKey"] = "bleeding_edge"
             changed = True
 
         # Shader Pre-Caching & background Vulkan shader processing
@@ -125,7 +117,7 @@ let
             with open(path, "w") as f:
                 f.write(dump(data))
                 f.write("\n")
-            print("[nixly_steam] Proton Experimental (Bleeding Edge) + Shader Pre-Caching configured.", file=sys.stderr)
+            print("[nixly_steam] Nixly_Proton + Shader Pre-Caching configured.", file=sys.stderr)
 
     if __name__ == "__main__":
         main()
@@ -161,7 +153,7 @@ LAUNCHER
     cat > $out/share/applications/nixly_steam.desktop << EOF
 [Desktop Entry]
 Name=Steam
-Comment=Steam with Proton Experimental (Bleeding Edge) and Shader Pre-Caching
+Comment=Steam with Nixly_Proton and Shader Pre-Caching
 Exec=$out/bin/nixly_steam %U
 Icon=steam
 Terminal=false
@@ -181,13 +173,12 @@ EOF
   '';
 
   meta = {
-    description = "Steam with Proton Experimental (Bleeding Edge) and Shader Pre-Caching auto-configured";
+    description = "Steam with Nixly_Proton and Shader Pre-Caching auto-configured";
     longDescription = ''
-      Steam wrapped with automatic Proton Experimental (Bleeding Edge)
-      configuration. On each launch, the wrapper ensures that Proton
-      Experimental is set as the global default compatibility tool,
-      the Bleeding Edge beta branch is selected, Shader Pre-Caching
-      is enabled, and background processing of Vulkan shaders is on.
+      Steam wrapped with automatic Nixly_Proton configuration. On each
+      launch, the wrapper ensures that Nixly_Proton is set as the global
+      default compatibility tool, Shader Pre-Caching is enabled, and
+      background processing of Vulkan shaders is on.
 
       Requires programs.steam.enable = true in your NixOS configuration.
     '';
