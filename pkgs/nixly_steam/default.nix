@@ -82,7 +82,7 @@ let
         if path is None:
             print(
                 "[nixly_steam] Steam config not found. "
-                "Proton will be configured after first Steam launch.",
+                "Settings will be configured after first Steam launch.",
                 file=sys.stderr,
             )
             return
@@ -112,6 +112,12 @@ let
             apps["1493710"]["BetaKey"] = "bleeding_edge"
             changed = True
 
+        # Shader Pre-Caching & background Vulkan shader processing
+        shader = ensure(steam_cfg, ["ShaderCacheManager"])
+        if shader.get("EnableShaderBackgroundProcessing") != "1":
+            shader["EnableShaderBackgroundProcessing"] = "1"
+            changed = True
+
         if changed:
             backup = path + ".nixly_backup"
             if not os.path.exists(backup):
@@ -119,7 +125,7 @@ let
             with open(path, "w") as f:
                 f.write(dump(data))
                 f.write("\n")
-            print("[nixly_steam] Proton Experimental (Bleeding Edge) configured.", file=sys.stderr)
+            print("[nixly_steam] Proton Experimental (Bleeding Edge) + Shader Pre-Caching configured.", file=sys.stderr)
 
     if __name__ == "__main__":
         main()
@@ -154,8 +160,8 @@ LAUNCHER
 
     cat > $out/share/applications/nixly_steam.desktop << EOF
 [Desktop Entry]
-Name=nixly_steam
-Comment=Steam with Proton Experimental (Bleeding Edge)
+Name=Steam
+Comment=Steam with Proton Experimental (Bleeding Edge) and Shader Pre-Caching
 Exec=$out/bin/nixly_steam %U
 Icon=steam
 Terminal=false
@@ -175,12 +181,13 @@ EOF
   '';
 
   meta = {
-    description = "Steam with Proton Experimental (Bleeding Edge) auto-configured";
+    description = "Steam with Proton Experimental (Bleeding Edge) and Shader Pre-Caching auto-configured";
     longDescription = ''
       Steam wrapped with automatic Proton Experimental (Bleeding Edge)
       configuration. On each launch, the wrapper ensures that Proton
-      Experimental is set as the global default compatibility tool and
-      that the Bleeding Edge beta branch is selected.
+      Experimental is set as the global default compatibility tool,
+      the Bleeding Edge beta branch is selected, Shader Pre-Caching
+      is enabled, and background processing of Vulkan shaders is on.
 
       Requires programs.steam.enable = true in your NixOS configuration.
     '';
