@@ -12,6 +12,7 @@
   libX11,
   x11Support ? !stdenv.hostPlatform.isDarwin,
   nvidiaSupport ? true,
+  addDriverRunpath,
   testers,
 }:
 
@@ -53,6 +54,7 @@ stdenv.mkDerivation (finalAttrs: {
     pkg-config
     util-macros
     python3
+    addDriverRunpath
   ];
 
   propagatedBuildInputs =
@@ -76,6 +78,12 @@ stdenv.mkDerivation (finalAttrs: {
   env.NIX_CFLAGS_COMPILE = lib.optionalString (
     x11Support && !stdenv.hostPlatform.isDarwin
   ) ''-DLIBGL_PATH="${lib.getLib (if nvidiaSupport then libglvnd else libGL)}/lib"'';
+
+  postFixup = ''
+    addDriverRunpath $out/lib/libepoxy.so.0
+  '' + lib.optionalString (x11Support && nvidiaSupport && !stdenv.hostPlatform.isDarwin) ''
+    patchelf --add-rpath "${lib.getLib libglvnd}/lib" $out/lib/libepoxy.so.0
+  '';
 
   doCheck = true;
 
