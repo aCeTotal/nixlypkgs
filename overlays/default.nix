@@ -11,4 +11,6 @@ in {
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };
   nixly_steam = callPackage ../pkgs/nixly_steam { };
+  libepoxy = callPackage ../pkgs/libepoxy { };
+  xwayland = callPackage ../pkgs/xwayland { inherit (final) libepoxy; };
 }
