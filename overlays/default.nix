@@ -6,7 +6,7 @@ in {
   winintegration = callPackage ../pkgs/winintegration { };
   winstripping = callPackage ../pkgs/winstripping { };
   speedtree = callPackage ../pkgs/speedtree { };
-  nixlytile = callPackage ../pkgs/nixlytile { };
+  nixlytile = callPackage ../pkgs/nixlytile { libepoxy = final.libepoxy-nixly; };
   claude = callPackage ../pkgs/claude { };
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };

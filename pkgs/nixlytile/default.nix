@@ -4,10 +4,11 @@
 , pkg-config
 , makeWrapper
 , autoPatchelfHook
+, meson
+, ninja
 , wayland
 , wayland-scanner
 , wayland-protocols
-, wlroots
 , libinput
 , libxkbcommon
 , fcft
@@ -17,13 +18,23 @@
 , systemd
 , xwayland
 , seatd
-, xorg
+, libxcb
+, libxcb-wm
+, libepoxy
+, libglvnd
+, libgbm
+, hwdata
+, libliftoff
+, libdisplay-info
+, lcms2
+, libxcb-errors
 , cairo
 , librsvg
 , gdk-pixbuf
 , hicolor-icon-theme
 , adwaita-icon-theme
 , papirus-icon-theme
+, shared-mime-info
 , libpng
 , libjpeg
 , ffmpeg
@@ -38,21 +49,43 @@
 }:
 
 let
-  wlrootsPc = "wlroots-${lib.versions.majorMinor wlroots.version}";
+  nixlytileSrc = fetchFromGitHub {
+    owner = "aCeTotal";
+    repo = "nixlytile";
+    # TODO: update rev + hash after committing wlroots into the repo
+    rev = "35638ba902b237287b18bef1a5eccb8e28fcf4ab";
+    hash = "sha256-MkdUHKHYc/Y4BjtjipSATYRZRDVGqmconQDkPyoztco=";
+  };
+
+  wlrootsLocal = stdenv.mkDerivation {
+    pname = "wlroots";
+    version = "0.20.0-rc4";
+    src = nixlytileSrc + "/wlroots";
+    nativeBuildInputs = [ meson ninja pkg-config wayland-scanner ];
+    buildInputs = [
+      wayland wayland-protocols libdrm libxkbcommon pixman libinput
+      xwayland seatd libepoxy libglvnd libxcb libxcb-wm
+      libgbm hwdata libliftoff libdisplay-info lcms2 libxcb-errors
+    ];
+    mesonFlags = [
+      "-Dexamples=false"
+      "-Dxwayland=enabled"
+      "-Dbackends=drm,libinput"
+      "-Drenderers=gles2"
+      "-Dallocators=gbm"
+    ];
+  };
+
+  wlrootsPc = "wlroots-0.20";
 in
 
-stdenv.mkDerivation rec {
+stdenv.mkDerivation {
   pname = "nixlytile";
   version = "git";
 
   passthru.providedSessions = [ "nixlytile" ];
 
-  src = fetchFromGitHub {
-    owner = "aCeTotal";
-    repo = "nixlytile";
-    rev = "35f383a7d1bcfa79581912260beffa65aa9794e0";
-    hash = "sha256-2NHS+YTbGx3dx+gLNdA8By1Sxq6cZbmZttk+sLsQlco=";
-  };
+  src = nixlytileSrc;
 
   nativeBuildInputs = [
     pkg-config
@@ -65,7 +98,7 @@ stdenv.mkDerivation rec {
 
   buildInputs = [
     wayland
-    wlroots
+    wlrootsLocal
     libinput
     libxkbcommon
     fcft
@@ -74,9 +107,10 @@ stdenv.mkDerivation rec {
     libdrm
     systemd
     xwayland
-    xorg.libxcb
-    xorg.xcbutilwm
-    seatd
+    libxcb
+    libxcb-wm
+    libepoxy
+    libglvnd
 
     cairo
     librsvg
@@ -119,8 +153,8 @@ stdenv.mkDerivation rec {
 
     wrapProgram $out/bin/nixlytile \
       --prefix PATH : ${lib.makeBinPath [ swaybg brightnessctl xwayland ]} \
-      --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ mesa mesa.drivers libGL vulkan-loader ]}" \
-      --prefix XDG_DATA_DIRS : "${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share"
+      --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ mesa libGL vulkan-loader ]}" \
+      --prefix XDG_DATA_DIRS : "${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share:${shared-mime-info}/share"
 
     runHook postInstall
   '';
