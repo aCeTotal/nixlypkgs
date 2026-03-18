@@ -1,0 +1,98 @@
+warning: Git tree '/home/total/.nixlyos' is dirty
+building the system configuration...
+warning: Git tree '/home/total/.nixlyos' is dirty
+these 24 derivations will be built:
+  /nix/store/693priravrmlgymcqgh71a3yg6qb7z23-nixlytile-git.drv
+  /nix/store/dwzsbsipsgkh8vjms8sccd6sq9vs8pz9-nixlytile-launcher.drv
+  /nix/store/gcq68x0sq81xsawljmxs95yxf3fvqp5q-nixlytile-session.drv
+  /nix/store/ylk6lzankdm6p4vl5glxprk1zypd8car-system-path.drv
+  /nix/store/236x8v41w3j8d59fviimjh4yfa13ifyc-dbus-1.drv
+  /nix/store/3ywrjk8k8mbwzindhkqknkq9hrmbnv48-ensure-all-wrappers-paths-exist.drv
+  /nix/store/3g1z990x9wb69p1l9dwinl1ga3iw6gxn-desktops.drv
+  /nix/store/8gi92nkg75ch962s26gal3p3v6y88il0-config.ini.drv
+  /nix/store/ni8qpzvza3vlnjh9wypw1nzqnj8kbcl7-set-environment.drv
+  /nix/store/hd3p7h0im1ays3k5cmk2pyxa8rfc0qg7-etc-profile.drv
+  /nix/store/vv4x3d5riwpldw943q4rv8m34a90z17s-X-Restart-Triggers-dbus.drv
+  /nix/store/v4qqswkd3xkc6k8l2s0rk6imgmics5l8-unit-dbus.service.drv
+  /nix/store/rivw6pk88l1fl3ifhn6sf8rgcxykhvqj-user-units.drv
+  /nix/store/syq6zds2rgkpwa0x26q4l8jin0c2sx62-etc-pam-environment.drv
+  /nix/store/73346yj0mnlq2pi5p32g82511x21nyig-X-Restart-Triggers-polkit.drv
+  /nix/store/cir1g4lcq4x1x03f54f6czd04hj2rb5n-unit-polkit.service.drv
+  /nix/store/93qi634ssc8ifd2613d08i3qwwbs3s6s-security-wrapper-.nixlytile-wrapped-x86_64-unknown-linux-musl.drv
+  /nix/store/blsyxka77qkczxliancsz8kddmhrsgfx-unit-script-suid-sgid-wrappers-start.drv
+  /nix/store/sf5qnzsy1cdqg7q79gkzivfs79hhz5g6-unit-suid-sgid-wrappers.service.drv
+  /nix/store/srks0r8cbs79km28yldlbara3d5yayr3-unit-dbus.service.drv
+  /nix/store/vda4zs57a0qhvpi69c8zrcf6ch7pr9f7-system-units.drv
+  /nix/store/v5qk6a7ssfpvy8xfwa2h91kx04pnf9gb-etc.drv
+  /nix/store/wg5zhflxwd8w9vq8bgdxy79s56l127gd-activate.drv
+  /nix/store/2qd9pdrcx53718gmmgjj44mqyhpx61kf-nixos-system-nixlytest-26.05.20260317.cda4854.drv
+building '/nix/store/693priravrmlgymcqgh71a3yg6qb7z23-nixlytile-git.drv'...
+error: Cannot build '/nix/store/693priravrmlgymcqgh71a3yg6qb7z23-nixlytile-git.drv'.
+       Reason: builder failed with exit code 1.
+       Output paths:
+         /nix/store/4v2s0df75vp0xzf8wfzhpbhsc02a2094-nixlytile-git
+       Last 25 log lines:
+       >     libdrm.so.2 -> found: /nix/store/z7xv3cj72mhagg6wri2slmxqh213fwbr-libdrm-2.4.131/lib
+       >     libxcb-icccm.so.4 -> found: /nix/store/b1hrry92mp8x0ybvgydcsrcxkr1ps91i-libxcb-wm-0.4.2/lib
+       >     libxcb.so.1 -> found: /nix/store/m5z0dbcz2y7r0f3rill6z02msz9b46if-libxcb-1.17.0/lib
+       >     libfcft.so.4 -> found: /nix/store/77lqmpvbra5f5g2bpzf7pkha1zinvhl0-fcft-3.3.3/lib
+       >     libpixman-1.so.0 -> found: /nix/store/s60msvirzaknyjgpsc8yyld1qg5i3hn5-pixman-0.46.4/lib
+       >     libsystemd.so.0 -> found: /nix/store/1mv4y8dsjsb0bw2rs7c2xpaxp5sdz282-systemd-minimal-libs-259/lib
+       >     librsvg-2.so.2 -> found: /nix/store/6r0krhrml6hz987s40kbqczq5923i7ix-librsvg-2.61.3/lib
+       >     libgio-2.0.so.0 -> found: /nix/store/1qm74vf93ik1xjrr9kl6qvjrklljlcqh-glib-2.86.3/lib
+       >     libgdk_pixbuf-2.0.so.0 -> found: /nix/store/f8f11x06gi8ycykwb2yyhv5jgjj5b8fv-gdk-pixbuf-2.44.5/lib
+       >     libgobject-2.0.so.0 -> found: /nix/store/1qm74vf93ik1xjrr9kl6qvjrklljlcqh-glib-2.86.3/lib
+       >     libglib-2.0.so.0 -> found: /nix/store/1qm74vf93ik1xjrr9kl6qvjrklljlcqh-glib-2.86.3/lib
+       >     libcairo.so.2 -> found: /nix/store/zjarzxjwirqym8wasmzgvqjvvp3bbwr9-cairo-1.18.4/lib
+       >     libavformat.so.62 -> found: /nix/store/8x2msxrm9yb8ycz9pi1pi8wz5zs9gy64-ffmpeg-8.0.1-lib/lib
+       >     libavcodec.so.62 -> found: /nix/store/8x2msxrm9yb8ycz9pi1pi8wz5zs9gy64-ffmpeg-8.0.1-lib/lib
+       >     libavutil.so.60 -> found: /nix/store/8x2msxrm9yb8ycz9pi1pi8wz5zs9gy64-ffmpeg-8.0.1-lib/lib
+       >     libswscale.so.9 -> found: /nix/store/8x2msxrm9yb8ycz9pi1pi8wz5zs9gy64-ffmpeg-8.0.1-lib/lib
+       >     libswresample.so.6 -> found: /nix/store/8x2msxrm9yb8ycz9pi1pi8wz5zs9gy64-ffmpeg-8.0.1-lib/lib
+       >     libpipewire-0.3.so.0 -> found: /nix/store/fcqhn9m2sih0rmhw1j1ffxrkl8vw7248-pipewire-1.4.10/lib
+       >     libass.so.9 -> found: /nix/store/cqw1xi44jblr3kql44ak1ipsvzasqdyk-libass-0.17.4/lib
+       >     libwlroots-0.19.so -> not found!
+       > setting RPATH to: /nix/store/jcc9imfj4samq59gwsskxalcd9rjicip-wayland-1.24.0/lib:/nix/store/k1gvr4prs9736r1lhqyy1plxrrvv9b4m-libxkbcommon-1.11.0/lib:/nix/store/1rsgf5h37ivryg00k3qnw5achbbpb57k-libinput-1.29.2/lib:/nix/store/z7xv3cj72mhagg6wri2slmxqh213fwbr-libdrm-2.4.131/lib:/nix/store/b1hrry92mp8x0ybvgydcsrcxkr1ps91i-libxcb-wm-0.4.2/lib:/nix/store/m5z0dbcz2y7r0f3rill6z02msz9b46if-libxcb-1.17.0/lib:/nix/store/77lqmpvbra5f5g2bpzf7pkha1zinvhl0-fcft-3.3.3/lib:/nix/store/s60msvirzaknyjgpsc8yyld1qg5i3hn5-pixman-0.46.4/lib:/nix/store/1mv4y8dsjsb0bw2rs7c2xpaxp5sdz282-systemd-minimal-libs-259/lib:/nix/store/6r0krhrml6hz987s40kbqczq5923i7ix-librsvg-2.61.3/lib:/nix/store/1qm74vf93ik1xjrr9kl6qvjrklljlcqh-glib-2.86.3/lib:/nix/store/f8f11x06gi8ycykwb2yyhv5jgjj5b8fv-gdk-pixbuf-2.44.5/lib:/nix/store/zjarzxjwirqym8wasmzgvqjvvp3bbwr9-cairo-1.18.4/lib:/nix/store/8x2msxrm9yb8ycz9pi1pi8wz5zs9gy64-ffmpeg-8.0.1-lib/lib:/nix/store/fcqhn9m2sih0rmhw1j1ffxrkl8vw7248-pipewire-1.4.10/lib:/nix/store/cqw1xi44jblr3kql44ak1ipsvzasqdyk-libass-0.17.4/lib
+       > auto-patchelf: 1 dependencies could not be satisfied
+       > error: auto-patchelf could not satisfy dependency libwlroots-0.19.so wanted by /nix/store/4v2s0df75vp0xzf8wfzhpbhsc02a2094-nixlytile-git/bin/.nixlytile-wrapped
+       > auto-patchelf failed to find all the required dependencies.
+       > Add the missing dependencies to --libs or use `--ignore-missing="foo.so.1 bar.so etc.so"`.
+       For full logs, run:
+         nix log /nix/store/693priravrmlgymcqgh71a3yg6qb7z23-nixlytile-git.drv
+error: Cannot build '/nix/store/3ywrjk8k8mbwzindhkqknkq9hrmbnv48-ensure-all-wrappers-paths-exist.drv'.
+       Reason: 1 dependency failed.
+       Output paths:
+         /nix/store/46paw9xn5ap7iyqvrf7ir1iww6fgaq1h-ensure-all-wrappers-paths-exist
+error: Cannot build '/nix/store/dwzsbsipsgkh8vjms8sccd6sq9vs8pz9-nixlytile-launcher.drv'.
+       Reason: 1 dependency failed.
+       Output paths:
+         /nix/store/zvvscaiiax9376i2lr8ps1nxij1xk66c-nixlytile-launcher
+error: Cannot build '/nix/store/gcq68x0sq81xsawljmxs95yxf3fvqp5q-nixlytile-session.drv'.
+       Reason: 1 dependency failed.
+       Output paths:
+         /nix/store/v4z77hk4sjy6532fza9szdxvw1wvhj9b-nixlytile-session
+error: Cannot build '/nix/store/93qi634ssc8ifd2613d08i3qwwbs3s6s-security-wrapper-.nixlytile-wrapped-x86_64-unknown-linux-musl.drv'.
+       Reason: 1 dependency failed.
+       Output paths:
+         /nix/store/wxssvsnrl9qr5nwibhk9bv1hc8vj01ac-security-wrapper-.nixlytile-wrapped-x86_64-unknown-linux-musl
+error: Build failed due to failed dependency
+error: Build failed due to failed dependency
+error: Build failed due to failed dependency
+error: Cannot build '/nix/store/3g1z990x9wb69p1l9dwinl1ga3iw6gxn-desktops.drv'.
+       Reason: 1 dependency failed.
+       Output paths:
+         /nix/store/1bwl7y0696kyrd58s0c62qn3y4d5hpny-desktops
+error: Cannot build '/nix/store/2qd9pdrcx53718gmmgjj44mqyhpx61kf-nixos-system-nixlytest-26.05.20260317.cda4854.drv'.
+       Reason: 1 dependency failed.
+       Output paths:
+         /nix/store/af2kyrbi02h6q0jw632s2jbd7pnmklzs-nixos-system-nixlytest-26.05.20260317.cda4854
+error: Cannot build '/nix/store/ylk6lzankdm6p4vl5glxprk1zypd8car-system-path.drv'.
+       Reason: 1 dependency failed.
+       Output paths:
+         /nix/store/2fvl2nrycp4va4wyxxaj1xymmzg909w5-system-path
+error: Cannot build '/nix/store/blsyxka77qkczxliancsz8kddmhrsgfx-unit-script-suid-sgid-wrappers-start.drv'.
+       Reason: 1 dependency failed.
+       Output paths:
+         /nix/store/ala86d1vhm7ax2i1n4v4ai1d3f98p2iw-unit-script-suid-sgid-wrappers-start
+error: Build failed due to failed dependency
+Command 'nix --extra-experimental-features 'nix-command flakes' build --print-out-paths '/home/total/.nixlyos#nixosConfigurations."nixlyos".config.system.build.toplevel' --no-link' returned non-zero exit status 1.
