@@ -30,6 +30,9 @@
 , pipewire
 , libass
 , libva
+, mesa
+, libGL
+, vulkan-loader
 , swaybg
 , brightnessctl
 }:
@@ -87,6 +90,9 @@ stdenv.mkDerivation rec {
     pipewire
     libass
     libva
+    mesa
+    libGL
+    vulkan-loader
   ];
 
   makeFlags = [
@@ -113,6 +119,7 @@ stdenv.mkDerivation rec {
 
     wrapProgram $out/bin/nixlytile \
       --prefix PATH : ${lib.makeBinPath [ swaybg brightnessctl xwayland ]} \
+      --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ mesa mesa.drivers libGL vulkan-loader ]}" \
       --prefix XDG_DATA_DIRS : "${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share"
 
     runHook postInstall
