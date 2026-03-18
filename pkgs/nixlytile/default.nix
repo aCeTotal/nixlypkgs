@@ -52,9 +52,8 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    # TODO: update rev + hash after committing wlroots into the repo
-    rev = "35638ba902b237287b18bef1a5eccb8e28fcf4ab";
-    hash = "sha256-MkdUHKHYc/Y4BjtjipSATYRZRDVGqmconQDkPyoztco=";
+    rev = "10137d440bad92795c6a2514e9b49093280070d3";
+    hash = "sha256-M7m1V8lMs1IjIBimxliZSF9lyMjazbCpSrU7S5qotBQ=";
   };
 
   wlrootsLocal = stdenv.mkDerivation {
