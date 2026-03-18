@@ -3,6 +3,7 @@
 , fetchFromGitHub
 , pkg-config
 , makeWrapper
+, autoPatchelfHook
 , wayland
 , wayland-scanner
 , wayland-protocols
@@ -56,6 +57,7 @@ stdenv.mkDerivation rec {
     wayland-scanner
     wayland-protocols
     makeWrapper
+    autoPatchelfHook
   ];
 
   buildInputs = [
@@ -110,7 +112,7 @@ stdenv.mkDerivation rec {
          install
 
     wrapProgram $out/bin/nixlytile \
-      --prefix PATH : ${lib.makeBinPath [ swaybg brightnessctl ]} \
+      --prefix PATH : ${lib.makeBinPath [ swaybg brightnessctl xwayland ]} \
       --prefix XDG_DATA_DIRS : "${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share"
 
     runHook postInstall
