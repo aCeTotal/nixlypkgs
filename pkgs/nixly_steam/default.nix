@@ -6,6 +6,7 @@
   steam,
   python3,
   bash,
+  bubblewrap,
 }:
 
 let
@@ -127,7 +128,7 @@ in
 
 stdenvNoCC.mkDerivation {
   pname = "nixly_steam";
-  version = "1.0.0.85";
+  version = "1.0.0.86";
 
   dontUnpack = true;
   dontBuild = true;
@@ -142,12 +143,19 @@ stdenvNoCC.mkDerivation {
     cat > $out/bin/nixly_steam <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Use nix store bubblewrap to avoid "Unexpected capabilities but not setuid" error.
+# The store binary has no file capabilities, so pressure-vessel works cleanly.
+export PRESSURE_VESSEL_BWRAP="NIXLY_BWRAP_PATH"
+export PRESSURE_VESSEL_FILESYSTEMS_RO=/nix/store
+
 NIXLY_CONFIGURE_PROTON 2>/dev/null || true
 exec steam "$@"
 LAUNCHER
     chmod +x $out/bin/nixly_steam
 
     substituteInPlace $out/bin/nixly_steam \
+      --replace-fail "NIXLY_BWRAP_PATH" "${bubblewrap}/bin/bwrap" \
       --replace-fail "NIXLY_CONFIGURE_PROTON" "${configureProton}"
 
     cat > $out/share/applications/nixly_steam.desktop << EOF
@@ -169,7 +177,7 @@ EOF
 
   postFixup = ''
     wrapProgram $out/bin/nixly_steam \
-      --prefix PATH : ${lib.makeBinPath [ steam bash ]}
+      --prefix PATH : ${lib.makeBinPath [ steam bash bubblewrap ]}
   '';
 
   meta = {
