@@ -52,13 +52,13 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "cca45c2c13a3311852979365e64c59a53ea465b3";
-    hash = "sha256-iVQr4S5xa4LbUGXyFCpbdGnWxCaTwIccL+F5QbUyz3I=";
+    rev = "5a6ea35488e924911f347c7ade09cf924c43bc41";
+    hash = "sha256-5E26559q9DSfiyM3exFV5WwHzXgfc2rUYSfn52pIpkk=";
   };
 
   wlrootsLocal = stdenv.mkDerivation {
-    pname = "wlroots";
-    version = "0.20.0-rc4";
+    pname = "wlroots-nixly";
+    version = "";
     src = nixlytileSrc + "/wlroots";
     nativeBuildInputs = [ meson ninja pkg-config wayland-scanner ];
     buildInputs = [
