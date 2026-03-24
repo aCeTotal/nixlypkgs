@@ -9,5 +9,5 @@ in {
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };
   nixly_steam = callPackage ../pkgs/nixly_steam { };
   libepoxy-nixly = callPackage ../pkgs/libepoxy { };
-  blender = callPackage ../pkgs/blender/ { };
+  blender = callPackage ../pkgs/blender { };
 }
