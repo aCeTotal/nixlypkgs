@@ -8,5 +8,6 @@ in {
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };
   nixly_steam = callPackage ../pkgs/nixly_steam { };
-  blender = callPackage ../pkgs/blender { };
+  libepoxy-nixly = callPackage ../pkgs/libepoxy { };
+  blender = callPackage ../pkgs/blender/ { };
 }
