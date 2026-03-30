@@ -61,7 +61,6 @@ let
     version = "";
     src = nixlytileSrc + "/wlroots";
     patches = [
-      ./wlroots-nvidia-cursor-format.patch
     ];
     nativeBuildInputs = [ meson ninja pkg-config wayland-scanner ];
     buildInputs = [
