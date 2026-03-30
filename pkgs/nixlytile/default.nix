@@ -52,14 +52,17 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "a64ffc12f23f8ca7200187ac1256f36d0c4ac2fe";
-    hash = "sha256-Dc1JP/XxkOoegNVSp/WS4fxuzwQeCIbuqvbKa4ql5wo=";
+    rev = "d3eabbe66c11dd3c0f863f380b3e4c19ad1f4ea9";
+    hash = "sha256-HjyavLRVB6QRqYm3DYabprELgzk9Gy+4uAbelYPxdeY=";
   };
 
   wlrootsLocal = stdenv.mkDerivation {
     pname = "wlroots-nixly";
     version = "";
     src = nixlytileSrc + "/wlroots";
+    patches = [
+      ./wlroots-nvidia-cursor-format.patch
+    ];
     nativeBuildInputs = [ meson ninja pkg-config wayland-scanner ];
     buildInputs = [
       wayland wayland-protocols libdrm libxkbcommon pixman libinput
