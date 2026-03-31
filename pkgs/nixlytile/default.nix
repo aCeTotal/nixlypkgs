@@ -4,6 +4,7 @@
 , pkg-config
 , makeWrapper
 , autoPatchelfHook
+, addDriverRunpath
 , meson
 , ninja
 , wayland
@@ -46,6 +47,27 @@
 , vulkan-loader
 , swaybg
 , brightnessctl
+, xdg-utils
+, thunar
+, thunar-volman
+, thunar-archive-plugin
+, networkmanager
+, networkmanagerapplet
+, wireplumber
+, pavucontrol
+, blueman
+, fd
+, findutils
+, coreutils
+, gnused
+, gnugrep
+, alacritty
+, foot
+, libnotify
+, wtype
+, grim
+, slurp
+, wl-clipboard
 }:
 
 let
@@ -78,6 +100,53 @@ let
   };
 
   wlrootsPc = "wlroots-0.20";
+
+  runtimeDeps = [
+    # Core utilities
+    swaybg
+    brightnessctl
+    xdg-utils
+    xwayland
+
+    # File manager
+    thunar
+    thunar-volman
+    thunar-archive-plugin
+
+    # Network management
+    networkmanager
+    networkmanagerapplet
+
+    # Audio
+    pipewire
+    wireplumber
+    pavucontrol
+
+    # Bluetooth
+    blueman
+
+    # System utilities
+    fd
+    findutils
+    coreutils
+    gnused
+    gnugrep
+
+    # Terminal
+    alacritty
+    foot
+
+    # Notifications
+    libnotify
+
+    # Virtual keyboard input
+    wtype
+
+    # Screenshot
+    grim
+    slurp
+    wl-clipboard
+  ];
 in
 
 stdenv.mkDerivation {
@@ -95,6 +164,7 @@ stdenv.mkDerivation {
     wayland-protocols
     makeWrapper
     autoPatchelfHook
+    addDriverRunpath
   ];
 
   buildInputs = [
@@ -153,11 +223,15 @@ stdenv.mkDerivation {
          install
 
     wrapProgram $out/bin/nixlytile \
-      --prefix PATH : ${lib.makeBinPath [ swaybg brightnessctl xwayland ]} \
+      --prefix PATH : ${lib.makeBinPath runtimeDeps} \
       --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ mesa libGL vulkan-loader ]}" \
       --prefix XDG_DATA_DIRS : "${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share:${shared-mime-info}/share"
 
     runHook postInstall
+  '';
+
+  postFixup = ''
+    addDriverRunpath $out/bin/nixlytile
   '';
 
   meta = with lib; {
