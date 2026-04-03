@@ -12,6 +12,7 @@ let
     tmdb_api_key=${cfg.tmdbApiKey}
     tmdb_language=${cfg.tmdbLanguage}
     cache_dir=${cfg.dataDir}/cache
+    transcode_enabled=${lib.boolToString cfg.transcodeEnabled}
     ${lib.concatMapStringsSep "\n" (p: "unprocessed_path=${p}") cfg.unprocessedPaths}
     ${lib.concatMapStringsSep "\n" (p: "converted_path=${p}") cfg.convertedPaths}
     ${lib.concatMapStringsSep "\n" (p: "roms_path=${p}") cfg.romsPaths}
@@ -99,6 +100,19 @@ in
       '';
     };
 
+    # ── Transcoding ────────────────────────────────────────────────────
+
+    transcodeEnabled = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Enable automatic transcoding of files in unprocessedPaths.
+        When false, the server skips inotify watches and periodic scans
+        on unprocessed directories – useful for servers that only serve
+        pre-converted media.
+      '';
+    };
+
     # ── Source media paths (raw/unconverted files) ────────────────────
 
     unprocessedPaths = lib.mkOption {
@@ -180,7 +194,7 @@ in
       description = "Nixly Media Server";
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
-      path = [ pkgs.ffmpeg-headless ];
+      path = lib.optionals cfg.transcodeEnabled [ pkgs.ffmpeg-headless ];
 
       serviceConfig = {
         Type = "simple";
