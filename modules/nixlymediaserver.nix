@@ -13,6 +13,7 @@ let
     tmdb_language=${cfg.tmdbLanguage}
     cache_dir=${cfg.dataDir}/cache
     transcode_enabled=${lib.boolToString cfg.transcodeEnabled}
+    ${lib.optionalString (cfg.downloadPath != "") "download_path=${cfg.downloadPath}"}
     ${lib.concatMapStringsSep "\n" (p: "unprocessed_path=${p}") cfg.unprocessedPaths}
     ${lib.concatMapStringsSep "\n" (p: "converted_path=${p}") cfg.convertedPaths}
     ${lib.concatMapStringsSep "\n" (p: "roms_path=${p}") cfg.romsPaths}
@@ -163,6 +164,21 @@ in
       '';
     };
 
+    # ── Downloads ─────────────────────────────────────────────────────
+
+    downloadPath = lib.mkOption {
+      type = lib.types.str;
+      default = "";
+      example = "/mnt/bigdisk1/downloads";
+      description = ''
+        Directory to monitor for completed downloads.
+        Media files here are automatically classified (TV/Movie), renamed
+        cleanly, scraped against TMDB, and moved to convertedPaths[0]/nixly_ready_media/.
+        No transcoding — files are moved as-is.
+        Empty = disabled.
+      '';
+    };
+
     # ── Firewall ──────────────────────────────────────────────────────
 
     openFirewall = lib.mkOption {
@@ -214,7 +230,8 @@ in
           [ cfg.dataDir ]
           ++ cfg.unprocessedPaths
           ++ cfg.convertedPaths
-          ++ cfg.romsPaths;
+          ++ cfg.romsPaths
+          ++ lib.optional (cfg.downloadPath != "") cfg.downloadPath;
         PrivateTmp = true;
       };
     };
