@@ -7,6 +7,7 @@
 , ffmpeg-headless
 , cjson
 , libzip
+, libarchive
 }:
 
 stdenv.mkDerivation rec {
@@ -32,6 +33,7 @@ stdenv.mkDerivation rec {
     ffmpeg-headless
     cjson
     libzip
+    libarchive
   ];
 
   makeFlags = [
