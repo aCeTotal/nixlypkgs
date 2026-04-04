@@ -17,4 +17,11 @@ in {
       sed -i '/#include "spvIR.h"/a #include <cstdint>' core/deps/glslang/SPIRV/SpvBuilder.h
     '';
   });
+
+  # Fix minizip pkg-config Cflags to include the minizip/ subdirectory
+  minizip = prev.minizip.overrideAttrs (old: {
+    postFixup = (old.postFixup or "") + ''
+      sed -i 's|^Cflags:.*|Cflags: -I''${prefix}/include/minizip|' $out/lib/pkgconfig/minizip.pc
+    '';
+  });
 }
