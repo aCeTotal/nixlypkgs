@@ -3,7 +3,7 @@ let
   callPackage = final.callPackage;
 in {
   speedtree = callPackage ../pkgs/speedtree { };
-  nixlytile = callPackage ../pkgs/nixlytile { libepoxy = final.libepoxy-nixly; };
+  nixlytile = callPackage ../pkgs/nixlytile { };
   claude = callPackage ../pkgs/claude { };
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };
