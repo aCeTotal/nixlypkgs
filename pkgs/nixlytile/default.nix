@@ -21,8 +21,6 @@
 , seatd
 , libxcb
 , libxcb-wm
-, libepoxy
-, libglvnd
 , libgbm
 , hwdata
 , libliftoff
@@ -42,9 +40,9 @@
 , pipewire
 , libass
 , libva
-, mesa
-, libGL
 , vulkan-loader
+, vulkan-headers
+, glslang
 , swaybg
 , brightnessctl
 , xdg-utils
@@ -74,8 +72,8 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "7c21a34718ddcd0defc4cd2c5c987b47843c6c0a";
-    hash = "sha256-TGipGRmfAd5+B2cXtc+Yp+16mH1NFgoO0/C5NPCQXkM=";
+    rev = "eba9ced8e209e9989b59f8a6fe5a69bdfef32d80";
+    hash = "sha256-SEsu03HImtKIjc3L90kHbYDghq1PCEqmVgaG6G/hv+E=";
   };
 
   wlrootsLocal = stdenv.mkDerivation {
@@ -84,17 +82,18 @@ let
     src = nixlytileSrc + "/wlroots";
     patches = [
     ];
-    nativeBuildInputs = [ meson ninja pkg-config wayland-scanner ];
+    nativeBuildInputs = [ meson ninja pkg-config wayland-scanner glslang ];
     buildInputs = [
       wayland wayland-protocols libdrm libxkbcommon pixman libinput
-      xwayland seatd libepoxy libglvnd libxcb libxcb-wm
+      xwayland seatd libxcb libxcb-wm
       libgbm hwdata libliftoff libdisplay-info lcms2 libxcb-errors
+      vulkan-loader vulkan-headers
     ];
     mesonFlags = [
       "-Dexamples=false"
       "-Dxwayland=enabled"
       "-Dbackends=drm,libinput"
-      "-Drenderers=gles2"
+      "-Drenderers=vulkan"
       "-Dallocators=gbm"
     ];
   };
@@ -180,8 +179,6 @@ stdenv.mkDerivation {
     xwayland
     libxcb
     libxcb-wm
-    libepoxy
-    libglvnd
 
     cairo
     librsvg
@@ -195,9 +192,8 @@ stdenv.mkDerivation {
     pipewire
     libass
     libva
-    mesa
-    libGL
     vulkan-loader
+    vulkan-headers
   ];
 
   makeFlags = [
@@ -223,8 +219,8 @@ stdenv.mkDerivation {
          install
 
     wrapProgram $out/bin/nixlytile \
+      --set WLR_RENDERER vulkan \
       --prefix PATH : ${lib.makeBinPath runtimeDeps} \
-      --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ mesa libGL vulkan-loader ]}" \
       --prefix XDG_DATA_DIRS : "${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share:${shared-mime-info}/share"
 
     runHook postInstall
