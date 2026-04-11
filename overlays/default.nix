@@ -10,6 +10,7 @@ in {
   nixly_steam = callPackage ../pkgs/nixly_steam { };
   libepoxy-nixly = callPackage ../pkgs/libepoxy { };
   blender_nixly = callPackage ../pkgs/blender_nixly { };
+  kmymoney = callPackage ../pkgs/kmymoney { };
 
   # Fix flycast bundled glslang missing <cstdint> for GCC 15
   flycast = prev.flycast.overrideAttrs (old: {
