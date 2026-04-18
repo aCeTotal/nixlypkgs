@@ -6,8 +6,6 @@
 , curl
 , ffmpeg-headless
 , cjson
-, libzip
-, libarchive
 }:
 
 stdenv.mkDerivation rec {
@@ -17,8 +15,8 @@ stdenv.mkDerivation rec {
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "fe711a2859eefddfd989877e2b79679a517b9da6";
-    hash = "sha256-Bc7w8m6h9YBK+6icVZ3DyfBCc2Z8+kHIYsM3djOMOlg=";
+    rev = "430550c2dc982af8ff5568b24432504b1603f3d2";
+    hash = "sha256-4N6ucQH79Gu+cvSbft+gvlgp6Z43qXEvBdw2+Jo1jJE=";
   };
 
   sourceRoot = "${src.name}/Server";
@@ -32,8 +30,6 @@ stdenv.mkDerivation rec {
     curl
     ffmpeg-headless
     cjson
-    libzip
-    libarchive
   ];
 
   makeFlags = [

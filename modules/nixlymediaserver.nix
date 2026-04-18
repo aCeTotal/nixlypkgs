@@ -12,11 +12,8 @@ let
     tmdb_api_key=${cfg.tmdbApiKey}
     tmdb_language=${cfg.tmdbLanguage}
     cache_dir=${cfg.dataDir}/cache
-    transcode_enabled=${lib.boolToString cfg.transcodeEnabled}
-    ${lib.optionalString (cfg.downloadPath != "") "download_path=${cfg.downloadPath}"}
     ${lib.concatMapStringsSep "\n" (p: "unprocessed_path=${p}") cfg.unprocessedPaths}
     ${lib.concatMapStringsSep "\n" (p: "converted_path=${p}") cfg.convertedPaths}
-    ${lib.concatMapStringsSep "\n" (p: "roms_path=${p}") cfg.romsPaths}
   '';
 in
 {
@@ -101,81 +98,34 @@ in
       '';
     };
 
-    # ── Transcoding ────────────────────────────────────────────────────
-
-    transcodeEnabled = lib.mkOption {
-      type = lib.types.bool;
-      default = false;
-      description = ''
-        Enable automatic transcoding of files in unprocessedPaths.
-        When false, the server skips inotify watches and periodic scans
-        on unprocessed directories – useful for servers that only serve
-        pre-converted media.
-      '';
-    };
-
-    # ── Source media paths (raw/unconverted files) ────────────────────
+    # ── Source media paths (raw, unprocessed files) ───────────────────
 
     unprocessedPaths = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [];
-      example = [ "/mnt/nas/downloads" "/mnt/usb/new-media" ];
+      example = [ "/mnt/bigdisk1/downloads" ];
       description = ''
-        Directories containing raw/unconverted media files.
-        The transcoder watches these for new video files, converts them
-        to x265 CRF 14 MKV (FLAC 7.1 + Atmos passthrough), and deletes
-        the source file after successful conversion.
-        inotify watches these in real-time + a 5-minute periodic backup scan.
+        Directories containing raw media files to be scraped, renamed and moved.
+        The server watches these with inotify and periodically rescans them.
+        Files are classified (Movie / TV episode), matched against TMDB, then
+        MOVED (rename, not copied) into
+        <convertedPaths[0]>/nixly_ready_media/{Movies,TV/<Show>/Season<N>}/.
+        No re-encoding is performed.
       '';
     };
 
-    # ── Destination paths (converted/ready media) ─────────────────────
+    # ── Destination paths (ready media) ───────────────────────────────
 
     convertedPaths = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [];
-      example = [ "/mnt/media-disk1" "/mnt/media-disk2" ];
+      example = [ "/mnt/bigdisk1/www/aceclan" ];
       description = ''
-        Destination disks/directories for converted media.
-        Transcoded files are placed in <path>/nixly_ready_media/TV|Movies/.
-        The server scans and serves content from these nixly_ready_media subdirectories.
-        Multiple paths allow spreading content across disks.
-
-        Structure created automatically:
-          <path>/nixly_ready_media/
-            Movies/
-              movie.title.year.4K.10bit.x265.CRF14.HDR.5.1.mkv
-            TV/
-              show.name.year/
-                Season1/
-                  show.name.year.S01E01.1080p.10bit.x265.CRF14.7.1.mkv
-      '';
-    };
-
-    # ── ROMs ──────────────────────────────────────────────────────────
-
-    romsPaths = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [];
-      example = [ "/mnt/nas/roms" ];
-      description = ''
-        Directories containing ROM files (NES, SNES, N64, GameCube, Wii, Switch).
-        These are served as-is without transcoding.
-      '';
-    };
-
-    # ── Downloads ─────────────────────────────────────────────────────
-
-    downloadPath = lib.mkOption {
-      type = lib.types.str;
-      default = "";
-      example = "/mnt/bigdisk1/downloads";
-      description = ''
-        Directory to monitor for completed downloads.
-        Media files here are automatically classified (TV/Movie), renamed
-        cleanly, scraped against TMDB, and moved to convertedPaths[0]/nixly_ready_media/.
-        No transcoding — files are moved as-is.
-        Empty = disabled.
+        Destination disks/directories for ready media.
+        Scraped and renamed files are placed under
+        <path>/nixly_ready_media/{Movies,TV/<Show>/Season<N>}/.
+        The server also scans these on startup to populate the library and
+        re-scrapes TMDB metadata for existing entries during full rescan.
       '';
     };
 
@@ -192,14 +142,14 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    users.users.${cfg.user} = {
+    users.users.${cfg.user} = lib.mkIf (cfg.user == "nixlymedia") {
       isSystemUser = true;
       group = cfg.group;
       home = cfg.dataDir;
       description = "Nixly Media Server user";
     };
 
-    users.groups.${cfg.group} = { };
+    users.groups.${cfg.group} = lib.mkIf (cfg.group == "nixlymedia") { };
 
     systemd.tmpfiles.rules = [
       "d ${cfg.dataDir} 0750 ${cfg.user} ${cfg.group} -"
@@ -210,7 +160,7 @@ in
       description = "Nixly Media Server";
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
-      path = lib.optionals cfg.transcodeEnabled [ pkgs.ffmpeg-headless ];
+      path = [ pkgs.ffmpeg-headless ];
 
       serviceConfig = {
         Type = "simple";
@@ -229,9 +179,7 @@ in
         ReadWritePaths =
           [ cfg.dataDir ]
           ++ cfg.unprocessedPaths
-          ++ cfg.convertedPaths
-          ++ cfg.romsPaths
-          ++ lib.optional (cfg.downloadPath != "") cfg.downloadPath;
+          ++ cfg.convertedPaths;
         PrivateTmp = true;
       };
     };
