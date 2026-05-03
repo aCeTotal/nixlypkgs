@@ -4,6 +4,9 @@ let
 in {
   speedtree = callPackage ../pkgs/speedtree { };
   nixlytile = callPackage ../pkgs/nixlytile { };
+  nixly_launcher = callPackage ../pkgs/nixly_launcher {
+    src = inputs.nixly_launcher_src;
+  };
   claude = callPackage ../pkgs/claude { };
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };

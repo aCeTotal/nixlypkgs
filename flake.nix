@@ -1,7 +1,15 @@
 {
   description = "nixlypkgs – lightweight nixpkgs-style overlay repo";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Tracked as raw source — the derivation in pkgs/nixly_launcher consumes
+    # it as `src`. Swap to fetchFromGitHub when the project is published.
+    nixly_launcher_src = {
+      url = "path:/home/total/nixly_launcher";
+      flake = false;
+    };
+  };
 
   outputs = inputs@{ self, nixpkgs, ... }:
     let
@@ -22,7 +30,7 @@
         let
           pkgs = self.legacyPackages.${system};
         in {
-          inherit (pkgs) winstripping speedtree nixlytile nixlymediaserver;
+          inherit (pkgs) winstripping speedtree nixlytile nixly_launcher nixlymediaserver;
 
           dwl = pkgs.nixlytile;
           default = pkgs.nixlytile;

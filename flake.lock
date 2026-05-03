@@ -1,12 +1,25 @@
 {
   "nodes": {
+    "nixly_launcher_src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1777830702,
+        "narHash": "sha256-UCRwn0NsRq17PC+pWGtu55NFyML0ZCyBpOqLDv4ahl8=",
+        "path": "/home/total/nixly_launcher",
+        "type": "path"
+      },
+      "original": {
+        "path": "/home/total/nixly_launcher",
+        "type": "path"
+      }
+    },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1767640445,
-        "narHash": "sha256-UWYqmD7JFBEDBHWYcqE6s6c77pWdcU/i+bwD6XxMb8A=",
+        "lastModified": 1777578337,
+        "narHash": "sha256-Ad49moKWeXtKBJNy2ebiTQUEgdLyvGmTeykAQ9xM+Z4=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "9f0c42f8bc7151b8e7e5840fb3bd454ad850d8c5",
+        "rev": "15f4ee454b1dce334612fa6843b3e05cf546efab",
         "type": "github"
       },
       "original": {
@@ -18,6 +31,7 @@
     },
     "root": {
       "inputs": {
+        "nixly_launcher_src": "nixly_launcher_src",
         "nixpkgs": "nixpkgs"
       }
     }
