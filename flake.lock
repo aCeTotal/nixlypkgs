@@ -13,6 +13,19 @@
         "type": "path"
       }
     },
+    "nixly_lockscreen_src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1778096603,
+        "narHash": "sha256-YXifciUCuvRxro/KAccElw5ej2jA0HNU78SOx2dGLYE=",
+        "path": "/home/total/nixly_lockscreen",
+        "type": "path"
+      },
+      "original": {
+        "path": "/home/total/nixly_lockscreen",
+        "type": "path"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1777578337,
@@ -32,6 +45,7 @@
     "root": {
       "inputs": {
         "nixly_launcher_src": "nixly_launcher_src",
+        "nixly_lockscreen_src": "nixly_lockscreen_src",
         "nixpkgs": "nixpkgs"
       }
     }

@@ -9,6 +9,10 @@
       url = "path:/home/total/nixly_launcher";
       flake = false;
     };
+    nixly_lockscreen_src = {
+      url = "path:/home/total/nixly_lockscreen";
+      flake = false;
+    };
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:
@@ -30,7 +34,7 @@
         let
           pkgs = self.legacyPackages.${system};
         in {
-          inherit (pkgs) winstripping speedtree nixlytile nixly_launcher nixlymediaserver;
+          inherit (pkgs) winstripping speedtree nixlytile nixly_launcher nixly_lockscreen nixlymediaserver;
 
           dwl = pkgs.nixlytile;
           default = pkgs.nixlytile;
@@ -42,6 +46,7 @@
           nixpkgs.overlays = [ self.overlays.default ];
         };
         nixlymediaserver = import ./modules/nixlymediaserver.nix;
+        nixly_lockscreen = import ./modules/nixly_lockscreen.nix;
       };
 
       homeManagerModules = {

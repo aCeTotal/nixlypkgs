@@ -7,6 +7,9 @@ in {
   nixly_launcher = callPackage ../pkgs/nixly_launcher {
     src = inputs.nixly_launcher_src;
   };
+  nixly_lockscreen = callPackage ../pkgs/nixly_lockscreen {
+    src = inputs.nixly_lockscreen_src;
+  };
   claude = callPackage ../pkgs/claude { };
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };
