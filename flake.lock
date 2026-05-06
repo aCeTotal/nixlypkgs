@@ -3,8 +3,8 @@
     "nixly_launcher_src": {
       "flake": false,
       "locked": {
-        "lastModified": 1777839011,
-        "narHash": "sha256-7zA4vMv6tMY+K4M6+pjTus9uJqyYzvkUAlPPa94VJ0o=",
+        "lastModified": 1778100398,
+        "narHash": "sha256-tGMtQHCST7UtTjrAKYokhLG0cb8VteANQZqPCuPFaps=",
         "path": "/home/total/nixly_launcher",
         "type": "path"
       },
