@@ -138,7 +138,12 @@ stdenv'.mkDerivation (finalAttrs: {
   ];
 
   postPatch =
-    (lib.optionalString stdenv.hostPlatform.isDarwin ''
+    ''
+      substituteInPlace source/blender/gpu/vulkan/vk_texture_pool.cc \
+        --replace-fail 'CLOG_TRACE(&LOG, log_message.c_str());' \
+                       'CLOG_TRACE(&LOG, "%s", log_message.c_str());'
+    ''
+    + (lib.optionalString stdenv.hostPlatform.isDarwin ''
       : > build_files/cmake/platform/platform_apple_xcode.cmake
       substituteInPlace source/creator/CMakeLists.txt \
         --replace-fail '${"$"}{LIBDIR}/python' \
