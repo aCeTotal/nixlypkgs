@@ -7,6 +7,10 @@
   python3,
   bash,
   bubblewrap,
+  # Extra CLI args appended to the steam invocation. Use to inject e.g.
+  # `-cef-disable-gpu-compositing` for Niri/xwayland-satellite (CEF GPU
+  # compositing fails through rootless XWayland → Steam UI black window).
+  extraSteamArgs ? [ ],
 }:
 
 let
@@ -165,13 +169,17 @@ export VKD3D_CONFIG="''${VKD3D_CONFIG:-dxr,dxr11}"
 export WINE_FULLSCREEN_FSR="''${WINE_FULLSCREEN_FSR:-1}"
 
 NIXLY_CONFIGURE_PROTON 2>/dev/null || true
-exec steam "$@"
+exec steam NIXLY_EXTRA_STEAM_ARGS "$@"
 LAUNCHER
     chmod +x $out/bin/nixly_steam
 
     substituteInPlace $out/bin/nixly_steam \
       --replace-fail "NIXLY_BWRAP_PATH" "${bubblewrap}/bin/bwrap" \
-      --replace-fail "NIXLY_CONFIGURE_PROTON" "${configureProton}"
+      --replace-fail "NIXLY_CONFIGURE_PROTON" "${configureProton}" \
+      --replace-fail " NIXLY_EXTRA_STEAM_ARGS" "${
+        lib.optionalString (extraSteamArgs != [ ])
+          (" " + lib.escapeShellArgs extraSteamArgs)
+      }"
 
     cat > $out/share/applications/nixly_steam.desktop << EOF
 [Desktop Entry]
