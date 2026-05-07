@@ -7,10 +7,10 @@
   python3,
   bash,
   bubblewrap,
-  # Extra CLI args appended to the steam invocation. Use to inject e.g.
-  # `-cef-disable-gpu-compositing` for Niri/xwayland-satellite (CEF GPU
-  # compositing fails through rootless XWayland → Steam UI black window).
-  extraSteamArgs ? [ ],
+  # Extra CLI args appended to the steam invocation. Default disables CEF GPU
+  # compositing — required under Niri/xwayland-satellite where rootless
+  # XWayland breaks CEF compositing → Steam UI black window.
+  extraSteamArgs ? [ "-cef-disable-gpu-compositing" ],
 }:
 
 let
