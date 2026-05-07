@@ -7,7 +7,6 @@
   python3,
   bash,
   bubblewrap,
-  gamemode,
 }:
 
 let
@@ -166,21 +165,18 @@ export VKD3D_CONFIG="''${VKD3D_CONFIG:-dxr,dxr11}"
 export WINE_FULLSCREEN_FSR="''${WINE_FULLSCREEN_FSR:-1}"
 
 NIXLY_CONFIGURE_PROTON 2>/dev/null || true
-# gamemoderun on the Steam process activates GameMode for Steam + every
-# child it spawns (each game). Renice/CPU-gov/IO-prio applied automatically.
-exec NIXLY_GAMEMODERUN steam "$@"
+exec steam "$@"
 LAUNCHER
     chmod +x $out/bin/nixly_steam
 
     substituteInPlace $out/bin/nixly_steam \
       --replace-fail "NIXLY_BWRAP_PATH" "${bubblewrap}/bin/bwrap" \
-      --replace-fail "NIXLY_CONFIGURE_PROTON" "${configureProton}" \
-      --replace-fail "NIXLY_GAMEMODERUN" "${gamemode}/bin/gamemoderun"
+      --replace-fail "NIXLY_CONFIGURE_PROTON" "${configureProton}"
 
     cat > $out/share/applications/nixly_steam.desktop << EOF
 [Desktop Entry]
 Name=Steam
-Comment=Steam with Proton CachyOS, GameMode, and Shader Pre-Caching
+Comment=Steam with Proton CachyOS and Shader Pre-Caching
 Exec=$out/bin/nixly_steam %U
 Icon=steam
 Terminal=false
@@ -196,18 +192,19 @@ EOF
 
   postFixup = ''
     wrapProgram $out/bin/nixly_steam \
-      --prefix PATH : ${lib.makeBinPath [ steam bash bubblewrap gamemode ]}
+      --prefix PATH : ${lib.makeBinPath [ steam bash bubblewrap ]}
   '';
 
   meta = {
-    description = "Steam with Proton CachyOS, GameMode, and Shader Pre-Caching auto-configured";
+    description = "Steam with Proton CachyOS and Shader Pre-Caching auto-configured";
     longDescription = ''
       Steam wrapped for maximum gaming performance:
         - Proton CachyOS set as global default compatibility tool.
         - Shader Pre-Caching + background Vulkan shader processing on.
-        - gamemoderun wraps the Steam process so every game inherits
-          GameMode (CPU governor, renice, ioprio).
         - Vendor-agnostic env hints for Mesa/NVAPI/DXVK/VKD3D/Wine FSR.
+
+      GameMode not applied to Steam itself. Add `gamemoderun %command%`
+      per-game in Steam launch options if desired.
 
       Requires programs.steam.enable = true and the proton-cachyos
       overlay (Proton CachyOS compat tool registered in Steam) in your
