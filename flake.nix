@@ -3,14 +3,12 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    # Tracked as raw source — the derivation in pkgs/nixly_launcher consumes
-    # it as `src`. Swap to fetchFromGitHub when the project is published.
     nixly_launcher_src = {
-      url = "path:/home/total/nixly_launcher";
+      url = "github:aCeTotal/nixly_launcher";
       flake = false;
     };
     nixly_lockscreen_src = {
-      url = "path:/home/total/nixly_lockscreen";
+      url = "github:aCeTotal/nixly_lockscreen";
       flake = false;
     };
   };
