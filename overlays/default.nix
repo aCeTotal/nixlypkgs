@@ -15,7 +15,9 @@ in {
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };
   nixly_steam = callPackage ../pkgs/nixly_steam { };
   libepoxy-nixly = callPackage ../pkgs/libepoxy { };
-  blender_nixly = callPackage ../pkgs/blender_nixly { };
+  blender_nvidia = callPackage ../pkgs/blender_nvidia { };
+  blender_amd    = callPackage ../pkgs/blender_amd    { };
+  blender_intel  = callPackage ../pkgs/blender_intel  { };
   kmymoney = callPackage ../pkgs/kmymoney { };
 
   # Fix flycast bundled glslang missing <cstdint> for GCC 15

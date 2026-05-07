@@ -12,7 +12,7 @@
   colladaSupport ? true,
   config,
   cudaPackages,
-  cudaSupport ? config.cudaSupport,
+  cudaSupport ? false,
   dbus,
   embree,
   fetchzip,
@@ -69,7 +69,7 @@
   pugixml,
   python313Packages, # must use python3Packages instead of python3.pkgs, see https://github.com/NixOS/nixpkgs/issues/211340
   rocmPackages,
-  rocmSupport ? config.rocmSupport,
+  rocmSupport ? true,
   rubberband,
   runCommand,
   shaderc,
@@ -117,13 +117,13 @@ let
 in
 
 stdenv'.mkDerivation (finalAttrs: {
-  pname = "blender";
-  version = "5.1.0";
+  pname = "blender_amd";
+  version = "5.1.1";
 
   src = fetchzip {
     name = "source";
     url = "https://download.blender.org/source/blender-${finalAttrs.version}.tar.xz";
-    hash = "sha256-knXAK3mW0tDz5ukuYkAZMv/zF9NLR8pofc3ujabcsys=";
+    hash = "sha256-iJolR8iS2go0doO96ibyseCeMunFL+XPoQ25NbX6oOA=";
   };
 
   patches = [
@@ -362,18 +362,27 @@ stdenv'.mkDerivation (finalAttrs: {
         --prefix PATH : $program_PATH \
         --prefix PYTHONPATH : "$program_PYTHONPATH" \
         --add-flags '--python-use-system-env'
+    ''
+    + lib.optionalString stdenv.hostPlatform.isLinux ''
+      mv $out/bin/blender $out/bin/blender_amd
+      mv $out/bin/.blender-wrapped $out/bin/.blender_amd-wrapped
+      sed -i 's|/\.blender-wrapped|/\.blender_amd-wrapped|g' $out/bin/blender_amd
+      sed -e 's|^Exec=blender|Exec=blender_amd|' \
+          -e 's|^Name=Blender$|Name=Blender (AMD)|' \
+          -i $out/share/applications/blender.desktop
+      mv $out/share/applications/blender.desktop $out/share/applications/blender_amd.desktop
     '';
 
   # Set RUNPATH so that libcuda and libnvrtc in /run/opengl-driver(-32)/lib can be
   # found. See the explanation in libglvnd.
   postFixup =
     lib.optionalString cudaSupport ''
-      for program in $out/bin/blender $out/bin/.blender-wrapped; do
+      for program in $out/bin/blender_amd $out/bin/.blender_amd-wrapped; do
         addDriverRunpath "$program"
       done
     ''
     + lib.optionalString stdenv.hostPlatform.isDarwin ''
-      makeWrapper $out/Applications/Blender.app/Contents/MacOS/Blender $out/bin/blender
+      makeWrapper $out/Applications/Blender.app/Contents/MacOS/Blender $out/bin/blender_amd
     '';
 
   passthru = {
@@ -459,6 +468,6 @@ stdenv'.mkDerivation (finalAttrs: {
       amarshall
       veprbl
     ];
-    mainProgram = "blender";
+    mainProgram = "blender_amd";
   };
 })

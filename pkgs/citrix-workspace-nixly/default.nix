@@ -96,7 +96,7 @@
 }:
 
 let
-  version = "25.08.10.111";
+  version = "26.01.0.150";
   homepage = "https://www.citrix.com/downloads/workspace-app/linux/workspace-app-for-linux-latest.html";
 
   fuse3' = symlinkJoin {
@@ -140,7 +140,7 @@ stdenv.mkDerivation {
 
   src = fetchurl {
     url = "https://pfoprod.ddns.net/Adrian/linuxx64-${version}.tar.gz";
-    hash = "sha256-bd3ClxBRJgvjJW+waKBE31k9ePam+n2pHeSjlkvkDRo=";
+    hash = "sha256-d2S589Mr40lngmmq36rA4T1yXz/6ScLN3TJCfGVyeSs=";
     curlOptsList = [ "--insecure" ];
   };
 
@@ -392,10 +392,14 @@ stdenv.mkDerivation {
         fi
       fi
 
-      # wfclient.ini: inject drive mappings into the [WFClient] section
+      # wfclient.ini: inject drive mappings + HDX performance into [WFClient]
       if [ -f "$ICAInstDir/config/wfclient.ini" ]; then
         if ! grep -q "CDMAllowed" "$ICAInstDir/config/wfclient.ini"; then
           sed -i '/^\[WFClient\]/a\CDMAllowed=True\nDriveEnabledA=True\nDrivePathA=\\/\nDriveReadAccessA=3\nDriveWriteAccessA=3\nDriveEnabledH=True\nDrivePathH=$HOME\\/\nDriveReadAccessH=3\nDriveWriteAccessH=3' "$ICAInstDir/config/wfclient.ini"
+        fi
+        # HDX graphics: H.264/H.265 + hardware accel for Thinwire
+        if ! grep -q "^H264Enabled" "$ICAInstDir/config/wfclient.ini"; then
+          sed -i '/^\[WFClient\]/a\H264Enabled=True\nH265Enabled=True\nGraphicsAcceleration=True\nEnableHardwareDecoding=True\nMaximumCompression=True' "$ICAInstDir/config/wfclient.ini"
         fi
       fi
 
@@ -439,7 +443,22 @@ stdenv.mkDerivation {
       UseFullScreen=false
       TWIFullScreenMode=false
       NoWindowManager=false
+      H264Enabled=True
+      H265Enabled=True
+      HardwareEncodeEnabled=True
+      DeepCompressionV2Allowed=True
       TWGFX
+        fi
+
+        # EDT (Enlightened Data Transport) — UDP-based HDX, lower latency than TCP
+        if ! grep -q "\[Network\\\\TCP-IP\\\\HDXEnlightenedDataTransport\]" "$ICAInstDir/config/All_Regions.ini"; then
+          cat >> "$ICAInstDir/config/All_Regions.ini" << 'EDT'
+
+      [Network\TCP-IP\HDXEnlightenedDataTransport]
+      EDT=Allow
+      HDXoverUDP=Preferred
+      EDTUseAdaptiveCwnd=True
+      EDT
         fi
       fi
 

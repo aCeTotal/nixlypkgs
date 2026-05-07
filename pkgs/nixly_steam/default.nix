@@ -7,12 +7,13 @@
   python3,
   bash,
   bubblewrap,
+  gamemode,
 }:
 
 let
   configureProton = writeScript "nixly-steam-configure-proton" ''
     #!${python3}/bin/python3
-    """Auto-configure Nixly_Proton as default Proton for Steam."""
+    """Auto-configure Proton CachyOS as default Proton for Steam."""
     import os, re, sys, shutil
 
     def find_config():
@@ -94,13 +95,13 @@ let
         changed = False
         steam_cfg = ensure(data, ["InstallConfigStore", "Software", "Valve", "Steam"])
 
-        # Global default: Nixly_Proton
+        # Global default: Proton CachyOS
         compat = ensure(steam_cfg, ["CompatToolMapping"])
         if "0" not in compat or not isinstance(compat.get("0"), dict):
             compat["0"] = {}
         entry = compat["0"]
-        if entry.get("name") != "Nixly_Proton":
-            entry["name"] = "Nixly_Proton"
+        if entry.get("name") != "Proton CachyOS":
+            entry["name"] = "Proton CachyOS"
             entry["config"] = ""
             entry["priority"] = "250"
             changed = True
@@ -118,7 +119,7 @@ let
             with open(path, "w") as f:
                 f.write(dump(data))
                 f.write("\n")
-            print("[nixly_steam] Nixly_Proton + Shader Pre-Caching configured.", file=sys.stderr)
+            print("[nixly_steam] Proton CachyOS + Shader Pre-Caching configured.", file=sys.stderr)
 
     if __name__ == "__main__":
         main()
@@ -128,7 +129,7 @@ in
 
 stdenvNoCC.mkDerivation {
   pname = "nixly_steam";
-  version = "1.0.0.86";
+  version = "1.1.0.0";
 
   dontUnpack = true;
   dontBuild = true;
@@ -149,19 +150,37 @@ set -euo pipefail
 export PRESSURE_VESSEL_BWRAP="NIXLY_BWRAP_PATH"
 export PRESSURE_VESSEL_FILESYSTEMS_RO=/nix/store
 
+# Vendor-agnostic gaming env: each var is consumed only by matching driver
+# (RADV_* = AMD mesa; __GL_* = NVIDIA proprietary; mesa_glthread = mesa).
+# All no-op on non-matching hardware. Safe across Intel/AMD/NVIDIA.
+export RADV_PERFTEST="''${RADV_PERFTEST:-gpl,nggc}"
+export mesa_glthread="''${mesa_glthread:-true}"
+export MESA_SHADER_CACHE_MAX_SIZE="''${MESA_SHADER_CACHE_MAX_SIZE:-10G}"
+export __GL_THREADED_OPTIMIZATIONS="''${__GL_THREADED_OPTIMIZATIONS:-1}"
+export __GL_SHADER_DISK_CACHE_SIZE="''${__GL_SHADER_DISK_CACHE_SIZE:-10737418240}"
+
+# Proton/DXVK/VKD3D — DLSS/Reflex/DXR enablement. Vendor-agnostic.
+export PROTON_ENABLE_NVAPI="''${PROTON_ENABLE_NVAPI:-1}"
+export DXVK_ENABLE_NVAPI="''${DXVK_ENABLE_NVAPI:-1}"
+export VKD3D_CONFIG="''${VKD3D_CONFIG:-dxr,dxr11}"
+export WINE_FULLSCREEN_FSR="''${WINE_FULLSCREEN_FSR:-1}"
+
 NIXLY_CONFIGURE_PROTON 2>/dev/null || true
-exec steam "$@"
+# gamemoderun on the Steam process activates GameMode for Steam + every
+# child it spawns (each game). Renice/CPU-gov/IO-prio applied automatically.
+exec NIXLY_GAMEMODERUN steam "$@"
 LAUNCHER
     chmod +x $out/bin/nixly_steam
 
     substituteInPlace $out/bin/nixly_steam \
       --replace-fail "NIXLY_BWRAP_PATH" "${bubblewrap}/bin/bwrap" \
-      --replace-fail "NIXLY_CONFIGURE_PROTON" "${configureProton}"
+      --replace-fail "NIXLY_CONFIGURE_PROTON" "${configureProton}" \
+      --replace-fail "NIXLY_GAMEMODERUN" "${gamemode}/bin/gamemoderun"
 
     cat > $out/share/applications/nixly_steam.desktop << EOF
 [Desktop Entry]
 Name=Steam
-Comment=Steam with Nixly_Proton and Shader Pre-Caching
+Comment=Steam with Proton CachyOS, GameMode, and Shader Pre-Caching
 Exec=$out/bin/nixly_steam %U
 Icon=steam
 Terminal=false
@@ -177,18 +196,22 @@ EOF
 
   postFixup = ''
     wrapProgram $out/bin/nixly_steam \
-      --prefix PATH : ${lib.makeBinPath [ steam bash bubblewrap ]}
+      --prefix PATH : ${lib.makeBinPath [ steam bash bubblewrap gamemode ]}
   '';
 
   meta = {
-    description = "Steam with Nixly_Proton and Shader Pre-Caching auto-configured";
+    description = "Steam with Proton CachyOS, GameMode, and Shader Pre-Caching auto-configured";
     longDescription = ''
-      Steam wrapped with automatic Nixly_Proton configuration. On each
-      launch, the wrapper ensures that Nixly_Proton is set as the global
-      default compatibility tool, Shader Pre-Caching is enabled, and
-      background processing of Vulkan shaders is on.
+      Steam wrapped for maximum gaming performance:
+        - Proton CachyOS set as global default compatibility tool.
+        - Shader Pre-Caching + background Vulkan shader processing on.
+        - gamemoderun wraps the Steam process so every game inherits
+          GameMode (CPU governor, renice, ioprio).
+        - Vendor-agnostic env hints for Mesa/NVAPI/DXVK/VKD3D/Wine FSR.
 
-      Requires programs.steam.enable = true in your NixOS configuration.
+      Requires programs.steam.enable = true and the proton-cachyos
+      overlay (Proton CachyOS compat tool registered in Steam) in your
+      NixOS configuration.
     '';
     homepage = "https://store.steampowered.com/";
     license = lib.licenses.unfreeRedistributable;
