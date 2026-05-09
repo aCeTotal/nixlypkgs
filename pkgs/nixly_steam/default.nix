@@ -211,12 +211,67 @@ let
         news = ensure(user_cfg, ["News"])
         changed |= set_leaf(news, "NotifyAvailableGames", "0")
 
+        # Steam Game Recording off — background recording eats CPU/disk
+        # constantly during gameplay. Key paths shifted between Steam builds
+        # (streaming_v2 vs GameRecording subtree); write to all known
+        # locations. Best-effort: extra keys are harmless if Steam ignores.
+        gr = ensure(user_cfg, ["GameRecording"])
+        for k in ("Mode", "Enabled", "BackgroundRecording"):
+            changed |= set_leaf(gr, k, "0")
+        sv2 = ensure(user_cfg, ["streaming_v2"])
+        changed |= set_leaf(sv2, "BackgroundRecording", "0")
+
         # Per-game gamemode auto-apply
         changed |= patch_app_launch_options(user_cfg)
 
         if changed:
             write_back(path, data)
             print(f"[nixly_steam] Local UI prefs patched: {path}", file=sys.stderr)
+
+    def library_paths(root):
+        # libraryfolders.vdf lives in steamapps/ (current) or config/ (older).
+        # Returns list of library root dirs (each contains steamapps/).
+        paths = [root]
+        for cand in (
+            os.path.join(root, "steamapps", "libraryfolders.vdf"),
+            os.path.join(root, "config", "libraryfolders.vdf"),
+        ):
+            if not os.path.isfile(cand):
+                continue
+            try:
+                with open(cand) as f:
+                    data = parse(f.read())
+            except Exception:
+                continue
+            folders = data.get("libraryfolders") or data.get("LibraryFolders") or {}
+            if isinstance(folders, dict):
+                for v in folders.values():
+                    if isinstance(v, dict) and isinstance(v.get("path"), str):
+                        paths.append(v["path"])
+            break
+        # Dedup, preserve order.
+        seen, out = set(), []
+        for p in paths:
+            if p not in seen and os.path.isdir(p):
+                seen.add(p)
+                out.append(p)
+        return out
+
+    def patch_appmanifest(path):
+        # AutoUpdateBehavior: "0" always-update (default), "1" only-on-launch,
+        # "2" high-priority. Set to "1" so background updates don't hit disk
+        # /bandwidth during gameplay. New installs get "0" → re-run on each
+        # launch.
+        with open(path) as f:
+            data = parse(f.read())
+        appstate = data.get("AppState")
+        if not isinstance(appstate, dict):
+            return False
+        if appstate.get("AutoUpdateBehavior") == "1":
+            return False
+        appstate["AutoUpdateBehavior"] = "1"
+        write_back(path, data)
+        return True
 
     def main():
         root = find_root()
@@ -240,6 +295,20 @@ let
                 patch_localconfig(lc)
             except Exception as e:
                 print(f"[nixly_steam] local patch failed ({lc}): {e}", file=sys.stderr)
+
+        patched = 0
+        for lib in library_paths(root):
+            for acf in glob.glob(os.path.join(lib, "steamapps", "appmanifest_*.acf")):
+                try:
+                    if patch_appmanifest(acf):
+                        patched += 1
+                except Exception as e:
+                    print(f"[nixly_steam] acf patch failed ({acf}): {e}", file=sys.stderr)
+        if patched:
+            print(
+                f"[nixly_steam] AutoUpdateBehavior=1 applied to {patched} app(s).",
+                file=sys.stderr,
+            )
 
     if __name__ == "__main__":
         main()
@@ -285,12 +354,23 @@ export DXVK_ENABLE_NVAPI="''${DXVK_ENABLE_NVAPI:-1}"
 export VKD3D_CONFIG="''${VKD3D_CONFIG:-dxr,dxr11}"
 export WINE_FULLSCREEN_FSR="''${WINE_FULLSCREEN_FSR:-1}"
 
+# Force ntsync (faster than fsync). CachyOS kernel ships ntsync; Proton
+# autodetects but explicit makes it deterministic. No-op on kernels without
+# the module — Proton falls back to fsync.
+export PROTON_USE_NTSYNC="''${PROTON_USE_NTSYNC:-1}"
+
 # Compat tools (GE-Proton, Proton CachyOS, …). Prepended so user-set value
 # from environment still wins via colon-merge.
 export STEAM_EXTRA_COMPAT_TOOLS_PATHS="NIXLY_COMPAT_PATHS''${STEAM_EXTRA_COMPAT_TOOLS_PATHS:+:''${STEAM_EXTRA_COMPAT_TOOLS_PATHS}}"
 
+# Pre-launch: cover first-ever run when Steam dirs may not yet exist.
 NIXLY_CONFIGURE_PROTON 2>/dev/null || true
-exec steam NIXLY_EXTRA_STEAM_ARGS "$@"
+# Post-exit: Steam rewrites config.vdf + localconfig.vdf on exit and drops
+# CompatToolMapping["0"] / StartPage / notification keys it didn't set itself.
+# Re-patch via EXIT trap so values persist for next launch even if Steam
+# crashes or returns non-zero (set -e would otherwise skip the post-step).
+trap 'NIXLY_CONFIGURE_PROTON 2>/dev/null || true' EXIT
+steam NIXLY_EXTRA_STEAM_ARGS "$@"
 LAUNCHER
     chmod +x $out/bin/nixly_steam
 
