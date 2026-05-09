@@ -7,26 +7,41 @@
   python3,
   bash,
   bubblewrap,
+  proton-ge-bin,
+  proton-cachyos,
   # Extra CLI args appended to the steam invocation. Default disables CEF GPU
   # compositing — required under Niri/xwayland-satellite where rootless
   # XWayland breaks CEF compositing → Steam UI black window.
   extraSteamArgs ? [ "-cef-disable-gpu-compositing" ],
+  # Compat tools exposed via STEAM_EXTRA_COMPAT_TOOLS_PATHS. programs.steam's
+  # extraCompatPackages only wires the system steam binary (it's a
+  # configuration on programs.steam.package, not a global env injection).
+  # nixly_steam exec's `steam` from its own PATH and never inherits that.
+  # Bake the path into the launcher so GE-Proton + Proton CachyOS appear in
+  # Steam's compat-tool dropdown when launched via nixly_steam.
+  extraCompatPackages ? [ proton-ge-bin proton-cachyos ],
 }:
 
 let
   configureProton = writeScript "nixly-steam-configure-proton" ''
     #!${python3}/bin/python3
-    """Auto-configure Proton CachyOS as default Proton for Steam."""
-    import os, re, sys, shutil
+    """Auto-configure Steam: Proton CachyOS default, shader pre-cache,
+    Library as start page, friends + news popups off, gamemoderun prefix
+    on every game's LaunchOptions.
 
-    def find_config():
+    Steam rewrites localconfig.vdf on exit, so this runs on every launch.
+    Best-effort: VDF key names occasionally shift between Steam UI rewrites.
+    """
+    import glob, os, re, sys, shutil
+
+    def find_root():
         xdg = os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share"))
         for p in [
-            os.path.join(xdg, "Steam", "config", "config.vdf"),
-            os.path.expanduser("~/.steam/steam/config/config.vdf"),
-            os.path.expanduser("~/.steam/root/config/config.vdf"),
+            os.path.join(xdg, "Steam"),
+            os.path.expanduser("~/.steam/steam"),
+            os.path.expanduser("~/.steam/root"),
         ]:
-            if os.path.isfile(p):
+            if os.path.isdir(p):
                 return p
         return None
 
@@ -82,19 +97,23 @@ let
             d = d[k]
         return d
 
-    def main():
-        path = find_config()
-        if path is None:
-            print(
-                "[nixly_steam] Steam config not found. "
-                "Settings will be configured after first Steam launch.",
-                file=sys.stderr,
-            )
-            return
+    def set_leaf(d, key, value):
+        if d.get(key) != value:
+            d[key] = value
+            return True
+        return False
 
+    def write_back(path, data):
+        backup = path + ".nixly_backup"
+        if not os.path.exists(backup):
+            shutil.copy2(path, backup)
+        with open(path, "w") as f:
+            f.write(dump(data))
+            f.write("\n")
+
+    def patch_global(path):
         with open(path) as f:
             data = parse(f.read())
-
         changed = False
         steam_cfg = ensure(data, ["InstallConfigStore", "Software", "Valve", "Steam"])
 
@@ -111,18 +130,116 @@ let
 
         # Shader Pre-Caching & background Vulkan shader processing
         shader = ensure(steam_cfg, ["ShaderCacheManager"])
-        if shader.get("EnableShaderBackgroundProcessing") != "1":
-            shader["EnableShaderBackgroundProcessing"] = "1"
-            changed = True
+        changed |= set_leaf(shader, "EnableShaderBackgroundProcessing", "1")
+
+        # Library as start page (global fallback)
+        changed |= set_leaf(steam_cfg, "StartPage", "Library")
 
         if changed:
-            backup = path + ".nixly_backup"
-            if not os.path.exists(backup):
-                shutil.copy2(path, backup)
-            with open(path, "w") as f:
-                f.write(dump(data))
-                f.write("\n")
-            print("[nixly_steam] Proton CachyOS + Shader Pre-Caching configured.", file=sys.stderr)
+            write_back(path, data)
+            print("[nixly_steam] Global config patched.", file=sys.stderr)
+
+    def patch_app_launch_options(user_cfg):
+        # Inject `gamemoderun %command%` into per-app LaunchOptions so every
+        # game runs under gamemode without wrapping Steam itself. Re-runs on
+        # each Steam start, so newly installed games get covered.
+        prefix = "gamemoderun %command%"
+        changed = False
+        # Steam's case occasionally drifts ("apps" vs "Apps"); check both.
+        steam_node = ensure(user_cfg, ["Software", "Valve", "Steam"])
+        apps = None
+        for k in ("apps", "Apps"):
+            v = steam_node.get(k)
+            if isinstance(v, dict):
+                apps = v
+                break
+        if apps is None:
+            return False
+
+        for appid, app in apps.items():
+            if not isinstance(app, dict):
+                continue
+            opts = app.get("LaunchOptions", "")
+            if "gamemoderun" in opts:
+                continue
+            if not opts:
+                app["LaunchOptions"] = prefix
+                changed = True
+            elif "%command%" in opts:
+                app["LaunchOptions"] = opts.replace(
+                    "%command%", "gamemoderun %command%", 1
+                )
+                changed = True
+            else:
+                # Args-only launch options: prepending would make Steam launch
+                # `gamemoderun` as the game binary. Skip to avoid breakage.
+                print(
+                    f"[nixly_steam] app {appid}: args-only LaunchOptions "
+                    f"({opts!r}); skipping gamemode prefix.",
+                    file=sys.stderr,
+                )
+        return changed
+
+    def patch_localconfig(path):
+        with open(path) as f:
+            data = parse(f.read())
+        changed = False
+        user_cfg = ensure(data, ["UserLocalConfigStore"])
+
+        # Library as start page (per-user; Steam reads this over global)
+        system = ensure(user_cfg, ["system"])
+        changed |= set_leaf(system, "StartPage", "Library")
+
+        # Friends notifications + sounds off (no chat/online popups)
+        friends = ensure(user_cfg, ["friends"])
+        for k in [
+            "Notifications_ShowChatRoomNotification",
+            "Notifications_ShowMessage",
+            "Notifications_ShowOnlineFriend",
+            "Notifications_ShowOnlineGame",
+            "Notifications_ShowFriendActivity",
+            "Notifications_EventsAndAnnouncements",
+            "Sounds_PlayChatRoomNotification",
+            "Sounds_PlayMessage",
+            "Sounds_PlayOnlineFriend",
+            "Sounds_PlayOnlineGame",
+            "Sounds_PlayEventsAndAnnouncements",
+        ]:
+            changed |= set_leaf(friends, k, "0")
+
+        # News popups off (store/news auto-popups)
+        news = ensure(user_cfg, ["News"])
+        changed |= set_leaf(news, "NotifyAvailableGames", "0")
+
+        # Per-game gamemode auto-apply
+        changed |= patch_app_launch_options(user_cfg)
+
+        if changed:
+            write_back(path, data)
+            print(f"[nixly_steam] Local UI prefs patched: {path}", file=sys.stderr)
+
+    def main():
+        root = find_root()
+        if root is None:
+            print(
+                "[nixly_steam] Steam directory not found. "
+                "Settings will be configured after first Steam launch.",
+                file=sys.stderr,
+            )
+            return
+
+        gconf = os.path.join(root, "config", "config.vdf")
+        if os.path.isfile(gconf):
+            try:
+                patch_global(gconf)
+            except Exception as e:
+                print(f"[nixly_steam] global patch failed: {e}", file=sys.stderr)
+
+        for lc in glob.glob(os.path.join(root, "userdata", "*", "config", "localconfig.vdf")):
+            try:
+                patch_localconfig(lc)
+            except Exception as e:
+                print(f"[nixly_steam] local patch failed ({lc}): {e}", file=sys.stderr)
 
     if __name__ == "__main__":
         main()
@@ -168,6 +285,10 @@ export DXVK_ENABLE_NVAPI="''${DXVK_ENABLE_NVAPI:-1}"
 export VKD3D_CONFIG="''${VKD3D_CONFIG:-dxr,dxr11}"
 export WINE_FULLSCREEN_FSR="''${WINE_FULLSCREEN_FSR:-1}"
 
+# Compat tools (GE-Proton, Proton CachyOS, …). Prepended so user-set value
+# from environment still wins via colon-merge.
+export STEAM_EXTRA_COMPAT_TOOLS_PATHS="NIXLY_COMPAT_PATHS''${STEAM_EXTRA_COMPAT_TOOLS_PATHS:+:''${STEAM_EXTRA_COMPAT_TOOLS_PATHS}}"
+
 NIXLY_CONFIGURE_PROTON 2>/dev/null || true
 exec steam NIXLY_EXTRA_STEAM_ARGS "$@"
 LAUNCHER
@@ -176,6 +297,9 @@ LAUNCHER
     substituteInPlace $out/bin/nixly_steam \
       --replace-fail "NIXLY_BWRAP_PATH" "${bubblewrap}/bin/bwrap" \
       --replace-fail "NIXLY_CONFIGURE_PROTON" "${configureProton}" \
+      --replace-fail "NIXLY_COMPAT_PATHS" "${
+        lib.makeSearchPathOutput "steamcompattool" "" extraCompatPackages
+      }" \
       --replace-fail " NIXLY_EXTRA_STEAM_ARGS" "${
         lib.optionalString (extraSteamArgs != [ ])
           (" " + lib.escapeShellArgs extraSteamArgs)
@@ -204,12 +328,21 @@ EOF
   '';
 
   meta = {
-    description = "Steam with Proton CachyOS and Shader Pre-Caching auto-configured";
+    description = "Steam with Proton CachyOS, Shader Pre-Caching and quiet UI auto-configured";
     longDescription = ''
       Steam wrapped for maximum gaming performance:
         - Proton CachyOS set as global default compatibility tool.
         - Shader Pre-Caching + background Vulkan shader processing on.
+        - Library set as start page (global + per-user).
+        - Friends + news notification popups + sounds disabled.
+        - `gamemoderun %command%` injected into every game's LaunchOptions
+          (empty → set; `%command%` present → replace; args-only → skip).
         - Vendor-agnostic env hints for Mesa/NVAPI/DXVK/VKD3D/Wine FSR.
+
+      Steam rewrites localconfig.vdf on exit, so the launcher reapplies UI
+      prefs on every start. Best-effort: VDF key names occasionally shift
+      between Steam UI rewrites; failures log to stderr and do not block
+      launch.
 
       GameMode not applied to Steam itself. Add `gamemoderun %command%`
       per-game in Steam launch options if desired.
