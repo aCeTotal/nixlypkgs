@@ -348,6 +348,28 @@ export MESA_SHADER_CACHE_MAX_SIZE="''${MESA_SHADER_CACHE_MAX_SIZE:-10G}"
 export __GL_THREADED_OPTIMIZATIONS="''${__GL_THREADED_OPTIMIZATIONS:-1}"
 export __GL_SHADER_DISK_CACHE_SIZE="''${__GL_SHADER_DISK_CACHE_SIZE:-10737418240}"
 
+# Force discrete GPU on hybrid (PRIME) systems. Detection-gated so vars
+# only apply when a second GPU exists — single-GPU NVIDIA/AMD/Intel skip
+# entirely (avoids __GLX_VENDOR_LIBRARY_NAME=nvidia breaking GL on
+# AMD-only, and DRI_PRIME=1 confusing mesa on single-GPU).
+nixly_gpu_count=$(ls -d /sys/class/drm/renderD* 2>/dev/null | wc -l)
+if [ "$nixly_gpu_count" -gt 1 ]; then
+  if [ -e /proc/driver/nvidia/version ]; then
+    # NVIDIA hybrid (Intel/AMD iGPU + NVIDIA dGPU). Offload mode: GL via
+    # nvidia GLX vendor, Vulkan only sees NVIDIA device.
+    export __NV_PRIME_RENDER_OFFLOAD="''${__NV_PRIME_RENDER_OFFLOAD:-1}"
+    export __NV_PRIME_RENDER_OFFLOAD_PROVIDER="''${__NV_PRIME_RENDER_OFFLOAD_PROVIDER:-NVIDIA-G0}"
+    export __GLX_VENDOR_LIBRARY_NAME="''${__GLX_VENDOR_LIBRARY_NAME:-nvidia}"
+    export __VK_LAYER_NV_optimus="''${__VK_LAYER_NV_optimus:-NVIDIA_only}"
+  else
+    # Mesa-only hybrid (Intel iGPU + AMD dGPU). DRI_PRIME=1 picks the
+    # non-default (discrete) provider for GL; mesa's vk_device_select
+    # layer also honors DRI_PRIME for Vulkan device selection.
+    export DRI_PRIME="''${DRI_PRIME:-1}"
+  fi
+fi
+unset nixly_gpu_count
+
 # Proton/DXVK/VKD3D — DLSS/Reflex/DXR enablement. Vendor-agnostic.
 export PROTON_ENABLE_NVAPI="''${PROTON_ENABLE_NVAPI:-1}"
 export DXVK_ENABLE_NVAPI="''${DXVK_ENABLE_NVAPI:-1}"
