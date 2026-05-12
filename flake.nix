@@ -45,6 +45,7 @@
         };
         nixlymediaserver = import ./modules/nixlymediaserver.nix;
         nixly_lockscreen = import ./modules/nixly_lockscreen.nix;
+        nixly_steam = import ./modules/nixly_steam.nix;
       };
 
       homeManagerModules = {

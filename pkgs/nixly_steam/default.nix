@@ -7,8 +7,18 @@
   python3,
   bash,
   bubblewrap,
+  gamescope,
+  wlr-randr,
+  gamemode,
   proton-ge-bin,
   proton-cachyos,
+  writeShellScript,
+  # GPU vendor to bake universally-safe env defaults for. "auto" detects at
+  # launch via /sys/class/drm/cardN/device/vendor + /proc/driver/nvidia/version
+  # and sets the matching vendor block. "amd"/"nvidia"/"intel" bakes the
+  # selected vendor's block directly (skips runtime detection). The "generic"
+  # block (vendor-agnostic Proton/Wine flags) always applies.
+  gpuVendor ? "auto",
   # Extra CLI args appended to the steam invocation. Default disables CEF GPU
   # compositing — required under Niri/xwayland-satellite where rootless
   # XWayland breaks CEF compositing → Steam UI black window.
@@ -23,10 +33,190 @@
 }:
 
 let
+  validVendors = [ "auto" "amd" "nvidia" "intel" ];
+
+  gpuParams = assert
+    (lib.elem gpuVendor validVendors)
+    || throw "nixly_steam: gpuVendor must be one of ${
+      lib.concatStringsSep ", " validVendors
+    } (got ${gpuVendor})";
+    import ./gpu-params.nix;
+
+  # Render `attrset { K = V; }` as bash `export K="''${K:-V}"` lines so user-set
+  # env always wins over the bake-in defaults.
+  exportLines = attrs:
+    lib.concatStringsSep "\n" (lib.mapAttrsToList
+      (k: v: ''export ${k}="''${${k}:-${v}}"'')
+      attrs);
+
+  amdBlock = exportLines gpuParams.amd;
+  nvidiaBlock = exportLines gpuParams.nvidia;
+  intelBlock = exportLines gpuParams.intel;
+  genericBlock = exportLines gpuParams.generic;
+
+  # Vendor-specific env block. "auto" → bash runtime-detect; explicit vendor →
+  # bake that vendor's block directly. "generic" block (Proton/Wine flags
+  # applicable everywhere) always trails.
+  gpuEnvScript = writeShellScript "nixly-steam-gpu-env" (
+    if gpuVendor == "auto" then ''
+      # Detect GPU vendor of dGPU (NVIDIA wins; else AMD > Intel by /sys IDs).
+      nixly_vendor=unknown
+      if [ -e /proc/driver/nvidia/version ]; then
+        nixly_vendor=nvidia
+      else
+        for nixly_d in /sys/class/drm/card[0-9]*; do
+          [ -f "$nixly_d/device/vendor" ] || continue
+          case "$(cat "$nixly_d/device/vendor" 2>/dev/null)" in
+            0x1002) nixly_vendor=amd; break ;;
+            0x8086) [ "$nixly_vendor" = unknown ] && nixly_vendor=intel ;;
+          esac
+        done
+        unset nixly_d
+      fi
+      case "$nixly_vendor" in
+        amd)
+      ${amdBlock}
+          ;;
+        nvidia)
+      ${nvidiaBlock}
+          ;;
+        intel)
+      ${intelBlock}
+          ;;
+      esac
+      unset nixly_vendor
+      ${genericBlock}
+    '' else ''
+      # gpuVendor=${gpuVendor} baked at build time.
+      ${exportLines gpuParams.${gpuVendor}}
+      ${genericBlock}
+    ''
+  );
+
+  # Per-game wrapper: detect focused nixlytile output via niri-IPC, query
+  # its max mode via wlr-randr, exec gamescope fullscreen on that output
+  # with gamemoderun chaining the actual game. Fallback to first enabled
+  # output if IPC unavailable. Steam stores LaunchOptions as text, so the
+  # absolute store path is baked into every per-app LaunchOptions string;
+  # `configureProton` re-patches on launch so a new build's path replaces
+  # the old one before games run.
+  gamescopeWrap = writeScript "nixly-gamescope-wrap" ''
+    #!${python3}/bin/python3
+    """Wrap %command% with gamescope at focused output's max resolution."""
+    import json, os, socket, subprocess, sys, time
+
+    NIRI_SOCK = os.environ.get("NIRI_SOCKET", "")
+    WLR_RANDR = "${wlr-randr}/bin/wlr-randr"
+    GAMESCOPE = "${gamescope}/bin/gamescope"
+    GAMEMODERUN = "${gamemode}/bin/gamemoderun"
+
+    def focused_output():
+        if not NIRI_SOCK or not os.path.exists(NIRI_SOCK):
+            return None
+        try:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.settimeout(0.5)
+            s.connect(NIRI_SOCK)
+            s.sendall(b'"EventStream"\n')
+            buf = b""
+            deadline = time.time() + 1.5
+            while time.time() < deadline:
+                try:
+                    s.settimeout(max(0.05, deadline - time.time()))
+                    chunk = s.recv(65536)
+                except socket.timeout:
+                    break
+                if not chunk:
+                    break
+                buf += chunk
+                if b"WorkspacesChanged" in buf and buf.endswith(b"\n"):
+                    break
+            try:
+                s.close()
+            except Exception:
+                pass
+            for line in buf.split(b"\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    msg = json.loads(line)
+                except Exception:
+                    continue
+                if not isinstance(msg, dict):
+                    continue
+                wsc = msg.get("WorkspacesChanged")
+                if not isinstance(wsc, dict):
+                    continue
+                for w in wsc.get("workspaces", []) or []:
+                    if isinstance(w, dict) and w.get("is_focused"):
+                        return w.get("output")
+        except Exception:
+            return None
+        return None
+
+    def pick_mode(target_name):
+        try:
+            raw = subprocess.check_output([WLR_RANDR, "--json"], timeout=2.0)
+            outputs = json.loads(raw)
+        except Exception:
+            return None
+        if not isinstance(outputs, list):
+            return None
+        chosen = None
+        if target_name:
+            for o in outputs:
+                if isinstance(o, dict) and o.get("name") == target_name:
+                    chosen = o
+                    break
+        if chosen is None:
+            for o in outputs:
+                if isinstance(o, dict) and o.get("enabled"):
+                    chosen = o
+                    break
+        if chosen is None:
+            return None
+        modes = chosen.get("modes") or []
+        if not modes:
+            return None
+        def key(m):
+            return (
+                int(m.get("width") or 0) * int(m.get("height") or 0),
+                float(m.get("refresh") or 0),
+            )
+        best = max(modes, key=key)
+        try:
+            return (
+                str(chosen.get("name") or ""),
+                int(best["width"]),
+                int(best["height"]),
+                int(round(float(best.get("refresh") or 60))),
+            )
+        except Exception:
+            return None
+
+    def main():
+        name = focused_output()
+        mode = pick_mode(name)
+        cmd = [GAMESCOPE, "-f", "--backend", "wayland"]
+        if mode:
+            n, w, h, hz = mode
+            cmd += ["-W", str(w), "-H", str(h)]
+            if hz > 0:
+                cmd += ["-r", str(hz)]
+            if n:
+                cmd += ["--prefer-output", n]
+        cmd += ["--", GAMEMODERUN, *sys.argv[1:]]
+        os.execvp(cmd[0], cmd)
+
+    if __name__ == "__main__":
+        main()
+  '';
+
   configureProton = writeScript "nixly-steam-configure-proton" ''
     #!${python3}/bin/python3
     """Auto-configure Steam: Proton CachyOS default, shader pre-cache,
-    Library as start page, friends + news popups off, gamemoderun prefix
+    Library as start page, friends + news popups off, gamescope wrapper
     on every game's LaunchOptions.
 
     Steam rewrites localconfig.vdf on exit, so this runs on every launch.
@@ -140,10 +330,15 @@ let
             print("[nixly_steam] Global config patched.", file=sys.stderr)
 
     def patch_app_launch_options(user_cfg):
-        # Inject `gamemoderun %command%` into per-app LaunchOptions so every
-        # game runs under gamemode without wrapping Steam itself. Re-runs on
-        # each Steam start, so newly installed games get covered.
-        prefix = "gamemoderun %command%"
+        # Inject `<wrap> %command%` into per-app LaunchOptions so every game
+        # runs under gamescope (fullscreen at focused output's max mode) and
+        # gamemoderun (CPU governor + IO prio). The wrap binary chains
+        # gamemoderun internally. Re-runs on each Steam start so newly
+        # installed games get covered, and so a rebuild's new store path
+        # replaces the prior one in already-patched entries.
+        wrap = "${gamescopeWrap}"
+        wrap_marker = "nixly-gamescope-wrap"
+        new_prefix = f"{wrap} %command%"
         changed = False
         # Steam's case occasionally drifts ("apps" vs "Apps"); check both.
         steam_node = ensure(user_cfg, ["Software", "Valve", "Steam"])
@@ -156,26 +351,50 @@ let
         if apps is None:
             return False
 
+        import re as _re
+        # writeScript creates /nix/store/<hash>-nixly-gamescope-wrap as the
+        # file path itself (no /bin/ suffix).
+        wrap_path_re = _re.compile(
+            r"/nix/store/[A-Za-z0-9]+-nixly-gamescope-wrap"
+        )
+
         for appid, app in apps.items():
             if not isinstance(app, dict):
                 continue
             opts = app.get("LaunchOptions", "")
-            if "gamemoderun" in opts:
+
+            # Already wrapped — rewrite the store path if it has drifted to
+            # an older build, otherwise leave alone.
+            if wrap_marker in opts:
+                new_opts = wrap_path_re.sub(wrap, opts)
+                if new_opts != opts:
+                    app["LaunchOptions"] = new_opts
+                    changed = True
                 continue
+
             if not opts:
-                app["LaunchOptions"] = prefix
+                app["LaunchOptions"] = new_prefix
                 changed = True
-            elif "%command%" in opts:
+                continue
+
+            # Migrate prior `gamemoderun %command%` injection — wrap handles
+            # gamemode internally now.
+            if "gamemoderun %command%" in opts:
                 app["LaunchOptions"] = opts.replace(
-                    "%command%", "gamemoderun %command%", 1
+                    "gamemoderun %command%", new_prefix, 1
                 )
+                changed = True
+                continue
+
+            if "%command%" in opts:
+                app["LaunchOptions"] = opts.replace("%command%", new_prefix, 1)
                 changed = True
             else:
                 # Args-only launch options: prepending would make Steam launch
-                # `gamemoderun` as the game binary. Skip to avoid breakage.
+                # the wrap as the game binary's args. Skip to avoid breakage.
                 print(
                     f"[nixly_steam] app {appid}: args-only LaunchOptions "
-                    f"({opts!r}); skipping gamemode prefix.",
+                    f"({opts!r}); skipping gamescope wrap.",
                     file=sys.stderr,
                 )
         return changed
@@ -221,7 +440,7 @@ let
         sv2 = ensure(user_cfg, ["streaming_v2"])
         changed |= set_leaf(sv2, "BackgroundRecording", "0")
 
-        # Per-game gamemode auto-apply
+        # Per-game gamescope+gamemode auto-apply
         changed |= patch_app_launch_options(user_cfg)
 
         if changed:
@@ -339,14 +558,10 @@ set -euo pipefail
 export PRESSURE_VESSEL_BWRAP="NIXLY_BWRAP_PATH"
 export PRESSURE_VESSEL_FILESYSTEMS_RO=/nix/store
 
-# Vendor-agnostic gaming env: each var is consumed only by matching driver
-# (RADV_* = AMD mesa; __GL_* = NVIDIA proprietary; mesa_glthread = mesa).
-# All no-op on non-matching hardware. Safe across Intel/AMD/NVIDIA.
-export RADV_PERFTEST="''${RADV_PERFTEST:-gpl,nggc}"
-export mesa_glthread="''${mesa_glthread:-true}"
-export MESA_SHADER_CACHE_MAX_SIZE="''${MESA_SHADER_CACHE_MAX_SIZE:-10G}"
-export __GL_THREADED_OPTIMIZATIONS="''${__GL_THREADED_OPTIMIZATIONS:-1}"
-export __GL_SHADER_DISK_CACHE_SIZE="''${__GL_SHADER_DISK_CACHE_SIZE:-10737418240}"
+# GPU-vendor-specific env (gpuVendor build-time arg: auto/amd/nvidia/intel)
+# plus generic Proton/Wine flags. Each var uses `${VAR:-default}` so a
+# user-set value from the parent env always wins. See gpu-params.nix.
+source NIXLY_GPU_ENV
 
 # Force discrete GPU on hybrid (PRIME) systems. Detection-gated so vars
 # only apply when a second GPU exists — single-GPU NVIDIA/AMD/Intel skip
@@ -370,17 +585,6 @@ if [ "$nixly_gpu_count" -gt 1 ]; then
 fi
 unset nixly_gpu_count
 
-# Proton/DXVK/VKD3D — DLSS/Reflex/DXR enablement. Vendor-agnostic.
-export PROTON_ENABLE_NVAPI="''${PROTON_ENABLE_NVAPI:-1}"
-export DXVK_ENABLE_NVAPI="''${DXVK_ENABLE_NVAPI:-1}"
-export VKD3D_CONFIG="''${VKD3D_CONFIG:-dxr,dxr11}"
-export WINE_FULLSCREEN_FSR="''${WINE_FULLSCREEN_FSR:-1}"
-
-# Force ntsync (faster than fsync). CachyOS kernel ships ntsync; Proton
-# autodetects but explicit makes it deterministic. No-op on kernels without
-# the module — Proton falls back to fsync.
-export PROTON_USE_NTSYNC="''${PROTON_USE_NTSYNC:-1}"
-
 # Compat tools (GE-Proton, Proton CachyOS, …). Prepended so user-set value
 # from environment still wins via colon-merge.
 export STEAM_EXTRA_COMPAT_TOOLS_PATHS="NIXLY_COMPAT_PATHS''${STEAM_EXTRA_COMPAT_TOOLS_PATHS:+:''${STEAM_EXTRA_COMPAT_TOOLS_PATHS}}"
@@ -399,6 +603,7 @@ LAUNCHER
     substituteInPlace $out/bin/nixly_steam \
       --replace-fail "NIXLY_BWRAP_PATH" "${bubblewrap}/bin/bwrap" \
       --replace-fail "NIXLY_CONFIGURE_PROTON" "${configureProton}" \
+      --replace-fail "NIXLY_GPU_ENV" "${gpuEnvScript}" \
       --replace-fail "NIXLY_COMPAT_PATHS" "${
         lib.makeSearchPathOutput "steamcompattool" "" extraCompatPackages
       }" \
@@ -437,17 +642,29 @@ EOF
         - Shader Pre-Caching + background Vulkan shader processing on.
         - Library set as start page (global + per-user).
         - Friends + news notification popups + sounds disabled.
-        - `gamemoderun %command%` injected into every game's LaunchOptions
-          (empty → set; `%command%` present → replace; args-only → skip).
-        - Vendor-agnostic env hints for Mesa/NVAPI/DXVK/VKD3D/Wine FSR.
+        - `nixly-gamescope-wrap %command%` injected into every game's
+          LaunchOptions: gamescope fullscreen on the nixlytile-focused
+          output at its max mode, chaining gamemoderun for the actual
+          game process (empty → set; `gamemoderun %command%` → migrated;
+          `%command%` present → replace; args-only → skip).
+        - GPU-vendor-specific env defaults (gpuVendor arg, default "auto"):
+          AMD → RADV_PERFTEST/AMD_VULKAN_ICD/mesa_glthread/shader-cache.
+          NVIDIA → __GL_THREADED_OPTIMIZATIONS/__GL_GSYNC_ALLOWED/
+          __GL_VRR_ALLOWED/__GL_SHADER_DISK_CACHE_SIZE/NVAPI.
+          Intel → ANV_ENABLE_PIPELINE_CACHE/mesa_glthread/shader-cache.
+          Generic block (VKD3D_CONFIG=dxr,dxr11/WINE_FULLSCREEN_FSR/
+          PROTON_USE_NTSYNC) always applies. See gpu-params.nix.
 
       Steam rewrites localconfig.vdf on exit, so the launcher reapplies UI
       prefs on every start. Best-effort: VDF key names occasionally shift
       between Steam UI rewrites; failures log to stderr and do not block
       launch.
 
-      GameMode not applied to Steam itself. Add `gamemoderun %command%`
-      per-game in Steam launch options if desired.
+      The wrap script reads `NIRI_SOCKET` (exported by nixlytile) to find
+      the focused output, then `wlr-randr --json` for that output's max
+      mode (W×H by area, refresh as tiebreaker). Falls back to first
+      enabled output if IPC unavailable. GameMode is not applied to Steam
+      itself — only to the game process inside gamescope.
 
       Requires programs.steam.enable = true and the proton-cachyos
       overlay (Proton CachyOS compat tool registered in Steam) in your
