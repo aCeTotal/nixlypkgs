@@ -235,11 +235,29 @@ let
                 return p
         return None
 
+    # VDF strings allow C-style escapes inside quotes (\" \\ \n \t \r).
+    # Tokenizer must consume `\<anything>` as a unit so embedded `\"` does
+    # not terminate the string. Unescape on read, re-escape on dump so
+    # round-trip preserves Steam's payload exactly.
+    _UNESC = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", '"': '"'}
+
+    def _unescape(s):
+        return re.sub(r"\\([\s\S])", lambda m: _UNESC.get(m.group(1), m.group(1)), s)
+
+    def _escape(s):
+        return (
+            s.replace("\\", "\\\\")
+             .replace("\"", "\\\"")
+             .replace("\n", "\\n")
+             .replace("\t", "\\t")
+             .replace("\r", "\\r")
+        )
+
     def tokenize(text):
         tokens = []
-        for m in re.finditer(r'"([^"]*)"|(\{)|(\})', text):
+        for m in re.finditer(r'"((?:[^"\\]|\\[\s\S])*)"|(\{)|(\})', text):
             if m.group(1) is not None:
-                tokens.append(("s", m.group(1)))
+                tokens.append(("s", _unescape(m.group(1))))
             elif m.group(2):
                 tokens.append(("o", "{"))
             else:
@@ -271,13 +289,14 @@ let
         lines = []
         tab = "\t" * indent
         for k, v in data.items():
+            ek = _escape(k)
             if isinstance(v, dict):
-                lines.append(f'{tab}"{k}"')
+                lines.append(f'{tab}"{ek}"')
                 lines.append(tab + "{")
                 lines.append(dump(v, indent + 1))
                 lines.append(tab + "}")
             else:
-                lines.append(f'{tab}"{k}"\t\t"{v}"')
+                lines.append(f'{tab}"{ek}"\t\t"{_escape(str(v))}"')
         return "\n".join(lines)
 
     def ensure(d, keys):
@@ -390,13 +409,11 @@ let
                 app["LaunchOptions"] = opts.replace("%command%", new_prefix, 1)
                 changed = True
             else:
-                # Args-only launch options: prepending would make Steam launch
-                # the wrap as the game binary's args. Skip to avoid breakage.
-                print(
-                    f"[nixly_steam] app {appid}: args-only LaunchOptions "
-                    f"({opts!r}); skipping gamescope wrap.",
-                    file=sys.stderr,
-                )
+                # Args-only LaunchOptions ("-skipintro -windowed"): Steam appends
+                # these to the game binary. Inject `<wrap> %command%` in front so
+                # the wrap launches the game binary with the user's args intact.
+                app["LaunchOptions"] = f"{new_prefix} {opts}"
+                changed = True
         return changed
 
     def patch_localconfig(path):
