@@ -195,7 +195,31 @@ let
         except Exception:
             return None
 
+    def apply_prime_offload():
+        # Hybrid-GPU PRIME offload. Applied per-game (here) not to Steam
+        # parent: forcing Steam UI onto NVIDIA dGPU breaks steamwebhelper
+        # CEF inside the steam-runtime container (libGLX_nvidia not bound).
+        # Detection-gated: skip entirely on single-GPU systems to avoid
+        # __GLX_VENDOR_LIBRARY_NAME=nvidia on AMD-only or DRI_PRIME=1 on
+        # single-GPU mesa.
+        try:
+            renders = [p for p in os.listdir("/sys/class/drm")
+                       if p.startswith("renderD")]
+        except OSError:
+            return
+        if len(renders) <= 1:
+            return
+        if os.path.exists("/proc/driver/nvidia/version"):
+            os.environ.setdefault("__NV_PRIME_RENDER_OFFLOAD", "1")
+            os.environ.setdefault(
+                "__NV_PRIME_RENDER_OFFLOAD_PROVIDER", "NVIDIA-G0")
+            os.environ.setdefault("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
+            os.environ.setdefault("__VK_LAYER_NV_optimus", "NVIDIA_only")
+        else:
+            os.environ.setdefault("DRI_PRIME", "1")
+
     def main():
+        apply_prime_offload()
         name = focused_output()
         mode = pick_mode(name)
         cmd = [GAMESCOPE, "-f", "--backend", "wayland"]
@@ -580,27 +604,13 @@ export PRESSURE_VESSEL_FILESYSTEMS_RO=/nix/store
 # user-set value from the parent env always wins. See gpu-params.nix.
 source NIXLY_GPU_ENV
 
-# Force discrete GPU on hybrid (PRIME) systems. Detection-gated so vars
-# only apply when a second GPU exists — single-GPU NVIDIA/AMD/Intel skip
-# entirely (avoids __GLX_VENDOR_LIBRARY_NAME=nvidia breaking GL on
-# AMD-only, and DRI_PRIME=1 confusing mesa on single-GPU).
-nixly_gpu_count=$(ls -d /sys/class/drm/renderD* 2>/dev/null | wc -l)
-if [ "$nixly_gpu_count" -gt 1 ]; then
-  if [ -e /proc/driver/nvidia/version ]; then
-    # NVIDIA hybrid (Intel/AMD iGPU + NVIDIA dGPU). Offload mode: GL via
-    # nvidia GLX vendor, Vulkan only sees NVIDIA device.
-    export __NV_PRIME_RENDER_OFFLOAD="''${__NV_PRIME_RENDER_OFFLOAD:-1}"
-    export __NV_PRIME_RENDER_OFFLOAD_PROVIDER="''${__NV_PRIME_RENDER_OFFLOAD_PROVIDER:-NVIDIA-G0}"
-    export __GLX_VENDOR_LIBRARY_NAME="''${__GLX_VENDOR_LIBRARY_NAME:-nvidia}"
-    export __VK_LAYER_NV_optimus="''${__VK_LAYER_NV_optimus:-NVIDIA_only}"
-  else
-    # Mesa-only hybrid (Intel iGPU + AMD dGPU). DRI_PRIME=1 picks the
-    # non-default (discrete) provider for GL; mesa's vk_device_select
-    # layer also honors DRI_PRIME for Vulkan device selection.
-    export DRI_PRIME="''${DRI_PRIME:-1}"
-  fi
-fi
-unset nixly_gpu_count
+# Hybrid-GPU PRIME offload (NVIDIA/AMD dGPU) is applied per-game inside
+# gamescopeWrap, NOT to the Steam parent. Forcing the whole Steam process
+# onto an NVIDIA dGPU pushes steamwebhelper's CEF GPU process to look up
+# libGLX_nvidia inside the steam-runtime container, where NixOS driver
+# paths (/run/opengl-driver) aren't bound — CEF GPU process then crashes
+# in a respawn loop and the main UI never renders. Steam UI on Intel iGPU
+# is plenty; the dGPU only matters for game frames.
 
 # Compat tools (GE-Proton, Proton CachyOS, …). Prepended so user-set value
 # from environment still wins via colon-merge.
