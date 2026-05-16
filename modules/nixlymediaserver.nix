@@ -160,7 +160,9 @@ in
     users.groups.${cfg.group} = lib.mkIf (cfg.group == "nixlymedia") { };
 
     # Raise inotify watch limit — large libraries blow past the 8192 default.
-    boot.kernel.sysctl."fs.inotify.max_user_watches" = lib.mkDefault 524288;
+    # mkForce because nixpkgs sets a default at the same priority; we want
+    # this bumped whenever the server is enabled.
+    boot.kernel.sysctl."fs.inotify.max_user_watches" = lib.mkForce 524288;
 
     systemd.tmpfiles.rules = [
       "d ${cfg.dataDir} 0750 ${cfg.user} ${cfg.group} - -"
