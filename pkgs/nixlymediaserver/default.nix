@@ -1,28 +1,29 @@
 { lib
 , stdenv
 , fetchFromGitHub
+, makeWrapper
 , pkg-config
 , sqlite
 , curl
 , ffmpeg-headless
 , cjson
+, xdg-utils
 }:
 
 stdenv.mkDerivation rec {
   pname = "nixlymediaserver";
-  version = "git";
+  version = "0-unstable-2025-05-16";
 
   src = fetchFromGitHub {
     owner = "aCeTotal";
-    repo = "nixlytile";
-    rev = "df39dc2ca9698e3ec091af387c76405be93f2517";
-    hash = "sha256-z3G/rNJ+Xh68Vsdqov1TRKMnYYbUwPPvGFuYeyZXqr4=";
+    repo = "nixlymediaserver";
+    rev = "d5e62b0319460bcaddde59e2a428e73195ff5272";
+    hash = "sha256-EwLNKX7CwvpDVwB1W/qREgXVeVTDIenF0XSJ/gPrjzE=";
   };
-
-  sourceRoot = "${src.name}/Server";
 
   nativeBuildInputs = [
     pkg-config
+    makeWrapper
   ];
 
   buildInputs = [
@@ -37,7 +38,7 @@ stdenv.mkDerivation rec {
   ];
 
   preBuild = ''
-    # Repo has pre-compiled .o files committed; force a clean rebuild
+    # Repo ships pre-compiled .o files; force a clean rebuild.
     make clean
   '';
 
@@ -46,16 +47,15 @@ stdenv.mkDerivation rec {
 
     mkdir -p $out/bin
     cp nixly-server $out/bin/
-
-    mkdir -p $out/share/nixlymediaserver
-    cp ${src}/Server/config.conf.example $out/share/nixlymediaserver/ 2>/dev/null || true
+    wrapProgram $out/bin/nixly-server \
+      --prefix PATH : ${lib.makeBinPath [ xdg-utils ]}
 
     runHook postInstall
   '';
 
   meta = with lib; {
-    description = "Nixly Media Server - Lossless streaming server for movies and TV shows";
-    homepage = "https://github.com/aCeTotal/nixlytile";
+    description = "Lossless streaming media server with TMDB scraping, downloader, IP gate and live admin UI";
+    homepage = "https://github.com/aCeTotal/nixlymediaserver";
     license = licenses.gpl3Plus;
     platforms = platforms.linux;
     mainProgram = "nixly-server";
