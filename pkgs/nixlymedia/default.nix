@@ -65,6 +65,30 @@ rustPlatform.buildRustPackage rec {
     udev
   ];
 
+  postInstall = ''
+    for size in 16x16 32x32 64x64 128x128; do
+      install -Dm644 \
+        ${mpv-unwrapped}/share/icons/hicolor/$size/apps/mpv.png \
+        $out/share/icons/hicolor/$size/apps/nixlymedia.png
+    done
+    install -Dm644 \
+      ${mpv-unwrapped}/share/icons/hicolor/scalable/apps/mpv.svg \
+      $out/share/icons/hicolor/scalable/apps/nixlymedia.svg
+
+    install -Dm644 /dev/stdin $out/share/applications/nixlymedia.desktop <<EOF
+    [Desktop Entry]
+    Type=Application
+    Name=Nixly Media
+    GenericName=Media Client
+    Comment=Nixly Media desktop client for nixlymediaserver
+    Exec=nixlymedia
+    Icon=nixlymedia
+    Terminal=false
+    Categories=AudioVideo;Player;Video;
+    StartupWMClass=nixlymedia
+    EOF
+  '';
+
   postFixup = ''
     patchelf \
       --set-rpath "${lib.makeLibraryPath runtimeLibs}" \
