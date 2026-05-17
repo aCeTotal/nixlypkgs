@@ -32,7 +32,7 @@
         let
           pkgs = self.legacyPackages.${system};
         in {
-          inherit (pkgs) winstripping speedtree nixlytile nixly_launcher nixly_lockscreen nixlymediaserver geforce-now;
+          inherit (pkgs) winstripping speedtree nixlytile nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia geforce-now;
 
           dwl = pkgs.nixlytile;
           default = pkgs.nixlytile;
