@@ -35,13 +35,13 @@ let
 in
 rustPlatform.buildRustPackage rec {
   pname = "nixlymedia";
-  version = "0-unstable-2026-05-24";
+  version = "0-unstable-2026-05-25";
 
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlymedia";
-    rev = "22e505ed933c91ee04688c2bb9f386b8acd5a0c2";
-    hash = "sha256-S476vvirZxeNJv7FIYpG8aDIi0LaIHERwWpaVF0ttuk=";
+    rev = "f5fbfe347ed500e77da21a03a3f0d28c9bb4ef25";
+    hash = "sha256-A8ITvC89luOshRnaHjuHQbqKj/MY6ls0uXDbK1k7wGk=";
   };
 
   cargoLock = {
