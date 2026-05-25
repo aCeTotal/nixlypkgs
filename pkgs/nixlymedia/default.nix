@@ -40,8 +40,8 @@ rustPlatform.buildRustPackage rec {
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlymedia";
-    rev = "6248b57b895c1690e6ae44d4d111e7e0d5ec1ef3";
-    hash = "sha256-WVcJGrEF3kxc6OvgIQFixOzYJnG5KrQY9pQqDq1vG0o=";
+    rev = "a2c3ad0af10db6259a850bb114250ed67762a74c";
+    hash = "sha256-R52Q0Y67IgHzzXpf0rxBAI+Xr6rt1V6V4ZQdUxu78FQ=";
   };
 
   cargoLock = {
