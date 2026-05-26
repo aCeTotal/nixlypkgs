@@ -40,8 +40,8 @@ rustPlatform.buildRustPackage rec {
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlymedia";
-    rev = "fb45f184f6b662d4ebe620187ee2816207504561";
-    hash = "sha256-odbVkxXflMgbg7rZGo00QJmqir0c5mGtZajSTdNBm4E=";
+    rev = "b6ce3ac8e0099321c5cb66708089ffafc33a091e";
+    hash = "sha256-qTk4hINp81eiQhMB+W8Z81aLtxl8yWtehFvUmW6WnFc=";
   };
 
   cargoLock = {
@@ -93,6 +93,13 @@ rustPlatform.buildRustPackage rec {
     patchelf \
       --set-rpath "${lib.makeLibraryPath runtimeLibs}" \
       $out/bin/nixlymedia
+    # Auto-enable diagnostic log → /tmp/nixlymedia.log
+    # Inneholder: mpv verbose log (decoder/vo/ao/statusline/frame-timing),
+    # render-loop stats hver sekund (rendered_fps/present_fps/drops/avsync/
+    # cache buffering), HDR state-transitions, EGL/Wayland binding status.
+    wrapProgram $out/bin/nixlymedia \
+      --set NIXLY_LOG 1 \
+      --set NIXLY_LOG_FILE /tmp/nixlymedia.log
   '';
 
   meta = with lib; {
