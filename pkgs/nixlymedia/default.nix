@@ -40,7 +40,7 @@ rustPlatform.buildRustPackage rec {
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlymedia";
-    rev = "2859fcf8c37e18865cac58e24c55d7b14abb856c";
+    rev = "6bb2b8939e24a59bc7cd1cdec691971685563a9e";
     hash = "sha256-FTwD5kxCGT0U1qaCGhAmKZ5hdhR54rbXNENB7KuMevg=";
   };
 
