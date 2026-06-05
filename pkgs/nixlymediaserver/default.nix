@@ -12,13 +12,13 @@
 
 stdenv.mkDerivation rec {
   pname = "nixlymediaserver";
-  version = "0-unstable-2026-05-17";
+  version = "0-unstable-2026-06-06";
 
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlymediaserver";
-    rev = "441528a543fd172aba59850733c1ace4cf71fa28";
-    hash = "sha256-kWcxdTatOnLoosDjSGnYuURyNanHPitDcZFGmcvSLck=";
+    rev = "40b229e7d07f66fcadee23669583241a6590f580";
+    hash = "sha256-AHvA/lFNuZcuu/BmRgO68HG+SrWxG19FTkmr9QnsXPk=";
   };
 
   nativeBuildInputs = [
