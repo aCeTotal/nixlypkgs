@@ -1,64 +1,74 @@
-# NOTE: Use the following command to update the package
-# ```sh
-# nix-shell maintainers/scripts/update.nix --argstr commit true --arg predicate '(path: pkg: builtins.elem path [["claude-code"] ["claude-code-bin"] ["vscode-extensions" "anthropic" "claude-code"]])'
-# ```
+# Update with: ./update.sh
 {
   lib,
-  stdenv,
-  buildNpmPackage,
-  fetchzip,
+  stdenvNoCC,
+  fetchurl,
+  installShellFiles,
+  makeBinaryWrapper,
+  autoPatchelfHook,
+  alsa-lib,
+  procps,
+  ripgrep,
+  bubblewrap,
+  socat,
   versionCheckHook,
   writableTmpDirAsHomeHook,
-  bubblewrap,
-  procps,
-  socat,
 }:
-buildNpmPackage (finalAttrs: {
+let
+  stdenv = stdenvNoCC;
+  baseUrl = "https://downloads.claude.ai/claude-code-releases";
+  manifest = lib.importJSON ./manifest.json;
+  platformKey = "${stdenv.hostPlatform.node.platform}-${stdenv.hostPlatform.node.arch}";
+  platformManifestEntry = manifest.platforms.${platformKey};
+in
+stdenv.mkDerivation (finalAttrs: {
   pname = "claude-code";
-  version = "2.1.111";
+  inherit (manifest) version;
 
-  src = fetchzip {
-    url = "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-${finalAttrs.version}.tgz";
-    hash = "sha256-K3qhZXVJ2DIKv7YL9f/CHkuUYnK0lkIR1wjEa+xeSCk=";
+  src = fetchurl {
+    url = "${baseUrl}/${finalAttrs.version}/${platformKey}/claude";
+    sha256 = platformManifestEntry.checksum;
   };
 
-  npmDepsHash = "sha256-6f68qUMnDk6tn+qypVi8bPtNrxbtcf15tHrgtlhEaK4=";
+  dontUnpack = true;
+  dontBuild = true;
+  __noChroot = stdenv.hostPlatform.isDarwin;
+  dontStrip = true;
+
+  nativeBuildInputs = [
+    installShellFiles
+    makeBinaryWrapper
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isElf [ autoPatchelfHook ];
 
   strictDeps = true;
 
-  postPatch = ''
-    cp ${./package-lock.json} package-lock.json
+  installPhase = ''
+    runHook preInstall
 
-    # https://github.com/anthropics/claude-code/issues/15195
-    substituteInPlace cli.js \
-          --replace-fail '#!/bin/sh' '#!/usr/bin/env sh'
-  '';
+    installBin $src
 
-  dontNpmBuild = true;
-
-  env.AUTHORIZED = "1";
-
-  # `claude-code` tries to auto-update by default, this disables that functionality.
-  # https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview#environment-variables
-  # The DEV=true env var causes claude to crash with `TypeError: window.WebSocket is not a constructor`
-  postInstall = ''
     wrapProgram $out/bin/claude \
       --set DISABLE_AUTOUPDATER 1 \
+      --set-default FORCE_AUTOUPDATE_PLUGINS 1 \
       --set DISABLE_INSTALLATION_CHECKS 1 \
-      --unset DEV \
-      --prefix PATH : ${
+      --set USE_BUILTIN_RIPGREP 0 \
+      ${lib.optionalString stdenv.hostPlatform.isLinux ''
+        --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ alsa-lib ]} \
+      ''}--prefix PATH : ${
         lib.makeBinPath (
           [
-            # claude-code uses [node-tree-kill](https://github.com/pkrumins/node-tree-kill) which requires procps's pgrep(darwin) or ps(linux)
             procps
+            ripgrep
           ]
-          # the following packages are required for the sandbox to work (Linux only)
           ++ lib.optionals stdenv.hostPlatform.isLinux [
             bubblewrap
             socat
           ]
         )
       }
+
+    runHook postInstall
   '';
 
   doInstallCheck = true;
@@ -67,20 +77,22 @@ buildNpmPackage (finalAttrs: {
     versionCheckHook
   ];
   versionCheckKeepEnvironment = [ "HOME" ];
+  versionCheckProgramArg = "--version";
 
   passthru.updateScript = ./update.sh;
 
   meta = {
     description = "Agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster";
     homepage = "https://github.com/anthropics/claude-code";
-    downloadPage = "https://www.npmjs.com/package/@anthropic-ai/claude-code";
+    downloadPage = "https://claude.com/product/claude-code";
+    changelog = "https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md";
     license = lib.licenses.unfree;
-    maintainers = with lib.maintainers; [
-      adeci
-      malo
-      markus1189
-      omarjatoi
-      xiaoxiangmoe
+    sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
+    platforms = [
+      "aarch64-darwin"
+      "x86_64-darwin"
+      "aarch64-linux"
+      "x86_64-linux"
     ];
     mainProgram = "claude";
   };
