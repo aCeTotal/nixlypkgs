@@ -32,7 +32,7 @@
         let
           pkgs = self.legacyPackages.${system};
         in {
-          inherit (pkgs) winstripping speedtree nixlytile nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia geforce-now;
+          inherit (pkgs) winstripping speedtree nixlytile nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia geforce-now terraintile;
 
           dwl = pkgs.nixlytile;
           default = pkgs.nixlytile;
@@ -46,6 +46,10 @@
         nixlymediaserver = import ./modules/nixlymediaserver.nix;
         nixly_lockscreen = import ./modules/nixly_lockscreen.nix;
         nixly_steam = import ./modules/nixly_steam.nix;
+        terraintile = { ... }: {
+          imports = [ ./modules/terraintile.nix ];
+          nixpkgs.overlays = [ self.overlays.default ];
+        };
       };
 
       homeManagerModules = {
