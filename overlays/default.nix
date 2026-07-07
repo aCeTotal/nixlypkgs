@@ -11,6 +11,7 @@ in {
     src = inputs.nixly_lockscreen_src;
   };
   claude = callPackage ../pkgs/claude { };
+  glm = callPackage ../pkgs/glm { };
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
   nixlymedia = callPackage ../pkgs/nixlymedia { };
   terraintile = callPackage ../pkgs/terraintile { };
