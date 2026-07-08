@@ -56,6 +56,20 @@ in
       default = true;
       description = "Open the HTTP port (TCP) in the firewall.";
     };
+
+    extraGroups = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      example = [ "users" ];
+      description = "Supplementary groups for the service user.";
+    };
+
+    extraReadWritePaths = lib.mkOption {
+      type = lib.types.listOf lib.types.path;
+      default = [ ];
+      example = [ "/mnt/bigdisk1" ];
+      description = "Extra paths the service may write to, in addition to dataDir.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -84,6 +98,7 @@ in
         Type = "simple";
         User = cfg.user;
         Group = cfg.group;
+        SupplementaryGroups = cfg.extraGroups;
         WorkingDirectory = cfg.dataDir;
         ExecStart = "${lib.getExe cfg.package} --host ${cfg.host} --port ${toString cfg.port}";
 
@@ -99,7 +114,7 @@ in
         NoNewPrivileges = true;
         ProtectSystem = "strict";
         ProtectHome = "read-only";
-        ReadWritePaths = [ cfg.dataDir ];
+        ReadWritePaths = [ cfg.dataDir ] ++ cfg.extraReadWritePaths;
         PrivateTmp = true;
       };
     };
