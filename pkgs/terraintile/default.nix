@@ -12,8 +12,8 @@ rustPlatform.buildRustPackage rec {
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "TerrainTile";
-    rev = "3a350563dee0704891bfab8a2ad7427006e4765a";
-    hash = "sha256-9NduNhS3fiQjHCTFGBdKYZewOPDqNyGuz9CwW+KGKHI=";
+    rev = "00710f4e150ba258118b6c995bbcf40fad0f34f7";
+    hash = "sha256-stFMgcs1tGukOzAaR6ABHilCN3yiFMYSL1uK/lPzpns=";
   };
 
   cargoLock.lockFile = "${src}/Cargo.lock";
