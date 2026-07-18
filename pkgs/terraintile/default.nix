@@ -7,13 +7,13 @@
 
 rustPlatform.buildRustPackage rec {
   pname = "terraintile";
-  version = "0-unstable-2026-07-09";
+  version = "0-unstable-2026-07-18";
 
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "TerrainTile";
-    rev = "00710f4e150ba258118b6c995bbcf40fad0f34f7";
-    hash = "sha256-stFMgcs1tGukOzAaR6ABHilCN3yiFMYSL1uK/lPzpns=";
+    rev = "b89e76ac9eac27c32a89d7b62d4268eea15678f6";
+    hash = "sha256-H6qHUMlSNuUKYWnOwRatmSmC/WIJTMtk5edGa/q3Bj8=";
   };
 
   cargoLock.lockFile = "${src}/Cargo.lock";
