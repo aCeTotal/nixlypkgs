@@ -16,6 +16,7 @@ in {
   nixlymedia = callPackage ../pkgs/nixlymedia { };
   terraintile = callPackage ../pkgs/terraintile { };
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };
+  stm32cubeide = callPackage ../pkgs/stm32cubeide { };
   nixly_steam = callPackage ../pkgs/nixly_steam { };
   geforce-now = callPackage ../pkgs/geforce-now { };
   libepoxy-nixly = callPackage ../pkgs/libepoxy { };
