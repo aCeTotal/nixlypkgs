@@ -41,11 +41,11 @@ rustPlatform.buildRustPackage rec {
     # name satt eksplisitt: gammel "source"-path i store var korrupt
     # (02b1b3c-innhold registrert under 51a9fd9-hash); nytt navn = nytt
     # store-path = fersk fetch.
-    name = "nixlymedia-src-a20cbe6";
+    name = "nixlymedia-src-b335b55";
     owner = "aCeTotal";
     repo = "nixlymedia";
-    rev = "a20cbe6a3d5321e918166fbfacdf80bdb95ffb89";
-    hash = "sha256-K7JWY1lbKuPhx/7URsQqpOEzNUSEIVwXe3v52/A1MG4=";
+    rev = "b335b5580f302fd73eb0a9688b249f7ced6233de";
+    hash = "sha256-LHv4u1OIW3zOdx/VJBLfTJqXyBp0fHd0QUyj5MmVLVc=";
   };
 
   cargoLock = {
