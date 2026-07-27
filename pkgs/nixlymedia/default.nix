@@ -35,17 +35,17 @@ let
 in
 rustPlatform.buildRustPackage rec {
   pname = "nixlymedia";
-  version = "0-unstable-2026-07-25";
+  version = "0-unstable-2026-07-27";
 
   src = fetchFromGitHub {
     # name satt eksplisitt: gammel "source"-path i store var korrupt
     # (02b1b3c-innhold registrert under 51a9fd9-hash); nytt navn = nytt
     # store-path = fersk fetch.
-    name = "nixlymedia-src-5c6d330";
+    name = "nixlymedia-src-d91e5e0";
     owner = "aCeTotal";
     repo = "nixlymedia";
-    rev = "5c6d33076a46332f5ab0eb1fd1afdc94717dc3f4";
-    hash = "sha256-+2cuy/NSF+JlrFyuUMP8itkL4DhCHcnb6rVREER1k00=";
+    rev = "d91e5e0f4e59acd1dc96304efc6f9f1e07ebcfaf";
+    hash = "sha256-kpJC4Ikx5wvWtff2L2DTq5nVwPw24ksrfpBZuZjbuaI=";
   };
 
   cargoLock = {
