@@ -66,14 +66,15 @@
 , grim
 , slurp
 , wl-clipboard
+, nixlycc
 }:
 
 let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "7dfe5f47702d3b81af25ea946fea2b65957f1fde";
-    hash = "sha256-H/emnmUtF4Jo44aa+SpnLoTmQJ+ZqOzlWJG8Y2Ho9hQ=";
+    rev = "5989f77f420fbb6538af1218a428d8fce6bd24ce";
+    hash = "sha256-CAXV6B63TgO1mchna1BjZYI4GIFrRd6be1T+5hpFkSg=";
   };
 
   wlrootsLocal = stdenv.mkDerivation {
@@ -145,6 +146,9 @@ let
     grim
     slurp
     wl-clipboard
+
+    # Control center
+    nixlycc
   ];
 in
 
@@ -221,7 +225,7 @@ stdenv.mkDerivation {
     wrapProgram $out/bin/nixlytile \
       --set WLR_RENDERER vulkan \
       --prefix PATH : ${lib.makeBinPath runtimeDeps} \
-      --prefix XDG_DATA_DIRS : "${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share:${shared-mime-info}/share"
+      --prefix XDG_DATA_DIRS : "${nixlycc}/share:${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share:${shared-mime-info}/share"
 
     runHook postInstall
   '';

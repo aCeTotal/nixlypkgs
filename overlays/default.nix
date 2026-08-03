@@ -4,6 +4,7 @@ let
 in {
   speedtree = callPackage ../pkgs/speedtree { };
   nixlytile = callPackage ../pkgs/nixlytile { };
+  nixlycc = callPackage ../pkgs/nixlycc { };
   nixly_launcher = callPackage ../pkgs/nixly_launcher {
     src = inputs.nixly_launcher_src;
   };
