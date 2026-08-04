@@ -27,6 +27,7 @@
   libxt,
   ncurses,
   util-linux,
+  vulkan-loader,
   wayland,
 }:
 
@@ -68,6 +69,7 @@ stdenv.mkDerivation (finalAttrs: {
     libxt
     ncurses # libncursesw/libpanelw/libtinfo for bundlet python
     util-linux # libuuid, samme
+    vulkan-loader # erstatter bundlet loader, se installPhase
   ];
 
   # dlopen-es ved kjoretid, saa de maa inn i RUNPATH manuelt.
@@ -101,6 +103,12 @@ stdenv.mkDerivation (finalAttrs: {
 
     mkdir -p $out/share/blender
     cp -a . $out/share/blender
+
+    # Bundlet vulkan-loader mangler nixpkgs-patchen som legger
+    # /run/opengl-driver/share i ICD-soekestien, saa den finner ingen driver og
+    # Blender faller tilbake til OpenGL. autoPatchelfHook lenker libvulkan.so.1
+    # mot nixpkgs-loaderen naar den bundlede er borte.
+    rm $out/share/blender/lib/libvulkan.so*
 
     mkdir -p $out/bin
     ln -s $out/share/blender/blender $out/bin/blender
