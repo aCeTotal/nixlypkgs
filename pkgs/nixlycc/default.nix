@@ -6,6 +6,8 @@
 , pkg-config
 , qt6
 , libdrm
+, pam
+, hwdata
 }:
 
 stdenv.mkDerivation {
@@ -29,7 +31,10 @@ stdenv.mkDerivation {
   buildInputs = [
     qt6.qtbase
     qt6.qtwayland
+    qt6.qtsvg
     libdrm
+    pam
+    hwdata
   ];
 
   meta = with lib; {
