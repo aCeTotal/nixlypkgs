@@ -18,6 +18,7 @@ in {
   geforce-now = callPackage ../pkgs/geforce-now { };
   libepoxy-nixly = callPackage ../pkgs/libepoxy { };
   Blender_bin_lts = callPackage ../pkgs/blender_bin_lts { };
+  Unreal_editor = callPackage ../pkgs/unreal_editor { };
   kmymoney = callPackage ../pkgs/kmymoney { };
 
   # Fix flycast bundled glslang missing <cstdint> for GCC 15
