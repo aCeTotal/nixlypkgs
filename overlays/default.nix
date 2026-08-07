@@ -12,19 +12,12 @@ in {
     src = inputs.nixly_lockscreen_src;
   };
   claude = callPackage ../pkgs/claude { };
-  glm = callPackage ../pkgs/glm { };
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
   nixlymedia = callPackage ../pkgs/nixlymedia { };
-  terraintile = callPackage ../pkgs/terraintile { };
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };
-  stm32cubeide = callPackage ../pkgs/stm32cubeide { };
-  nixly_steam = callPackage ../pkgs/nixly_steam { };
   geforce-now = callPackage ../pkgs/geforce-now { };
   libepoxy-nixly = callPackage ../pkgs/libepoxy { };
   Blender_bin_lts = callPackage ../pkgs/blender_bin_lts { };
-  blender_nvidia = callPackage ../pkgs/blender_nvidia { };
-  blender_amd    = callPackage ../pkgs/blender_amd    { };
-  blender_intel  = callPackage ../pkgs/blender_intel  { };
   kmymoney = callPackage ../pkgs/kmymoney { };
 
   # Fix flycast bundled glslang missing <cstdint> for GCC 15
