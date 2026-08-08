@@ -14,13 +14,19 @@ if [ "$(ulimit -Sn)" -lt 65536 ]; then
 fi
 
 # --- Video backend ----------------------------------------------------------
-# UE 5.8 ships SDL3, whose Wayland backend is the native path (no XWayland
-# blur, correct fractional scaling). Override with UE5_VIDEODRIVER=x11 if
-# torn-off editor tabs or tooltips end up mispositioned - Wayland has no
-# absolute window placement, which Slate occasionally wants.
-driver="${UE5_VIDEODRIVER:-wayland}"
-if [ "$driver" = wayland ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
-  driver=x11
+# XWayland, not SDL3's native Wayland backend. Slate positions its windows in
+# absolute screen coordinates, which Wayland does not offer: every editor
+# window - the main frame, Settings, any torn-off tab - then comes up sized to
+# the whole output and pointer coordinates drift away from what is drawn.
+# Under a tiling compositor that reads as "always fullscreen, and the mouse is
+# off". Through XWayland the same windows are ordinary resizable toplevels the
+# compositor tiles normally.
+#
+# Set UE5_VIDEODRIVER=wayland to get the native backend back (no XWayland
+# blur, real fractional scaling) if you can live with the placement.
+driver="${UE5_VIDEODRIVER:-x11}"
+if [ "$driver" = x11 ] && [ -z "${DISPLAY:-}" ]; then
+  driver=wayland
 fi
 export SDL_VIDEO_DRIVER="$driver"
 export SDL_VIDEODRIVER="$driver"

@@ -5,15 +5,15 @@
       "locked": {
         "lastModified": 1785175888,
         "narHash": "sha256-lArVRi32PpJRq9H1apQqvDRP4ho2Ijd9JJufpQbt9dM=",
-        "owner": "aCeTotal",
-        "repo": "nixly_launcher",
+        "ref": "refs/heads/main",
         "rev": "d795d8f071520604ee2a485d157f50c83651a7e0",
-        "type": "github"
+        "revCount": 8,
+        "type": "git",
+        "url": "ssh://git@github.com/aCeTotal/nixly_launcher"
       },
       "original": {
-        "owner": "aCeTotal",
-        "repo": "nixly_launcher",
-        "type": "github"
+        "type": "git",
+        "url": "ssh://git@github.com/aCeTotal/nixly_launcher"
       }
     },
     "nixly_lockscreen_src": {

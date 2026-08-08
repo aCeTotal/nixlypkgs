@@ -264,15 +264,24 @@ stdenvNoCC.mkDerivation {
     chmod +x "$engine/Engine/Binaries/ThirdParty/DotNet/10.0/linux-x64/dotnet"
     find "$engine" -type f -name '*.sh' -exec chmod +x {} +
 
+    # The RUNPATH is what makes an executable survive being started without the
+    # launcher's environment: UnrealBuildAccelerator re-spawns the compiler and
+    # the link tools with a sanitised env, so an LD_LIBRARY_PATH-only setup
+    # fails there with "clang++: error while loading shared libraries:
+    # libstdc++.so.6" (UBA reports it as exit code 9666 and as a failed link).
+    # Existing entries are kept - Epic's own binaries rely on $ORIGIN.
     interp="$(cat ${stdenv.cc}/nix-support/dynamic-linker)"
+    libs="${lib.makeLibraryPath runtimeLibs}"
     patched=0
     while IFS= read -r -d "" f; do
       if [ -n "$(patchelf --print-interpreter "$f" 2>/dev/null)" ]; then
         patchelf --set-interpreter "$interp" "$f"
+        old="$(patchelf --print-rpath "$f" 2>/dev/null || true)"
+        patchelf --set-rpath "''${old:+$old:}$libs" "$f"
         patched=$((patched + 1))
       fi
     done < <(find "$engine" -type f -perm -u+x -print0)
-    echo "patched interpreter on $patched executables"
+    echo "patched interpreter and rpath on $patched executables"
 
     # --- shebangs ----------------------------------------------------------
     # The batch files hardcode #!/bin/bash, which does not exist on NixOS. The
