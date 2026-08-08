@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Gaea
+Comment=QuadSpinner Gaea 2 terrain designer
+Exec=@out@/bin/gaea
+Icon=gaea
+Terminal=false
+Categories=Graphics;3DGraphics;
+StartupWMClass=gaea.exe

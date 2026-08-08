@@ -19,6 +19,7 @@ in {
   libepoxy-nixly = callPackage ../pkgs/libepoxy { };
   Blender_bin_lts = callPackage ../pkgs/blender_bin_lts { };
   Unreal_editor = callPackage ../pkgs/unreal_editor { };
+  gaea = callPackage ../pkgs/gaea { };
   kmymoney = callPackage ../pkgs/kmymoney { };
 
   # Fix flycast bundled glslang missing <cstdint> for GCC 15
