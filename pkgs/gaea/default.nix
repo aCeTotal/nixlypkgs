@@ -1,9 +1,3 @@
-# QuadSpinner Gaea 2 (Windows-app) kjoert under Wine.
-#
-# GaeaSetup.exe paa aceclan.no er kun en web-bootstrapper: den laster ned
-# Gaea-<versjon>.exe (Inno Setup) fra get.gaea.app. Vi henter den ekte
-# installeren direkte og pakker den ut med innoextract, slik at bygget er
-# hermetisk. aceclan.no proeves foerst som speil.
 {
   lib,
   stdenvNoCC,
@@ -20,9 +14,6 @@
 }:
 
 let
-  # nixpkgs' innoextract (1.9/1.10-dev) stopper ved Inno Setup 6.3.3.
-  # Gaea-2.3.0.1.exe er bygget med Inno Setup 6.4.3, som krever nyere
-  # header-parsing. Denne forken dekker 1.2.10 t.o.m. 6.7.0.
   innoextract64 = innoextract.overrideAttrs (old: {
     version = "unstable-2026-02-23-inno67";
     src = fetchFromGitHub {
@@ -34,25 +25,15 @@ let
     patches = [ ];
   });
 
-  # Crack: readme.txt sier "Copy Gaea.Engine.dll to <install-dir>". Vi henter
-  # den erstattede motor-dll-en og legger den over app/Gaea.Engine.dll under
-  # bygget. Versjonsspesifikk — maa matche src-versjonen.
   crackEngineDll = fetchurl {
     url = "https://aceclan.no/derivations_source/Gaea/crack/Gaea.Engine.dll";
     hash = "sha256-pR8R0zaed9yCeQPC8jwKloS2Ahx77842oGcWr/OlW44=";
   };
 
-  # stagingFull har wine-mono og wine-gecko bundlet, saa wineboot installerer
-  # dem uten dialog ved foerste oppstart. WoW64-varianten gir 32-bits stoette
-  # uten 32-bits systembiblioteker.
   wine = wineWow64Packages.stagingFull;
 
   dotnetVersion = "8.0.29";
 
-  # Gaea.runtimeconfig.json krever Microsoft.NETCore.App og
-  # Microsoft.WindowsDesktop.App 8.0. Zip-arkivene slipper aa kjoere
-  # WiX-installerne inne i prefixen; de pakkes ut over hverandre.
-  # Runtime-zipen har hostfxr; desktop-zipen har bare WPF/WinForms-pakken.
   dotnetRuntime = fetchurl {
     url = "https://builds.dotnet.microsoft.com/dotnet/Runtime/${dotnetVersion}/dotnet-runtime-${dotnetVersion}-win-x64.zip";
     hash = "sha256-iuwXjoukUIXgP2iNZDD7GSJwcmWeeUGGsPF5SsWgBNg=";
@@ -63,10 +44,6 @@ let
     hash = "sha256-fr8NLHHAu1bRYL5egYoAgc1V6CoQZIFKL6+rAK7IXqg=";
   };
 
-  # Gaea skipper med D3D12 Agility SDK (D3D12Core.dll) og kan velge en
-  # D3D12-path. Wines innebygde d3d12 er svak; vkd3d-proton er samme
-  # oversetterlag som Proton bruker. nixpkgs-pakken er ELF (.so) og kan
-  # ikke overstyre PE-dll-er, saa vi henter den offisielle PE-releasen.
   vkd3dProtonVersion = "2.14.1";
   vkd3dProton = fetchurl {
     url = "https://github.com/HansKristian-Work/vkd3d-proton/releases/download/v${vkd3dProtonVersion}/vkd3d-proton-${vkd3dProtonVersion}.tar.zst";
@@ -123,7 +100,12 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       --subst-var out \
       --subst-var-by dxvk ${dxvk.bin}
     wrapProgram $out/bin/gaea \
-      --prefix PATH : ${lib.makeBinPath [ wine coreutils ]}
+      --prefix PATH : ${
+        lib.makeBinPath [
+          wine
+          coreutils
+        ]
+      }
 
     install -Dm644 ${./gaea.desktop} $out/share/applications/gaea.desktop
     substituteInPlace $out/share/applications/gaea.desktop --subst-var out
