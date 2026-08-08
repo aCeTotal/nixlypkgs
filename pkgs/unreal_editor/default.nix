@@ -79,6 +79,7 @@
   zlib,
   # PATH for the engine and the tools it shells out to.
   bash,
+  bubblewrap,
   coreutils,
   findutils,
   gawk,
@@ -87,6 +88,7 @@
   gnused,
   procps,
   which,
+  xdg-user-dirs,
   xdg-utils,
 }:
 
@@ -174,6 +176,8 @@ let
     gnused
     procps
     which
+    # xdg-user-dir: the editor resolves the default project directory with it.
+    xdg-user-dirs
     xdg-utils
   ];
 
@@ -243,6 +247,7 @@ stdenvNoCC.mkDerivation {
     rm -rf \
       "$engine/Engine/Binaries/Android" \
       "$engine/Engine/Binaries/LinuxArm64" \
+      "$engine/Engine/Binaries/ThirdParty/DotNet/10.0/linux-arm64" \
       "$engine/Engine/Intermediate/Build/Android" \
       "$engine/Engine/Intermediate/Build/LinuxArm64"
 
@@ -250,6 +255,12 @@ stdenvNoCC.mkDerivation {
     # Only the interpreter needs rewriting; shared objects are resolved through
     # LD_LIBRARY_PATH, which the launcher sets and every spawned worker
     # (ShaderCompileWorker, EpicWebHelper, UnrealBuildTool) inherits.
+    #
+    # A large part of the archive is extracted as 0555 (Epic's own binaries are
+    # 0755), and patchelf needs to reopen the file for writing - without this
+    # every third-party executable, dotnet and the bundled Python included,
+    # silently keeps its /lib64 interpreter.
+    chmod -R u+w "$engine"
     chmod +x "$engine/Engine/Binaries/ThirdParty/DotNet/10.0/linux-x64/dotnet"
     find "$engine" -type f -name '*.sh' -exec chmod +x {} +
 
@@ -257,11 +268,27 @@ stdenvNoCC.mkDerivation {
     patched=0
     while IFS= read -r -d "" f; do
       if [ -n "$(patchelf --print-interpreter "$f" 2>/dev/null)" ]; then
-        patchelf --set-interpreter "$interp" "$f" || echo "could not patch $f"
+        patchelf --set-interpreter "$interp" "$f"
         patched=$((patched + 1))
       fi
     done < <(find "$engine" -type f -perm -u+x -print0)
     echo "patched interpreter on $patched executables"
+
+    # --- shebangs ----------------------------------------------------------
+    # The batch files hardcode #!/bin/bash, which does not exist on NixOS. The
+    # editor spawns Build.sh through posix_spawnp(), so this surfaces as
+    # "Failed to launch Unreal Build Tool" rather than as a shell error.
+    find "$engine" -type f -name '*.sh' \
+      -exec sed -i '1s|^#!/bin/bash|#!${bash}/bin/bash|' {} +
+
+    # --- source code editor -------------------------------------------------
+    # Kept out of $out/bin so it is only on the PATH the launcher builds for
+    # the engine, never on the user's.
+    ide="$out/libexec/unreal-editor"
+    install -dm755 "$ide"
+    substitute ${./code.sh} "$ide/code" \
+      --replace-fail "#!/usr/bin/env bash" "#!${bash}/bin/bash"
+    chmod +x "$ide/code"
 
     # --- launchers --------------------------------------------------------
     install -dm755 "$out/bin"
@@ -273,7 +300,9 @@ stdenvNoCC.mkDerivation {
           --replace-fail "@exe@" "${rel}" \
           --replace-fail "@libs@" "${lib.makeLibraryPath runtimeLibs}" \
           --replace-fail "@path@" "${lib.makeBinPath runtimeBins}" \
-          --replace-fail "@libdecorplugins@" "${libdecor}/lib/libdecor/plugins-1"
+          --replace-fail "@ide@" "$ide" \
+          --replace-fail "@libdecorplugins@" "${libdecor}/lib/libdecor/plugins-1" \
+          --replace-fail "@bwrap@" "${bubblewrap}/bin/bwrap"
         chmod +x "$out/bin/${name}"
       '') entryPoints
     )}
