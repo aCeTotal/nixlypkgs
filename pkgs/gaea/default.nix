@@ -10,6 +10,7 @@
   fetchurl,
   innoextract,
   unzip,
+  zstd,
   icoutils,
   makeWrapper,
   coreutils,
@@ -38,6 +39,16 @@ let
     url = "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/${dotnetVersion}/windowsdesktop-runtime-${dotnetVersion}-win-x64.zip";
     hash = "sha256-fr8NLHHAu1bRYL5egYoAgc1V6CoQZIFKL6+rAK7IXqg=";
   };
+
+  # Gaea skipper med D3D12 Agility SDK (D3D12Core.dll) og kan velge en
+  # D3D12-path. Wines innebygde d3d12 er svak; vkd3d-proton er samme
+  # oversetterlag som Proton bruker. nixpkgs-pakken er ELF (.so) og kan
+  # ikke overstyre PE-dll-er, saa vi henter den offisielle PE-releasen.
+  vkd3dProtonVersion = "2.14.1";
+  vkd3dProton = fetchurl {
+    url = "https://github.com/HansKristian-Work/vkd3d-proton/releases/download/v${vkd3dProtonVersion}/vkd3d-proton-${vkd3dProtonVersion}.tar.zst";
+    hash = "sha256-rHDM/gHWELUcpnoKROTyT12inGZfrMDC+vR+CBjSMWg=";
+  };
 in
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "gaea";
@@ -55,6 +66,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   nativeBuildInputs = [
     innoextract
     unzip
+    zstd
     icoutils
     makeWrapper
   ];
@@ -70,6 +82,11 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
     unzip -q ${dotnetRuntime} -d $out/share/gaea/dotnet
     unzip -q ${dotnetDesktop} -d $out/share/gaea/dotnet
+
+    tar --zstd -xf ${vkd3dProton} -C .
+    install -Dm644 -t $out/share/gaea/vkd3d \
+      vkd3d-proton-${vkd3dProtonVersion}/x64/d3d12.dll \
+      vkd3d-proton-${vkd3dProtonVersion}/x64/d3d12core.dll
 
     mkdir icons && (cd icons && icotool -x $out/share/gaea/app/Gaea-2.ico)
     install -Dm644 icons/*_512x512x32.png \

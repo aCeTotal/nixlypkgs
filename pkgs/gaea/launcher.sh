@@ -12,8 +12,10 @@ export DOTNET_ROOT='C:\dotnet'
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 export DOTNET_NOLOGO=1
 
-# DXVK erstatter wined3d: Gaea.Viewport er en Unity-player som krever D3D11.
-export WINEDLLOVERRIDES="d3d9,d3d10core,d3d11,dxgi=n;winemenubuilder.exe=;${WINEDLLOVERRIDES:-}"
+# DXVK erstatter wined3d: Gaea.Viewport er en Unity-player som krever D3D11,
+# og WPF-UI-en renderer via D3D9Ex. vkd3d-proton dekker D3D12 — Gaea skipper
+# med D3D12 Agility SDK og kan velge den pathen.
+export WINEDLLOVERRIDES="d3d9,d3d10core,d3d11,d3d12,d3d12core,dxgi=n;winemenubuilder.exe=;${WINEDLLOVERRIDES:-}"
 
 # Standard: X11-driveren mot Xwayland (best testet, DXVK/Vulkan gaar rett gjennom).
 # GAEA_WAYLAND=1 skjuler DISPLAY slik at Wine faller tilbake til winewayland.
@@ -32,6 +34,8 @@ if [ "$(cat "$stamp" 2>/dev/null || true)" != "@out@" ]; then
     @dxvk@/x64/d3d10core.dll \
     @dxvk@/x64/d3d11.dll \
     @dxvk@/x64/dxgi.dll \
+    @out@/share/gaea/vkd3d/d3d12.dll \
+    @out@/share/gaea/vkd3d/d3d12core.dll \
     "$WINEPREFIX/drive_c/windows/system32/"
 
   ln -sfn @out@/share/gaea/dotnet "$WINEPREFIX/drive_c/dotnet"
