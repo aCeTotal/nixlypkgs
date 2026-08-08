@@ -29,6 +29,13 @@ if [ "$(cat "$stamp" 2>/dev/null || true)" != "@out@" ]; then
   wineboot --init
   wineserver -w
 
+  # Gaea-UI er WPF og rendrer via D3D9Ex. DXVK sin D3D9-swapchain blir hvit
+  # ved resize/fullskjerm (tiling-WM tvinger begge). Software-rendering av WPF
+  # fjerner den pathen helt — 3D-viewporten (Unity/D3D11) er upaavirket.
+  wine reg add 'HKCU\Software\Microsoft\Avalon.Graphics' \
+    /v DisableHWAcceleration /t REG_DWORD /d 1 /f
+  wineserver -w
+
   install -m644 \
     @dxvk@/x64/d3d9.dll \
     @dxvk@/x64/d3d10core.dll \

@@ -8,6 +8,7 @@
   lib,
   stdenvNoCC,
   fetchurl,
+  fetchFromGitHub,
   innoextract,
   unzip,
   zstd,
@@ -19,6 +20,28 @@
 }:
 
 let
+  # nixpkgs' innoextract (1.9/1.10-dev) stopper ved Inno Setup 6.3.3.
+  # Gaea-2.3.0.1.exe er bygget med Inno Setup 6.4.3, som krever nyere
+  # header-parsing. Denne forken dekker 1.2.10 t.o.m. 6.7.0.
+  innoextract64 = innoextract.overrideAttrs (old: {
+    version = "unstable-2026-02-23-inno67";
+    src = fetchFromGitHub {
+      owner = "UserUnknownFactor";
+      repo = "innoextract_win";
+      rev = "e561d8cb6004776eecb3184c0d56b3534a0c7e15";
+      hash = "sha256-+XFuDq9ILj0J1e2BYznR8pieANNn1xEA7e1FmadWSb4=";
+    };
+    patches = [ ];
+  });
+
+  # Crack: readme.txt sier "Copy Gaea.Engine.dll to <install-dir>". Vi henter
+  # den erstattede motor-dll-en og legger den over app/Gaea.Engine.dll under
+  # bygget. Versjonsspesifikk — maa matche src-versjonen.
+  crackEngineDll = fetchurl {
+    url = "https://aceclan.no/derivations_source/Gaea/crack/Gaea.Engine.dll";
+    hash = "sha256-pR8R0zaed9yCeQPC8jwKloS2Ahx77842oGcWr/OlW44=";
+  };
+
   # stagingFull har wine-mono og wine-gecko bundlet, saa wineboot installerer
   # dem uten dialog ved foerste oppstart. WoW64-varianten gir 32-bits stoette
   # uten 32-bits systembiblioteker.
@@ -52,7 +75,7 @@ let
 in
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "gaea";
-  version = "2.0.6.0";
+  version = "2.3.0.1";
 
   src = fetchurl {
     urls = [
@@ -60,11 +83,11 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       "https://get.gaea.app/Release/Gaea-${finalAttrs.version}.exe"
     ];
     # Samme sjekksum som bootstrapperen selv verifiserer mot.
-    hash = "sha256-CsMozYp6pORKVyIGG+cSoP6+oxScMEkScoi5eGkBlK8=";
+    hash = "sha256-GtwioEz5r0czhVFrnE6zagnCajFMOP+p4XpFrrv56Ss=";
   };
 
   nativeBuildInputs = [
-    innoextract
+    innoextract64
     unzip
     zstd
     icoutils
@@ -79,6 +102,9 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     innoextract --extract --silent --include app --output-dir . "$src"
     install -d $out/share/gaea
     mv app $out/share/gaea/app
+
+    # Crack: erstatt original motor-dll (readme.txt).
+    install -Dm644 ${crackEngineDll} $out/share/gaea/app/Gaea.Engine.dll
 
     unzip -q ${dotnetRuntime} -d $out/share/gaea/dotnet
     unzip -q ${dotnetDesktop} -d $out/share/gaea/dotnet
