@@ -73,8 +73,8 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "71b2ab6c656b61cd1cb8fb48e8d84bd44765b297";
-    hash = "sha256-7ivMbBl1XFWpUkdm3ttCIUQ783439zGB4c2aH6qKLhQ=";
+    rev = "44eda8adc9e9cfef90a3ea9011865fd786e6f15d";
+    hash = "sha256-9083gO7UN61eS0NnGxsBDq1Dm1RsKeJou8mTSoEJjLE=";
   };
 
   wlrootsLocal = stdenv.mkDerivation {
