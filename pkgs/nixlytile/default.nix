@@ -102,52 +102,41 @@ let
   wlrootsPc = "wlroots-0.20";
 
   runtimeDeps = [
-    # Core utilities
     swaybg
     brightnessctl
     xdg-utils
     xwayland
 
-    # File manager
     thunar
     thunar-volman
     thunar-archive-plugin
 
-    # Network management
     networkmanager
     networkmanagerapplet
 
-    # Audio
     pipewire
     wireplumber
     pavucontrol
 
-    # Bluetooth
     blueman
 
-    # System utilities
     fd
     findutils
     coreutils
     gnused
     gnugrep
 
-    # Terminal
     alacritty
     foot
 
-    # Notifications
     libnotify
 
-    # Virtual keyboard input
     wtype
 
-    # Screenshot
     grim
     slurp
     wl-clipboard
 
-    # Control center
     nixlycc
   ];
 in

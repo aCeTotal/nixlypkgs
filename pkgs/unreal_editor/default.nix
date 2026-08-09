@@ -1,10 +1,3 @@
-# Unreal Engine 5.8.0 installed build (Epic's prebuilt Linux binaries).
-#
-# Not built from source: the archive already carries Epic's own clang 20.1.8
-# toolchain, precompiled engine modules and a Zen store manifest, and it is
-# marked Engine/Build/InstalledBuild.txt - so UnrealBuildTool treats the engine
-# tree as read-only and redirects every write into the project directory and
-# $HOME. That is what makes a Nix store install viable at all.
 {
   lib,
   stdenv,
@@ -77,7 +70,6 @@
   wayland,
   xz,
   zlib,
-  # PATH for the engine and the tools it shells out to.
   bash,
   bubblewrap,
   coreutils,
@@ -96,9 +88,6 @@ let
   version = "5.8.0";
   base = "https://aceclan.no/derivations_source/UE5/${version}";
 
-  # Loaded by the editor itself, by the CEF3 browser helper, by the bundled
-  # CPython 3.11 and by the bundled .NET 10 runtime. None of these ship a
-  # libstdc++ or glibc of their own.
   runtimeLibs = [
     stdenv.cc.cc.lib
     addDriverRunpath.driverLink
@@ -176,12 +165,10 @@ let
     gnused
     procps
     which
-    # xdg-user-dir: the editor resolves the default project directory with it.
     xdg-user-dirs
     xdg-utils
   ];
 
-  # bin name -> path relative to the engine root
   entryPoints = {
     UnrealEditor = "Engine/Binaries/Linux/UnrealEditor";
     UnrealEditor-Cmd = "Engine/Binaries/Linux/UnrealEditor-Cmd";
@@ -219,8 +206,6 @@ stdenvNoCC.mkDerivation {
 
   dontUnpack = true;
 
-  # ~50 GiB of prebuilt binaries. Every stdenv fixup hook here would walk the
-  # whole tree for no gain, and stripping would break Epic's crash reporter.
   dontFixup = true;
 
   installPhase = ''
@@ -229,20 +214,11 @@ stdenvNoCC.mkDerivation {
     engine="$out/opt/UnrealEngine"
     install -dm755 "$engine"
 
-    # The engine archive is rooted at Engine/, and both plugin archives are
-    # rooted at Engine/Plugins/ - they overlay onto the same tree with no
-    # colliding paths.
     for archive in $srcs; do
       echo "extracting $archive"
       unzip -qq -o "$archive" -d "$engine"
     done
 
-    # --- slimming ---------------------------------------------------------
-    # Split debug info (10.5 GiB), Breakpad symbols (3.4 GiB) and PDBs, plus
-    # the Android and Linux/arm64 target binaries and their prebuilt objects.
-    # Engine/Intermediate/Build/Linux stays: it holds the UHT-generated headers
-    # every game C++ module includes, and the objects that keep the first
-    # "package a Linux build" from recompiling the whole engine.
     find "$engine" \( -name '*.debug' -o -name '*.sym' -o -name '*.pdb' \) -delete
     rm -rf \
       "$engine/Engine/Binaries/Android" \
@@ -251,25 +227,10 @@ stdenvNoCC.mkDerivation {
       "$engine/Engine/Intermediate/Build/Android" \
       "$engine/Engine/Intermediate/Build/LinuxArm64"
 
-    # --- ELF fixup --------------------------------------------------------
-    # Only the interpreter needs rewriting; shared objects are resolved through
-    # LD_LIBRARY_PATH, which the launcher sets and every spawned worker
-    # (ShaderCompileWorker, EpicWebHelper, UnrealBuildTool) inherits.
-    #
-    # A large part of the archive is extracted as 0555 (Epic's own binaries are
-    # 0755), and patchelf needs to reopen the file for writing - without this
-    # every third-party executable, dotnet and the bundled Python included,
-    # silently keeps its /lib64 interpreter.
     chmod -R u+w "$engine"
     chmod +x "$engine/Engine/Binaries/ThirdParty/DotNet/10.0/linux-x64/dotnet"
     find "$engine" -type f -name '*.sh' -exec chmod +x {} +
 
-    # The RUNPATH is what makes an executable survive being started without the
-    # launcher's environment: UnrealBuildAccelerator re-spawns the compiler and
-    # the link tools with a sanitised env, so an LD_LIBRARY_PATH-only setup
-    # fails there with "clang++: error while loading shared libraries:
-    # libstdc++.so.6" (UBA reports it as exit code 9666 and as a failed link).
-    # Existing entries are kept - Epic's own binaries rely on $ORIGIN.
     interp="$(cat ${stdenv.cc}/nix-support/dynamic-linker)"
     libs="${lib.makeLibraryPath runtimeLibs}"
     patched=0
@@ -283,23 +244,15 @@ stdenvNoCC.mkDerivation {
     done < <(find "$engine" -type f -perm -u+x -print0)
     echo "patched interpreter and rpath on $patched executables"
 
-    # --- shebangs ----------------------------------------------------------
-    # The batch files hardcode #!/bin/bash, which does not exist on NixOS. The
-    # editor spawns Build.sh through posix_spawnp(), so this surfaces as
-    # "Failed to launch Unreal Build Tool" rather than as a shell error.
     find "$engine" -type f -name '*.sh' \
       -exec sed -i '1s|^#!/bin/bash|#!${bash}/bin/bash|' {} +
 
-    # --- source code editor -------------------------------------------------
-    # Kept out of $out/bin so it is only on the PATH the launcher builds for
-    # the engine, never on the user's.
     ide="$out/libexec/unreal-editor"
     install -dm755 "$ide"
     substitute ${./code.sh} "$ide/code" \
       --replace-fail "#!/usr/bin/env bash" "#!${bash}/bin/bash"
     chmod +x "$ide/code"
 
-    # --- launchers --------------------------------------------------------
     install -dm755 "$out/bin"
     ${lib.concatStringsSep "\n" (
       lib.mapAttrsToList (name: rel: ''
@@ -316,10 +269,6 @@ stdenvNoCC.mkDerivation {
       '') entryPoints
     )}
 
-    # --- icon -------------------------------------------------------------
-    # The .icns holds the full-resolution UE artwork (ImageMagick has no ICNS
-    # coder, hence icns2png); the Linux .png upstream ships is a 96px stand-in
-    # and is only the fallback.
     icns="$engine/Engine/Source/Runtime/Launch/Resources/Mac/UnrealEngine.icns"
     src="$engine/Engine/Source/Runtime/Launch/Resources/Linux/UnrealEngine.png"
     install -dm755 "$TMPDIR/icns"
@@ -337,7 +286,6 @@ stdenvNoCC.mkDerivation {
         "$out/share/icons/hicolor/''${size}x''${size}/apps/unreal-editor.png"
     done
 
-    # --- desktop entry ----------------------------------------------------
     install -dm755 "$out/share/applications"
     cat > "$out/share/applications/unreal-editor.desktop" <<DESKTOP
     [Desktop Entry]
@@ -363,7 +311,6 @@ stdenvNoCC.mkDerivation {
     license = lib.licenses.unfree;
     platforms = [ "x86_64-linux" ];
     mainProgram = "UnrealEditor";
-    # 40 GiB source + ~51 GiB output; nothing a binary cache should carry.
     hydraPlatforms = [ ];
   };
 }

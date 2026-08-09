@@ -46,16 +46,12 @@ let
     hash = "sha256-fr8NLHHAu1bRYL5egYoAgc1V6CoQZIFKL6+rAK7IXqg=";
   };
 
-  # nvcuda.dll: Wine har ingen egen, og uten den laster ikke Gaea sin
-  # CUDA-backend. Ferdigbygde winelib-dll'er fra nvidia-libs.
   nvidiaLibsVersion = "1.0.2";
   nvidiaLibs = fetchurl {
     url = "https://github.com/SveSop/nvidia-libs/releases/download/v${nvidiaLibsVersion}/nvidia-libs-v${nvidiaLibsVersion}.tar.xz";
     hash = "sha256-Aei7Y2jQiOItjo8dAklyFOjbQ2R2Ahcl7wwHB7fLFzg=";
   };
 
-  # Retter opp Unity-viewportens vindu inne i Wine-desktopen — se
-  # kommentaren i gaea-embed.c.
   embedHelper = pkgsCross.mingwW64.stdenv.mkDerivation {
     pname = "gaea-embed";
     version = "1";
@@ -87,7 +83,6 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       "https://aceclan.no/derivations_source/Gaea/Gaea-${finalAttrs.version}.exe"
       "https://get.gaea.app/Release/Gaea-${finalAttrs.version}.exe"
     ];
-    # Samme sjekksum som bootstrapperen selv verifiserer mot.
     hash = "sha256-GtwioEz5r0czhVFrnE6zagnCajFMOP+p4XpFrrv56Ss=";
   };
 
@@ -108,7 +103,6 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     install -d $out/share/gaea
     mv app $out/share/gaea/app
 
-    # Crack: erstatt original motor-dll (readme.txt).
     install -Dm644 ${crackEngineDll} $out/share/gaea/app/Gaea.Engine.dll
 
     unzip -q ${dotnetRuntime} -d $out/share/gaea/dotnet

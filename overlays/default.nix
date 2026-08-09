@@ -22,7 +22,6 @@ in {
   gaea = callPackage ../pkgs/gaea { };
   kmymoney = callPackage ../pkgs/kmymoney { };
 
-  # Fix flycast bundled glslang missing <cstdint> for GCC 15
   flycast = prev.flycast.overrideAttrs (old: {
     postPatch = (old.postPatch or "") + ''
       sed -i '/#include "spvIR.h"/a #include <cstdint>' core/deps/glslang/SPIRV/SpvBuilder.h

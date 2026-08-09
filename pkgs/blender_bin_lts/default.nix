@@ -1,7 +1,3 @@
-# Offisiell blender.org-binary for Blender LTS. Bygges ikke fra kilde:
-# Blender Foundation distribuerer ferdig kompilerte Cycles-kernels for CUDA
-# (.cubin), OptiX (.ptx), HIP og oneAPI. De kan ikke settes sammen fra separate
-# cache-pakker etterpaa — GPU-backends er compile-time i Cycles.
 {
   lib,
   stdenv,
@@ -37,7 +33,6 @@ stdenv.mkDerivation (finalAttrs: {
 
   src = fetchurl {
     url = "https://download.blender.org/release/Blender5.2/blender-${finalAttrs.version}-linux-x64.tar.xz";
-    # Verifisert mot blender-5.2.0.sha256 fra download.blender.org.
     hash = "sha256-lvbBgaMPSVBgeDnchNQqNUslDYoCMbCYtZt7xpw1HEg=";
   };
 
@@ -46,16 +41,14 @@ stdenv.mkDerivation (finalAttrs: {
     addDriverRunpath
   ];
 
-  # Alt av grafikk/render-stack ligger bundlet i tarballens lib/ ($ORIGIN/lib).
-  # Kun det Blender forventer fra systemet listes her.
   buildInputs = [
     stdenv.cc.cc.lib
-    alsa-lib # de fire neste lenkes av bundlet libSDL3
+    alsa-lib
     dbus
     libjack2
     libpulseaudio
     libdrm
-    libglvnd # libGL/libEGL/libGLES, lenket av bundlet USD og SDL3
+    libglvnd
     libice
     libsm
     libx11
@@ -67,12 +60,11 @@ stdenv.mkDerivation (finalAttrs: {
     libxrandr
     libxrender
     libxt
-    ncurses # libncursesw/libpanelw/libtinfo for bundlet python
-    util-linux # libuuid, samme
-    vulkan-loader # erstatter bundlet loader, se installPhase
+    ncurses
+    util-linux
+    vulkan-loader
   ];
 
-  # dlopen-es ved kjoretid, saa de maa inn i RUNPATH manuelt.
   runtimeDependencies = [
     alsa-lib
     dbus
@@ -82,11 +74,8 @@ stdenv.mkDerivation (finalAttrs: {
     wayland
   ];
 
-  # libcuda.so.1 / libnvoptix.so.1 kommer fra nvidia-driveren, ikke fra nixpkgs.
   appendRunpaths = [ "${addDriverRunpath.driverLink}/lib" ];
 
-  # Driver-leverte og valgfrie backends finnes ikke i byggemiljoet.
-  # libGLES_CM/libsteam_api er valgfrie SDL3-baksider Blender ikke bruker.
   autoPatchelfIgnoreMissingDeps = [
     "libcuda.so.1"
     "libamdhip64.so.7"
@@ -104,10 +93,6 @@ stdenv.mkDerivation (finalAttrs: {
     mkdir -p $out/share/blender
     cp -a . $out/share/blender
 
-    # Bundlet vulkan-loader mangler nixpkgs-patchen som legger
-    # /run/opengl-driver/share i ICD-soekestien, saa den finner ingen driver og
-    # Blender faller tilbake til OpenGL. autoPatchelfHook lenker libvulkan.so.1
-    # mot nixpkgs-loaderen naar den bundlede er borte.
     rm $out/share/blender/lib/libvulkan.so*
 
     mkdir -p $out/bin
@@ -127,7 +112,7 @@ stdenv.mkDerivation (finalAttrs: {
     homepage = "https://www.blender.org/";
     license = with lib.licenses; [
       gpl2Plus
-      nvidiaCudaRedist # OptiX/CUDA-kernels bundlet av Blender Foundation
+      nvidiaCudaRedist
     ];
     platforms = [ "x86_64-linux" ];
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];

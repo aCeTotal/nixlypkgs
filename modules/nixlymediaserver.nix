@@ -53,7 +53,6 @@ in
       description = "Group the service runs as.";
     };
 
-    # ── Identity ──────────────────────────────────────────────────────
 
     serverId = lib.mkOption {
       type = lib.types.str;
@@ -70,7 +69,6 @@ in
       description = "Human-readable server name shown to clients.";
     };
 
-    # ── Bandwidth ─────────────────────────────────────────────────────
 
     uploadMbps = lib.mkOption {
       type = lib.types.int;
@@ -82,7 +80,6 @@ in
       '';
     };
 
-    # ── Auth ──────────────────────────────────────────────────────────
 
     authUser = lib.mkOption {
       type = lib.types.str;
@@ -99,7 +96,6 @@ in
       '';
     };
 
-    # ── TMDB ──────────────────────────────────────────────────────────
 
     tmdbApiKey = lib.mkOption {
       type = lib.types.str;
@@ -113,7 +109,6 @@ in
       description = "TMDB language code (e.g. en-US, nb-NO).";
     };
 
-    # ── Library + downloads ───────────────────────────────────────────
 
     mediaPaths = lib.mkOption {
       type = lib.types.listOf lib.types.str;
@@ -138,7 +133,6 @@ in
       description = "Destination directory for movie downloads from the /wget UI.";
     };
 
-    # ── Firewall ──────────────────────────────────────────────────────
 
     openFirewall = lib.mkOption {
       type = lib.types.bool;
@@ -159,9 +153,6 @@ in
     };
     users.groups.${cfg.group} = lib.mkIf (cfg.group == "nixlymedia") { };
 
-    # Raise inotify watch limit — large libraries blow past the 8192 default.
-    # mkForce because nixpkgs sets a default at the same priority; we want
-    # this bumped whenever the server is enabled.
     boot.kernel.sysctl."fs.inotify.max_user_watches" = lib.mkForce 524288;
 
     systemd.tmpfiles.rules = [
@@ -192,11 +183,8 @@ in
         Restart = "always";
         RestartSec = 5;
 
-        # Allow many concurrent streams + watching large libraries.
         LimitNOFILE = 65536;
 
-        # Hardening — read-mostly server with writes confined to dataDir,
-        # cache, and the configured media + download paths.
         NoNewPrivileges = true;
         ProtectSystem = "strict";
         ProtectHome = "read-only";

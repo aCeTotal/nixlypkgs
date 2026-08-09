@@ -4,13 +4,7 @@
   fetchurl,
   makeWrapper,
   python3,
-  # Browser executable resolved from PATH at runtime. Must accept
-  # `--app=<url>` (any Chromium-derived browser: chromium, google-chrome,
-  # brave, vivaldi, microsoft-edge, etc.). Kept as a plain string so we
-  # don't pull a browser into this derivation's closure (chromium from
-  # nixpkgs is often uncached and would build from source).
   browserCommand ? "chromium",
-  # Page opened in app mode. Default is the GFN web client.
   url ? "https://play.geforcenow.com/",
 }:
 

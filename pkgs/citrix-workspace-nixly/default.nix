@@ -6,7 +6,6 @@
   autoPatchelfHook,
   wrapGAppsHook3,
 
-  # Core libraries
   alsa-lib,
   atk,
   cacert,
@@ -69,7 +68,6 @@
   woff2,
   zlib,
 
-  # X11 libraries
   libxtst,
   libxscrnsaver,
   libxrender,
@@ -83,11 +81,9 @@
   xdpyinfo,
   libxcb,
 
-  # Wayland support
   wayland,
   libxkbcommon,
 
-  # MIME & XDG support
   shared-mime-info,
   desktop-file-utils,
   xdg-utils,
@@ -294,7 +290,6 @@ stdenv.mkDerivation {
       export ICAInstDir="$out/opt/citrix-icaclient"
       export HOME=$(mktemp -d)
 
-      # Run upstream installer
       sed -i \
         -e 's,^ANSWER="",ANSWER="$INSTALLER_YES",g' \
         -e 's,/bin/true,true,g' \
@@ -303,7 +298,6 @@ stdenv.mkDerivation {
       source_date=$(date --utc --date=@$SOURCE_DATE_EPOCH "+%F %T")
       faketime -f "$source_date" ${stdenv.shell} linuxx64/hinst CDROM "$(pwd)"
 
-      # Setlog utility
       if [ -f "$ICAInstDir/util/setlog" ]; then
         chmod +x "$ICAInstDir/util/setlog"
         ln -sf "$ICAInstDir/util/setlog" "$out/bin/citrix-setlog"
@@ -319,7 +313,6 @@ stdenv.mkDerivation {
 
       ln -sf $ICAInstDir/util/storebrowse $out/bin/storebrowse
 
-      # --- Security certificates ---
       echo "Expanding certificates..."
       pushd "$ICAInstDir/keystore/cacerts"
       awk 'BEGIN {c=0;} /BEGIN CERT/{c++} { print > "cert." c ".pem"}' \
@@ -327,15 +320,12 @@ stdenv.mkDerivation {
       popd
       ${mkWrappers copyCert extraCerts}
 
-      # --- Gstreamer 1.0 only ---
       rm $ICAInstDir/util/{gst_aud_{play,read},gst_*0.10,libgstflatstm0.10.so} || true
       ln -sf $ICAInstDir/util/gst_play1.0 $ICAInstDir/util/gst_play
       ln -sf $ICAInstDir/util/gst_read1.0 $ICAInstDir/util/gst_read
 
-      # --- Timezone ---
       echo UTC > "$ICAInstDir/timezone"
 
-      # --- MIME type for .ica files ---
       cat > $out/share/mime/packages/citrix-workspace.xml << 'MIME'
       <?xml version="1.0" encoding="UTF-8"?>
       <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-spec">
@@ -346,10 +336,8 @@ stdenv.mkDerivation {
       </mime-info>
       MIME
 
-      # --- Desktop files ---
       cp $ICAInstDir/desktop/* $out/share/applications/ || true
 
-      # Create a dedicated wfica desktop file that handles .ica files
       cat > $out/share/applications/wfica.desktop << DESKTOP
       [Desktop Entry]
       Name=Citrix Workspace
@@ -363,20 +351,16 @@ stdenv.mkDerivation {
       StartupNotify=true
       DESKTOP
 
-      # Remove MimeType from selfservice desktop to avoid it hijacking .ica files
       for f in $out/share/applications/*.desktop; do
         case "$(basename "$f")" in
-          wfica.desktop) ;; # skip, we just created it
+          wfica.desktop) ;;
           *) sed -i '/^MimeType=.*application\/x-ica/d' "$f" ;;
         esac
       done
       update-desktop-database $out/share/applications || true
 
-      # --- Client Drive Mapping (CDM) – Linux filesystem access ---
-      # Make config files writable before modifying them
       chmod -R u+w "$ICAInstDir/config/" || true
 
-      # module.ini: load the CDM virtual-channel driver
       if [ -f "$ICAInstDir/config/module.ini" ]; then
         if grep -q "\[ClientDrive\]" "$ICAInstDir/config/module.ini"; then
           sed -i '/\[ClientDrive\]/,/^\[/ {
@@ -392,18 +376,15 @@ stdenv.mkDerivation {
         fi
       fi
 
-      # wfclient.ini: inject drive mappings + HDX performance into [WFClient]
       if [ -f "$ICAInstDir/config/wfclient.ini" ]; then
         if ! grep -q "CDMAllowed" "$ICAInstDir/config/wfclient.ini"; then
           sed -i '/^\[WFClient\]/a\CDMAllowed=True\nDriveEnabledA=True\nDrivePathA=\\/\nDriveReadAccessA=3\nDriveWriteAccessA=3\nDriveEnabledH=True\nDrivePathH=$HOME\\/\nDriveReadAccessH=3\nDriveWriteAccessH=3' "$ICAInstDir/config/wfclient.ini"
         fi
-        # HDX graphics: H.264/H.265 + hardware accel for Thinwire
         if ! grep -q "^H264Enabled" "$ICAInstDir/config/wfclient.ini"; then
           sed -i '/^\[WFClient\]/a\H264Enabled=True\nH265Enabled=True\nGraphicsAcceleration=True\nEnableHardwareDecoding=True\nMaximumCompression=True' "$ICAInstDir/config/wfclient.ini"
         fi
       fi
 
-      # --- Disable TWI (graphics settings live in All_Regions.ini) ---
       if [ -f "$ICAInstDir/config/wfclient.ini" ]; then
         if ! grep -q "TWIMode" "$ICAInstDir/config/wfclient.ini"; then
           cat >> "$ICAInstDir/config/wfclient.ini" << 'BASIC'
@@ -413,7 +394,6 @@ stdenv.mkDerivation {
         fi
       fi
 
-      # Seamless Windows, CDM & Thinwire Graphics – All_Regions.ini
       if [ -f "$ICAInstDir/config/All_Regions.ini" ]; then
         if ! grep -q "\[Virtual Channels\\\\Seamless Windows\]" "$ICAInstDir/config/All_Regions.ini"; then
           cat >> "$ICAInstDir/config/All_Regions.ini" << 'SEAMLESS'
@@ -450,7 +430,6 @@ stdenv.mkDerivation {
       TWGFX
         fi
 
-        # EDT (Enlightened Data Transport) — UDP-based HDX, lower latency than TCP
         if ! grep -q "\[Network\\\\TCP-IP\\\\HDXEnlightenedDataTransport\]" "$ICAInstDir/config/All_Regions.ini"; then
           cat >> "$ICAInstDir/config/All_Regions.ini" << 'EDT'
 
@@ -462,7 +441,6 @@ stdenv.mkDerivation {
         fi
       fi
 
-      # module.ini – disable TWI
       if [ -f "$ICAInstDir/config/module.ini" ]; then
         if ! grep -q "\[ICA 3.0\]" "$ICAInstDir/config/module.ini"; then
           cat >> "$ICAInstDir/config/module.ini" << 'ICA30'
@@ -478,11 +456,9 @@ stdenv.mkDerivation {
       runHook postInstall
     '';
 
-  # autoPatchelf must run before ctx_rehash
   dontAutoPatchelf = true;
 
   postFixup = ''
-    # Null out hardcoded webkit bundle path so it falls back to LD_LIBRARY_PATH
     ${lib.getExe perl} -0777 -pi -e 's{/usr/lib/x86_64-linux-gnu/webkit2gtk-4.0/injected-bundle/}{"\0" x length($&)}e' \
       $out/opt/citrix-icaclient/usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.0.so.37.56.4
 

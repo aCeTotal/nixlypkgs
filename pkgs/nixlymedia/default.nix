@@ -38,9 +38,6 @@ rustPlatform.buildRustPackage rec {
   version = "0-unstable-2026-07-27";
 
   src = fetchFromGitHub {
-    # name satt eksplisitt: gammel "source"-path i store var korrupt
-    # (02b1b3c-innhold registrert under 51a9fd9-hash); nytt navn = nytt
-    # store-path = fersk fetch.
     name = "nixlymedia-src-2030162";
     owner = "aCeTotal";
     repo = "nixlymedia";
@@ -95,10 +92,6 @@ rustPlatform.buildRustPackage rec {
     patchelf \
       --set-rpath "${lib.makeLibraryPath runtimeLibs}" \
       $out/bin/nixlymedia
-    # Auto-enable diagnostic log → /tmp/nixlymedia.log
-    # Inneholder: mpv verbose log (decoder/vo/ao/statusline/frame-timing),
-    # render-loop stats hver sekund (rendered_fps/present_fps/drops/avsync/
-    # cache buffering), HDR state-transitions, EGL/Wayland binding status.
     wrapProgram $out/bin/nixlymedia \
       --set NIXLY_LOG 1 \
       --set NIXLY_LOG_FILE /tmp/nixlymedia.log

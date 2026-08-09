@@ -1,4 +1,3 @@
-# Update with: ./update.sh
 {
   lib,
   stdenvNoCC,

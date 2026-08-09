@@ -38,7 +38,6 @@ stdenv.mkDerivation rec {
   ];
 
   preBuild = ''
-    # Repo ships pre-compiled .o files; force a clean rebuild.
     make clean
   '';
 

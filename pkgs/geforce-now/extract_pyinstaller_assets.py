@@ -14,7 +14,7 @@ import sys
 import zlib
 
 COOKIE_MAGIC = b"MEI\x0c\x0b\x0a\x0b\x0e"
-COOKIE_LEN = 88  # magic(8) + 4xI + pylib(64)
+COOKIE_LEN = 88
 
 
 def parse(data: bytes):

@@ -38,7 +38,6 @@
           default = pkgs.nixlytile;
         });
 
-      # Drop-in modules to enable the overlay system-wide or per-user
       nixosModules = {
         nixlypkgs = { ... }: {
           nixpkgs.overlays = [ self.overlays.default ];

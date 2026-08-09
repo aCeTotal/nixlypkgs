@@ -9,7 +9,6 @@ stdenv.mkDerivation rec {
   version = "10.1.0";
 
   src = pkgs.fetchurl {
-    # Upstream prebuilt tarball
     url = "https://cdn-files.hexagon.unity.com/public/files/speedtree/SpeedTree_Modeler_v${version}_Linux.tar.gz";
     hash = "sha256-UxNiB1RwLj7fiMuAPKQW1fMBtoWIGUKNnwUkPy2koGo=";
   };
@@ -19,7 +18,6 @@ stdenv.mkDerivation rec {
     pkgs.patchelf
   ];
 
-  # We provide our own launcher and avoid Qt wrapper env logic
   dontWrapQtApps = true;
 
   buildInputs = with pkgs; [
@@ -33,7 +31,6 @@ stdenv.mkDerivation rec {
     libdrm
     dbus
 
-    # X11 / XCB stack
     xorg.libX11
     xorg.libXext
     xorg.libXrender
@@ -58,13 +55,10 @@ stdenv.mkDerivation rec {
     xorg.xcbutilwm
     xorg.xcbutilcursor
 
-    # Qt 6 runtime for plugins needing Qt libs
-    # We rely on bundled Qt; include system libs only
     sqlite
     xkeyboard_config
   ];
 
-  # We'll patch binaries manually and avoid autoPatchelf
   dontAutoPatchelf = true;
 
   dontUnpack = true;
@@ -78,16 +72,13 @@ stdenv.mkDerivation rec {
     workdir="$(mktemp -d)"
     tar -xzf "${src}" -C "$workdir"
 
-    # Try to locate the inner directory robustly
     innerRoot=""
 
-    # Common structure: SpeedTree_Modeler_v*/SpeedTree_Modeler_v*
     topCandidate="$(find "$workdir" -maxdepth 2 -type d -name 'SpeedTree_Modeler_v*_Linux' -print -quit || true)"
     if [ -n "$topCandidate" ]; then
       innerRoot="$(find "$topCandidate" -mindepth 1 -maxdepth 1 -type d -name 'SpeedTree_Modeler_v*' -print -quit || true)"
     fi
 
-    # Fallback: find a 'linux' dir and take its parent
     if [ -z "$innerRoot" ]; then
       linuxDir="$(find "$workdir" -maxdepth 4 -type d -name linux -print -quit || true)"
       if [ -n "$linuxDir" ]; then
@@ -95,7 +86,6 @@ stdenv.mkDerivation rec {
       fi
     fi
 
-    # Fallback: find the 'data' file and take its directory
     if [ -z "$innerRoot" ]; then
       dataDir="$(find "$workdir" -maxdepth 4 -type f -name data -print -quit || true)"
       if [ -n "$dataDir" ]; then
@@ -115,12 +105,10 @@ stdenv.mkDerivation rec {
 
     cd "$out/opt/speedtree"
 
-    # Unpack additional data file if present
     if [ -f data ]; then
       tar -zxf data > /dev/null 2>&1 || true
     fi
 
-    # Patch binaries and shared objects to find bundled libs and system libs
     rpath_base="$out/opt/speedtree/linux/lib:${lib.makeLibraryPath buildInputs}"
     if [ -f linux/SpeedTree_Modeler ]; then
       chmod +x linux/SpeedTree_Modeler || true
@@ -132,34 +120,25 @@ stdenv.mkDerivation rec {
       fi
     done < <(find linux -type f -print0)
 
-    # Launcher script that mirrors upstream behavior, adapted for NixOS
     libPath="${lib.makeLibraryPath buildInputs}"
     cat > "$out/opt/speedtree/speedtree.sh" <<'EOS'
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Change to SpeedTree directory
 CANONPATH="$(readlink -f "$0")"
 CANONPATH="$(dirname "$CANONPATH")"
 cd "$CANONPATH"
 
-# Set up new library path (include bundled libs + system libs)
-# Temporarily disable 'nounset' to allow empty LD_LIBRARY_PATH
 set +u
 export LD_LIBRARY_PATH="$CANONPATH"/linux/lib:__LIBPATH__:"$LD_LIBRARY_PATH"
 set -u
 
-# Set Qt plugin paths to bundled plugins
 export QT_PLUGIN_PATH="$CANONPATH/linux/plugins"
 export QT_QPA_PLATFORM_PLUGIN_PATH="$CANONPATH/linux/plugins/platforms"
 export QT_QPA_PLATFORM="xcb"
 export XKB_CONFIG_ROOT="__XKBROOT__"
-# export QT_DEBUG_PLUGINS=0
 
-# Uncomment to use license file instead of app preferences
-# export idvinc_LICENSE="/path/to/license.lic"
 
-# Run SpeedTree Modeler
 exec "./linux/SpeedTree_Modeler" "$@"
 EOS
     substituteInPlace "$out/opt/speedtree/speedtree.sh" \
@@ -167,11 +146,9 @@ EOS
       --replace "__XKBROOT__" "${pkgs.xkeyboard_config}/share/X11/xkb"
     chmod +x "$out/opt/speedtree/speedtree.sh"
 
-    # User-facing entry in PATH
     install -dm755 "$out/bin"
     ln -s "$out/opt/speedtree/speedtree.sh" "$out/bin/speedtree-modeler"
 
-    # .desktop entry for launchers like rofi
     install -dm755 "$out/share/applications"
     cat > "$out/share/applications/speedtree-modeler.desktop" <<EOF
 [Desktop Entry]

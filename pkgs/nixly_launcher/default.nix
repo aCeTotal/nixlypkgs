@@ -84,9 +84,6 @@ rustPlatform.buildRustPackage {
         --prefix PATH : "${lib.makeBinPath runtimePathPkgs}"
     done
 
-    # systemd user service — auto-starts the daemon when the user's
-    # graphical session comes up (compositors that activate
-    # graphical-session.target via systemd will start it automatically).
     mkdir -p $out/share/systemd/user
     cat > $out/share/systemd/user/nixly-launcher.service <<EOF
     [Unit]

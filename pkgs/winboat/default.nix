@@ -11,12 +11,10 @@
 
 stdenv.mkDerivation rec {
   pname = "winboat";
-  # Match source and sha used in the provided flake
   version = "0.8.5";
 
   src = fetchurl {
     url = "https://github.com/aCeTotal/winboat/releases/download/v${version}/winboat-${version}-x64.tar.gz";
-    # Hash provided in the prompt; ensure it matches the chosen version
     sha256 = "1mvvd6y0wcpqh6wmjzpax7pkdpwcibhb9y7hnrd7x79fr0s5f3mp";
   };
 
@@ -27,17 +25,14 @@ stdenv.mkDerivation rec {
     runHook preInstall
 
     mkdir -p $out/share/winboat $out/bin
-    # Copy all extracted release contents into share/winboat
     (cd . && tar cf - .) | (cd $out/share/winboat && tar xf -)
 
-    # Launch wrapper: run the Electron binary with the bundled app.asar
     cat > $out/bin/winboat <<EOF
 #!/usr/bin/env bash
 exec ${electron}/bin/electron "$out/share/winboat/resources/app.asar" "$@"
 EOF
     chmod +x $out/bin/winboat
 
-    # Desktop entry
     mkdir -p $out/share/applications
     cat > $out/share/applications/winboat.desktop <<EOF
 [Desktop Entry]
@@ -49,7 +44,6 @@ Icon=winboat
 Categories=Utility;
 EOF
 
-    # Icons (best-effort if present in the release)
     mkdir -p $out/share/icons/hicolor/256x256/apps
     if [ -f icons/icon.png ]; then
       cp icons/icon.png $out/share/icons/hicolor/256x256/apps/winboat.png
@@ -61,13 +55,11 @@ EOF
       cp resources/icon.png $out/share/winboat/icon.png
     fi
 
-    # Data files: provide usb.ids from hwdata
     mkdir -p $out/share/winboat/data
     mkdir -p $out/share/winboat/resources/data
     cp ${hwdata}/share/hwdata/usb.ids $out/share/winboat/data/usb.ids
     cp ${hwdata}/share/hwdata/usb.ids $out/share/winboat/resources/data/usb.ids
 
-    # Guest server payload (location differs between releases)
     mkdir -p $out/lib/guest_server
     if [ -d guest_server ]; then
       mkdir -p $out/share/winboat/resources/guest_server
@@ -87,7 +79,6 @@ EOF
   '';
 
   postFixup = ''
-    # Ensure required tools and libraries are available at runtime
     wrapProgram "$out/bin/winboat" \
       --prefix PATH : ${lib.makeBinPath [ freerdp3 usbutils ]} \
       --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ electron libusb1 (lib.getLib stdenv.cc.cc) ]}

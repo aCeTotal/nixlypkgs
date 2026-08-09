@@ -59,9 +59,6 @@ in
       '';
     };
 
-    # Auto-start the idle daemon for every graphical user session. Wayland
-    # compositors that activate `graphical-session.target` (Hyprland, Sway,
-    # GNOME, KDE …) will start nixly-idled automatically.
     systemd.user.services.nixly-idled = {
       description = "nixly_lockscreen idle daemon";
       partOf = [ "graphical-session.target" ];
@@ -80,8 +77,6 @@ in
       };
     };
 
-    # System-side TTY/sysrq lockdown helper used by the lockscreen
-    # while the screen is locked.
     systemd.services.nixly-lockguard = {
       description = "nixly_lockscreen TTY/sysrq lockdown helper";
       wantedBy = [ "multi-user.target" ];
