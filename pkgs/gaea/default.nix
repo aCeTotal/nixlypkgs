@@ -8,8 +8,10 @@
   zstd,
   icoutils,
   makeWrapper,
+  addDriverRunpath,
   coreutils,
   dxvk,
+  pkgsCross,
   wineWow64Packages,
 }:
 
@@ -42,6 +44,32 @@ let
   dotnetDesktop = fetchurl {
     url = "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/${dotnetVersion}/windowsdesktop-runtime-${dotnetVersion}-win-x64.zip";
     hash = "sha256-fr8NLHHAu1bRYL5egYoAgc1V6CoQZIFKL6+rAK7IXqg=";
+  };
+
+  # nvcuda.dll: Wine har ingen egen, og uten den laster ikke Gaea sin
+  # CUDA-backend. Ferdigbygde winelib-dll'er fra nvidia-libs.
+  nvidiaLibsVersion = "1.0.2";
+  nvidiaLibs = fetchurl {
+    url = "https://github.com/SveSop/nvidia-libs/releases/download/v${nvidiaLibsVersion}/nvidia-libs-v${nvidiaLibsVersion}.tar.xz";
+    hash = "sha256-Aei7Y2jQiOItjo8dAklyFOjbQ2R2Ahcl7wwHB7fLFzg=";
+  };
+
+  # Retter opp Unity-viewportens vindu inne i Wine-desktopen — se
+  # kommentaren i gaea-embed.c.
+  embedHelper = pkgsCross.mingwW64.stdenv.mkDerivation {
+    pname = "gaea-embed";
+    version = "1";
+    dontUnpack = true;
+    buildPhase = ''
+      runHook preBuild
+      $CC -O2 -mwindows -o gaea-embed.exe ${./gaea-embed.c} -luser32
+      runHook postBuild
+    '';
+    installPhase = ''
+      runHook preInstall
+      install -Dm755 gaea-embed.exe $out/bin/gaea-embed.exe
+      runHook postInstall
+    '';
   };
 
   vkd3dProtonVersion = "2.14.1";
@@ -91,6 +119,13 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       vkd3d-proton-${vkd3dProtonVersion}/x64/d3d12.dll \
       vkd3d-proton-${vkd3dProtonVersion}/x64/d3d12core.dll
 
+    tar -xf ${nvidiaLibs} -C .
+    install -Dm644 -t $out/share/gaea/nvlibs \
+      nvidia-libs-v${nvidiaLibsVersion}/x64/nvcuda.dll
+
+    install -Dm644 ${embedHelper}/bin/gaea-embed.exe \
+      $out/share/gaea/embed/gaea-embed.exe
+
     mkdir icons && (cd icons && icotool -x $out/share/gaea/app/Gaea-2.ico)
     install -Dm644 icons/*_512x512x32.png \
       $out/share/icons/hicolor/512x512/apps/gaea.png
@@ -98,7 +133,8 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     install -Dm755 ${./launcher.sh} $out/bin/gaea
     substituteInPlace $out/bin/gaea \
       --subst-var out \
-      --subst-var-by dxvk ${dxvk.bin}
+      --subst-var-by dxvk ${dxvk.bin} \
+      --subst-var-by driverLink ${addDriverRunpath.driverLink}
     wrapProgram $out/bin/gaea \
       --prefix PATH : ${
         lib.makeBinPath [
