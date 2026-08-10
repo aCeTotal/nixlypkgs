@@ -44,6 +44,7 @@
         };
         nixlymediaserver = import ./modules/nixlymediaserver.nix;
         nixly_lockscreen = import ./modules/nixly_lockscreen.nix;
+        citrix-workspace = import ./modules/citrix-workspace.nix;
       };
 
       homeManagerModules = {

@@ -10,6 +10,7 @@
   atk,
   cacert,
   cairo,
+  coreutils,
   curl,
   dconf,
   enchant,
@@ -20,6 +21,8 @@
   gdk-pixbuf,
   glib,
   glib-networking,
+  gnugrep,
+  gnused,
   gnome2,
   gtk2,
   gtk2-x11,
@@ -332,6 +335,14 @@ stdenv.mkDerivation {
         "util/ctxwebhelper"
       ]}
 
+      rm -f $out/bin/wfica
+      substitute ${./wfica-launch.sh} $out/bin/wfica \
+        --replace-fail '@wfica@' "$ICAInstDir/wfica" \
+        --replace-fail '@coreutils@' "${lib.getBin coreutils}/bin" \
+        --replace-fail '@gnused@' "${lib.getBin gnused}/bin" \
+        --replace-fail '@gnugrep@' "${lib.getBin gnugrep}/bin"
+      chmod +x $out/bin/wfica
+
       ln -sf $ICAInstDir/util/storebrowse $out/bin/storebrowse
 
       echo "Expanding certificates..."
@@ -399,8 +410,8 @@ stdenv.mkDerivation {
 
       for wfc in "$ICAInstDir/config/wfclient.ini" "$ICAInstDir/config/wfclient.template"; do
         [ -f "$wfc" ] || continue
-        if ! grep -q "CDMAllowed" "$wfc"; then
-          sed -i '/^\[WFClient\]/a\CDMAllowed=True\nDriveEnabledA=True\nDrivePathA=\\/\nDriveReadAccessA=3\nDriveWriteAccessA=3\nDriveEnabledH=True\nDrivePathH=$HOME\\/\nDriveReadAccessH=3\nDriveWriteAccessH=3' "$wfc"
+        if ! grep -q "DriveEnabledA" "$wfc"; then
+          sed -i '/^\[WFClient\]/a\CDMAllowed=True\nDriveEnabledA=True\nDrivePathA=/\nDriveReadAccessA=3\nDriveWriteAccessA=3' "$wfc"
         fi
         if ! grep -q "^H264Enabled" "$wfc"; then
           sed -i '/^\[WFClient\]/a\H264Enabled=True\nH265Enabled=True\nGraphicsAcceleration=True\nEnableHardwareDecoding=True\nMaximumCompression=True' "$wfc"
@@ -463,14 +474,14 @@ stdenv.mkDerivation {
             sed -i '/^\[ICA 3.0\]/a\TWIMode=0' "$ICAInstDir/config/module.ini"
           fi
           if ! grep -q "^TransparentKeyPassthrough=" "$ICAInstDir/config/module.ini"; then
-            sed -i '/^\[ICA 3.0\]/a\TransparentKeyPassthrough=Remote' "$ICAInstDir/config/module.ini"
+            sed -i '/^\[ICA 3.0\]/a\TransparentKeyPassthrough=Local' "$ICAInstDir/config/module.ini"
           fi
         else
           cat >> "$ICAInstDir/config/module.ini" << 'ICA30'
 
       [ICA 3.0]
       TWIMode=0
-      TransparentKeyPassthrough=Remote
+      TransparentKeyPassthrough=Local
       ICA30
         fi
       fi
