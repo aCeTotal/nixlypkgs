@@ -10,6 +10,7 @@
   atk,
   cacert,
   cairo,
+  curl,
   dconf,
   enchant,
   file,
@@ -27,10 +28,15 @@
   harfbuzzFull,
   heimdal,
   hyphen,
+  gpgme,
   krb5,
   lcms2,
+  libproxy,
+  networkmanager,
+  util-linux,
   libGL,
   libappindicator-gtk3,
+  libayatana-appindicator,
   libcanberra-gtk3,
   libcap,
   libcxx,
@@ -59,6 +65,8 @@
   pango,
   pcsclite,
   perl,
+  pugixml,
+  webkitgtk_4_1,
   sane-backends,
   speex,
   symlinkJoin,
@@ -92,7 +100,7 @@
 }:
 
 let
-  version = "26.01.0.150";
+  version = "26.04.0.105";
   homepage = "https://www.citrix.com/downloads/workspace-app/linux/workspace-app-for-linux-latest.html";
 
   fuse3' = symlinkJoin {
@@ -135,9 +143,8 @@ stdenv.mkDerivation {
   inherit version;
 
   src = fetchurl {
-    url = "https://pfoprod.ddns.net/Adrian/linuxx64-${version}.tar.gz";
-    hash = "sha256-d2S589Mr40lngmmq36rA4T1yXz/6ScLN3TJCfGVyeSs=";
-    curlOptsList = [ "--insecure" ];
+    url = "https://aceclan.no/derivations_source/citrix/workspace/linuxx64-gcc-8-${version}.tar.gz";
+    hash = "sha256-r+xwNiCbMiP1VsHvHKhK2iREhFTvE4gP9ljoSjWIGKs=";
   };
 
   dontBuild = true;
@@ -203,6 +210,15 @@ stdenv.mkDerivation {
     openssl'
     pango
     pcsclite
+    (pugixml.override { shared = true; })
+    webkitgtk_4_1
+    libayatana-appindicator
+    curl
+    gpgme
+    libproxy
+    networkmanager
+    (lib.getLib util-linux)
+    libx11
     sane-backends
     shared-mime-info
     speex
@@ -255,7 +271,7 @@ stdenv.mkDerivation {
         wrapProgram $out/opt/citrix-icaclient/${program} \
           ${lib.optionalString (icaFlag program != null) ''--add-flags "${icaFlag program} $ICAInstDir"''} \
           --set ICAROOT "$ICAInstDir" \
-          --set GDK_BACKEND "wayland" \
+          --set GDK_BACKEND "x11" \
           --prefix GIO_EXTRA_MODULES : "${glib-networking}/lib/gio/modules" \
           --prefix XDG_DATA_DIRS : "${shared-mime-info}/share" \
           --prefix PATH : "${lib.makeBinPath [ xdg-utils xprop xdpyinfo ]}" \
@@ -297,6 +313,11 @@ stdenv.mkDerivation {
         ./linuxx64/hinst
       source_date=$(date --utc --date=@$SOURCE_DATE_EPOCH "+%F %T")
       faketime -f "$source_date" ${stdenv.shell} linuxx64/hinst CDROM "$(pwd)"
+
+      if [ ! -e "$ICAInstDir/usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.0.so.37.56.4" ]; then
+        tar xzf linuxx64/linuxx64.cor/Webkit2gtk4.0/webkit2gtk-4.0.tar.gz \
+          --strip-components=1 -C "$ICAInstDir"
+      fi
 
       if [ -f "$ICAInstDir/util/setlog" ]; then
         chmod +x "$ICAInstDir/util/setlog"
@@ -376,23 +397,18 @@ stdenv.mkDerivation {
         fi
       fi
 
-      if [ -f "$ICAInstDir/config/wfclient.ini" ]; then
-        if ! grep -q "CDMAllowed" "$ICAInstDir/config/wfclient.ini"; then
-          sed -i '/^\[WFClient\]/a\CDMAllowed=True\nDriveEnabledA=True\nDrivePathA=\\/\nDriveReadAccessA=3\nDriveWriteAccessA=3\nDriveEnabledH=True\nDrivePathH=$HOME\\/\nDriveReadAccessH=3\nDriveWriteAccessH=3' "$ICAInstDir/config/wfclient.ini"
+      for wfc in "$ICAInstDir/config/wfclient.ini" "$ICAInstDir/config/wfclient.template"; do
+        [ -f "$wfc" ] || continue
+        if ! grep -q "CDMAllowed" "$wfc"; then
+          sed -i '/^\[WFClient\]/a\CDMAllowed=True\nDriveEnabledA=True\nDrivePathA=\\/\nDriveReadAccessA=3\nDriveWriteAccessA=3\nDriveEnabledH=True\nDrivePathH=$HOME\\/\nDriveReadAccessH=3\nDriveWriteAccessH=3' "$wfc"
         fi
-        if ! grep -q "^H264Enabled" "$ICAInstDir/config/wfclient.ini"; then
-          sed -i '/^\[WFClient\]/a\H264Enabled=True\nH265Enabled=True\nGraphicsAcceleration=True\nEnableHardwareDecoding=True\nMaximumCompression=True' "$ICAInstDir/config/wfclient.ini"
+        if ! grep -q "^H264Enabled" "$wfc"; then
+          sed -i '/^\[WFClient\]/a\H264Enabled=True\nH265Enabled=True\nGraphicsAcceleration=True\nEnableHardwareDecoding=True\nMaximumCompression=True' "$wfc"
         fi
-      fi
-
-      if [ -f "$ICAInstDir/config/wfclient.ini" ]; then
-        if ! grep -q "TWIMode" "$ICAInstDir/config/wfclient.ini"; then
-          cat >> "$ICAInstDir/config/wfclient.ini" << 'BASIC'
-
-      TWIMode=0
-      BASIC
+        if ! grep -q "TWIMode" "$wfc"; then
+          sed -i '/^\[WFClient\]/a\TWIMode=0' "$wfc"
         fi
-      fi
+      done
 
       if [ -f "$ICAInstDir/config/All_Regions.ini" ]; then
         if ! grep -q "\[Virtual Channels\\\\Seamless Windows\]" "$ICAInstDir/config/All_Regions.ini"; then
@@ -442,11 +458,19 @@ stdenv.mkDerivation {
       fi
 
       if [ -f "$ICAInstDir/config/module.ini" ]; then
-        if ! grep -q "\[ICA 3.0\]" "$ICAInstDir/config/module.ini"; then
+        if grep -q "^\[ICA 3.0\]" "$ICAInstDir/config/module.ini"; then
+          if ! grep -q "^TWIMode=" "$ICAInstDir/config/module.ini"; then
+            sed -i '/^\[ICA 3.0\]/a\TWIMode=0' "$ICAInstDir/config/module.ini"
+          fi
+          if ! grep -q "^TransparentKeyPassthrough=" "$ICAInstDir/config/module.ini"; then
+            sed -i '/^\[ICA 3.0\]/a\TransparentKeyPassthrough=Remote' "$ICAInstDir/config/module.ini"
+          fi
+        else
           cat >> "$ICAInstDir/config/module.ini" << 'ICA30'
 
       [ICA 3.0]
       TWIMode=0
+      TransparentKeyPassthrough=Remote
       ICA30
         fi
       fi
@@ -457,6 +481,7 @@ stdenv.mkDerivation {
     '';
 
   dontAutoPatchelf = true;
+  autoPatchelfIgnoreMissingDeps = [ "libgpgme.so.11" ];
 
   postFixup = ''
     ${lib.getExe perl} -0777 -pi -e 's{/usr/lib/x86_64-linux-gnu/webkit2gtk-4.0/injected-bundle/}{"\0" x length($&)}e' \
