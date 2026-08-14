@@ -48,5 +48,6 @@ export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 
 exec env "UE-LocalDataCachePath=$ddc" @bwrap@ \
   --dev-bind / / \
+  --ro-bind "@ld64@" /lib64 \
   --overlay-src "$engine" --overlay "$rw" "$work" "$root" \
   -- "$root/@exe@" "$@"

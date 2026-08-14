@@ -244,6 +244,11 @@ stdenvNoCC.mkDerivation {
     done < <(find "$engine" -type f -perm -u+x -print0)
     echo "patched interpreter and rpath on $patched executables"
 
+    # Bridge's node-bifrost ships without the exec bit and cannot be patchelfed
+    # (pkg-style binary, appended payload breaks). The launcher binds a real
+    # ld.so over /lib64 so its stock interpreter resolves.
+    chmod +x "$engine/Engine/Plugins/Bridge/ThirdParty/Linux/node-bifrost"
+
     find "$engine" -type f -name '*.sh' \
       -exec sed -i '1s|^#!/bin/bash|#!${bash}/bin/bash|' {} +
 
@@ -264,6 +269,7 @@ stdenvNoCC.mkDerivation {
           --replace-fail "@path@" "${lib.makeBinPath runtimeBins}" \
           --replace-fail "@ide@" "$ide" \
           --replace-fail "@libdecorplugins@" "${libdecor}/lib/libdecor/plugins-1" \
+          --replace-fail "@ld64@" "$(dirname "$interp")" \
           --replace-fail "@bwrap@" "${bubblewrap}/bin/bwrap"
         chmod +x "$out/bin/${name}"
       '') entryPoints
