@@ -19,11 +19,11 @@
     "nixly_lockscreen_src": {
       "flake": false,
       "locked": {
-        "lastModified": 1778097298,
-        "narHash": "sha256-pz2Vf0LE7rHVY5MYEud+VLqhYnDsDF685PgV/w3xAxU=",
+        "lastModified": 1786806405,
+        "narHash": "sha256-v8ep9FLoP0wmPood9bP0fG0AwPwKo5Fpoh9a0d7P8A8=",
         "owner": "aCeTotal",
         "repo": "nixly_lockscreen",
-        "rev": "db25e041f07a4ea7f349e6df781bcfffc4a40e7a",
+        "rev": "ebd59caf5837854a255a5b41a3ee96a963e932be",
         "type": "github"
       },
       "original": {
