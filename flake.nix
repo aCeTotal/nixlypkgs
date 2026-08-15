@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixly_launcher_src = {
-      url = "git+ssh://git@github.com/aCeTotal/nixly_launcher";
+      url = "github:aCeTotal/nixly_launcher";
       flake = false;
     };
     nixly_lockscreen_src = {
