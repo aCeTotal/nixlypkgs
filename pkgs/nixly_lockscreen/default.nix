@@ -42,8 +42,8 @@ rustPlatform.buildRustPackage {
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixly_lockscreen";
-    rev = "a39a80801bd76bf6d26bc5040a1aa25fdd63939d";
-    hash = "sha256-JppKJ+Ulu0Wge7urqyB+ANT9AX9xuUnX1gGZ7h2AnZg=";
+    rev = "4874a07d27204be2a0d63738e4e975fbe6a32a05";
+    hash = "sha256-uofPF9LZxb/mC+2gUX+UTH7ZEx8rXyZYU1PmBgeSRps=";
   };
 
   cargoHash = "sha256-iW+2iVpjFUbtMzJ2ERlDOM9u7M4vxaGhrpYPmQhvWhY=";
