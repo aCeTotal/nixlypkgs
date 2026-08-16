@@ -7,10 +7,6 @@
       url = "github:aCeTotal/nixly_launcher";
       flake = false;
     };
-    nixly_lockscreen_src = {
-      url = "github:aCeTotal/nixly_lockscreen";
-      flake = false;
-    };
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:

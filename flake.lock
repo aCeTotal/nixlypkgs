@@ -16,22 +16,6 @@
         "type": "github"
       }
     },
-    "nixly_lockscreen_src": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1786806405,
-        "narHash": "sha256-v8ep9FLoP0wmPood9bP0fG0AwPwKo5Fpoh9a0d7P8A8=",
-        "owner": "aCeTotal",
-        "repo": "nixly_lockscreen",
-        "rev": "ebd59caf5837854a255a5b41a3ee96a963e932be",
-        "type": "github"
-      },
-      "original": {
-        "owner": "aCeTotal",
-        "repo": "nixly_lockscreen",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1777578337,
@@ -51,7 +35,6 @@
     "root": {
       "inputs": {
         "nixly_launcher_src": "nixly_launcher_src",
-        "nixly_lockscreen_src": "nixly_lockscreen_src",
         "nixpkgs": "nixpkgs"
       }
     }
