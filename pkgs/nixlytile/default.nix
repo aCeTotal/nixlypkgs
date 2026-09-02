@@ -30,6 +30,8 @@
 , cairo
 , librsvg
 , gdk-pixbuf
+, qrencode
+, quirc
 , hicolor-icon-theme
 , adwaita-icon-theme
 , papirus-icon-theme
@@ -176,6 +178,8 @@ stdenv.mkDerivation {
     cairo
     librsvg
     gdk-pixbuf
+    qrencode
+    quirc
     hicolor-icon-theme
     adwaita-icon-theme
     papirus-icon-theme
