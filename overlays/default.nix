@@ -19,6 +19,7 @@ in {
   Unreal_editor = callPackage ../pkgs/unreal_editor { };
   gaea = callPackage ../pkgs/gaea { };
   kmymoney = callPackage ../pkgs/kmymoney { };
+  low-latency-layer = callPackage ../pkgs/low-latency-layer { };
 
   flycast = prev.flycast.overrideAttrs (old: {
     postPatch = (old.postPatch or "") + ''

@@ -28,7 +28,7 @@
         let
           pkgs = self.legacyPackages.${system};
         in {
-          inherit (pkgs) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia geforce-now Blender_bin_lts Unreal_editor gaea;
+          inherit (pkgs) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia geforce-now Blender_bin_lts Unreal_editor gaea low-latency-layer;
 
           dwl = pkgs.nixlytile;
           default = pkgs.nixlytile;
