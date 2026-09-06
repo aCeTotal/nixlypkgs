@@ -43,8 +43,10 @@ cp "$FLAKE/flake.lock" "$lockbak" 2>/dev/null || : > "$lockbak"
 rm -f "$FLAKE/flake.lock"
 # cd instead of --flake: the pinned nix (stable nixpkgs) still uses the old
 # CLI where flake lock/update only operate on the current directory.
-if ! (cd "$FLAKE" && nix flake lock &&
-      nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager) >>"$log" 2>&1; then
+# --refresh: skip the 1h github fetcher cache, or a push made minutes ago
+# resolves to the previous rev and the new flake.nix meets old code.
+if ! (cd "$FLAKE" && nix flake lock --refresh &&
+      nix flake update --refresh nixlypkgs/nixos-stable nixlypkgs/home-manager) >>"$log" 2>&1; then
   cp "$lockbak" "$FLAKE/flake.lock"
   tail -20 "$log" >&2
   exit 1
