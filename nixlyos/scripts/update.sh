@@ -26,6 +26,10 @@ tmp=$(mktemp -d -t nixlyos.XXXXXX)
 trap 'kill -- -"$sudo_keepalive" 2>/dev/null; rm -rf "$tmp"' EXIT
 
 nixlyos-detect-hw "$FLAKE/hardware" >>"$log" 2>&1
+# Seed/refresh custom/{inputs,modules}.nix and the user-inputs flake block.
+# Must run before locking so new inputs get resolved. Its errors (reserved
+# input name, broken inputs.nix) are user mistakes and go to the terminal.
+nixlyos-user-config "$FLAKE" >>"$log" 2>&1 || { tail -5 "$log" >&2; exit 1; }
 
 lockbak="$tmp/flake.lock"
 cp "$FLAKE/flake.lock" "$lockbak" 2>/dev/null || : > "$lockbak"
@@ -51,7 +55,7 @@ mkdir -p "$(dirname "$STAMP")"
 
 # The local tree is tiny, so its content plus the running system identify the
 # last known result and let the eval be skipped entirely.
-tree_key() { cat "$FLAKE"/flake.nix "$FLAKE"/flake.lock "$FLAKE"/local.nix "$FLAKE"/hardware/* 2>/dev/null | sha1sum | cut -d' ' -f1; }
+tree_key() { cat "$FLAKE"/flake.nix "$FLAKE"/flake.lock "$FLAKE"/local.nix "$FLAKE"/custom/* "$FLAKE"/hardware/* 2>/dev/null | sha1sum | cut -d' ' -f1; }
 
 key=$(tree_key)
 running=$(readlink -f /run/current-system)

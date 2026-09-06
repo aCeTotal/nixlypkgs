@@ -16,6 +16,15 @@ let
     '';
   };
 
+  userConfig = pkgs.writeShellApplication {
+    name = "nixlyos-user-config";
+    runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.gnugrep pkgs.gawk pkgs.jq ];
+    text = ''
+      export DEFAULT_BINDINGS=${scripts + "/bindings-default.conf"}
+      ${builtins.readFile (scripts + "/user-config.sh")}
+    '';
+  };
+
   update = pkgs.writeShellApplication {
     name = "nixlyos-update";
     runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.gnugrep pkgs.gawk pkgs.jq ];
@@ -27,5 +36,5 @@ let
   };
 in
 {
-  environment.systemPackages = [ detectHw update ];
+  environment.systemPackages = [ detectHw userConfig update ];
 }

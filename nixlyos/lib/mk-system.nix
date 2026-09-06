@@ -16,6 +16,11 @@
 , stateVersion
 , hardwareDir
 , localConfig ? null
+  # User extension point (~/.local/nixlyos/custom): modules.nix is a normal
+  # NixOS module, guarded so it cannot touch core-owned options; userInputs
+  # carries the resolved extra flake inputs declared in custom/inputs.nix.
+, userModules ? null
+, userInputs ? { }
 , username
 }:
 
@@ -84,7 +89,9 @@ let
   };
 
   specialArgs = {
-    inputs = moduleInputs;
+    # User inputs merge in under their own names; on a name clash the system
+    # inputs win, so nothing in the core can be shadowed from custom/inputs.nix.
+    inputs = userInputs // moduleInputs;
     inherit system totalvimPkg hwData;
     pkgs-unstable = pkgsUnstable;
     nixlyUser = username;
@@ -123,5 +130,8 @@ nixpkgs.lib.nixosSystem {
       };
     }
   ]
-  ++ nixpkgs.lib.optional (localConfig != null) localConfig;
+  ++ nixpkgs.lib.optional (localConfig != null) localConfig
+  # Guarded by the protected-namespace scan in user-config.sh; an eval-time
+  # guard is impossible without forcing otherwise-dead option definitions.
+  ++ nixpkgs.lib.optional (userModules != null) userModules;
 }

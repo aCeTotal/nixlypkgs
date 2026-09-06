@@ -29,6 +29,9 @@ rm -rf "$STAGE/flake"
 mkdir -p "$STAGE/flake"
 cp "$FLAKE/flake.nix" "$FLAKE/local.nix" "$STAGE/flake/"
 cp -r "$FLAKE/hardware" "$STAGE/flake/hardware"
+# flake.nix references ./custom/modules.nix on current machines; absent on
+# machines installed before the custom/ extension point existed.
+if [[ -d "$FLAKE/custom" ]]; then cp -r "$FLAKE/custom" "$STAGE/flake/custom"; fi
 
 # Exactly the same locking as nixlyos-update, or the staged key never
 # matches: fresh lock (inherits nixlypkgs' tested pins), then nixpkgs stable

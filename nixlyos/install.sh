@@ -211,21 +211,61 @@ cat > "$NIXLY_DIR/flake.nix" <<FLAKE
 {
   description = "NixlyOS machine";
 
-  # Everything lives in nixlypkgs (main); its flake.lock decides every
-  # input revision this machine runs.
-  inputs.nixlypkgs.url = "github:aCeTotal/nixlypkgs";
+  inputs = {
+    # Everything lives in nixlypkgs (main); its flake.lock decides every
+    # input revision this machine runs.
+    nixlypkgs.url = "github:aCeTotal/nixlypkgs";
+    # BEGIN USER INPUTS (generated from custom/inputs.nix — edit that instead)
+    # END USER INPUTS
+  };
 
-  outputs = { nixlypkgs, ... }: {
+  outputs = inputs@{ nixlypkgs, ... }: {
     nixosConfigurations.nixlyos = nixlypkgs.lib.mkNixlySystem {
       hostName = "$HOSTNAME";
       username = "$NIXLY_USER";
       stateVersion = "$STATE_VERSION";
       hardwareDir = ./hardware;
       localConfig = ./local.nix;
+      userModules = ./custom/modules.nix;
+      userInputs = builtins.removeAttrs inputs [ "nixlypkgs" "self" ];
     };
   };
 }
 FLAKE
+
+# Seed the custom/ extension point; nixlyos-user-config keeps it in sync
+# post-install, but the flake references custom/modules.nix already at
+# install-time eval.
+mkdir -p "$NIXLY_DIR/custom"
+
+cat > "$NIXLY_DIR/custom/inputs.nix" <<'CUSTOM'
+# Extra flake inputs for this machine, pulled into flake.nix on every update.
+# One attribute per input:
+#
+#   nixvim = "github:nix-community/nixvim";                     # a flake
+#   dotfiles = { url = "github:me/dotfiles"; flake = false; };  # plain source
+#
+# Names NixlyOS uses itself (nixpkgs, home-manager, nixlypkgs, ...) are
+# reserved. Reach the inputs from custom/modules.nix via the `inputs` arg.
+{
+}
+CUSTOM
+
+cat > "$NIXLY_DIR/custom/modules.nix" <<'CUSTOM'
+# Your own NixOS module. Anything you would normally put in configuration.nix
+# goes here: packages, services, imports of your own module files in custom/.
+# Inputs declared in custom/inputs.nix arrive through the `inputs` argument.
+# Options the NixlyOS core owns (display manager, portals, secure boot, ...)
+# are fenced off and refuse to build if set here.
+{ ... }:
+
+{
+}
+CUSTOM
+
+# Keybindings: nixlytile reads and inotify-watches this file directly, so an
+# edit applies immediately. Lives at the root, not in custom/.
+cp "$SELF_DIR/scripts/bindings-default.conf" "$NIXLY_DIR/bindings.conf"
 
 cat > "$NIXLY_DIR/local.nix" <<'LOCAL'
 # Per-machine overrides. Anything set here stays local and never reaches the
