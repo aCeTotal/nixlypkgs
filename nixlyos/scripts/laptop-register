@@ -1,0 +1,36 @@
+# Register for hardware-spesifikke overstyringer. Leses av
+# scripts/detect-hw.sh ved hver eval.
+#
+#   vendor-slug | produkt-glob | nixos-hardware-moduler (komma) | nvidia-branch
+#
+# Foerste linje som matcher vinner. "*" = alle. Sammenligning er
+# case-insensitiv, produkt-glob matches mot DMI product_name.
+#
+# Pseudo-modulen "no-model" i modul-feltet slaar av den DMI-utledede
+# modellmodulen. Bruk den om eval feiler paa en opsjon modellmodulen setter:
+# nixos-hardware foelger unstable, og dette flaket bruker stable nixpkgs, saa
+# en modul kan referere opsjoner som ikke finnes enda (eller er fjernet).
+#
+# Modulene legges I TILLEGG til det generiske settet (common-pc[-laptop]
+# [-ssd|-hdd]) og til modellmodulen detect-hw.sh utleder fra DMI
+# (<vendor>-<product|board|family>). Navn som ikke finnes i nixos-hardware
+# ignoreres med en advarsel — de 400+ modulnavnene trenger derfor ikke
+# staa her, bare det DMI ikke klarer aa gjette.
+#
+# Siste felt pinner NVIDIA-driver-branchen naar arkitektur-heuristikken i
+# detect-hw.sh gjetter feil. Gyldige verdier er attributtene under
+# boot.kernelPackages.nvidiaPackages: latest, production, legacy_580,
+# legacy_535, legacy_470, legacy_390, legacy_340 — pluss "nouveau", som
+# velger den in-tree driveren i stedet.
+#
+# NB: legacy_390 og legacy_340 er broken = true i nixpkgs (bygger ikke mot
+# moderne kernel). Pinner du dem, maa du ogsaa pinne en eldre
+# boot.kernelPackages og tillate broken-pakker. Uten pin havner Fermi og
+# eldre automatisk paa nouveau.
+#
+# Eksempler (kommenter inn / kopier etter behov):
+#
+# msi    | gs66 stealth 10ug | common-cpu-intel-cpu-only |
+# lenovo | *thinkpad x1*     | common-pc-laptop-acpi_call |
+# dell   | xps 15 9500       |                            | production
+# *      | *                 | common-hidpi               |

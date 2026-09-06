@@ -20,6 +20,7 @@ in {
   gaea = callPackage ../pkgs/gaea { };
   kmymoney = callPackage ../pkgs/kmymoney { };
   low-latency-layer = callPackage ../pkgs/low-latency-layer { };
+  proton-nixlyos = callPackage ../pkgs/proton-nixlyos { };
 
   flycast = prev.flycast.overrideAttrs (old: {
     postPatch = (old.postPatch or "") + ''
