@@ -37,8 +37,10 @@ cp "$FLAKE/flake.lock" "$lockbak" 2>/dev/null || : > "$lockbak"
 # without a maintainer bump. Kernel/chaotic, unstable and our own packages
 # stay exactly as pinned. A failed build still rolls back the whole lock.
 rm -f "$FLAKE/flake.lock"
-if ! { nix flake lock --flake "$FLAKE" &&
-       nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager --flake "$FLAKE"; } >>"$log" 2>&1; then
+# cd instead of --flake: the pinned nix (stable nixpkgs) still uses the old
+# CLI where flake lock/update only operate on the current directory.
+if ! (cd "$FLAKE" && nix flake lock &&
+      nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager) >>"$log" 2>&1; then
   cp "$lockbak" "$FLAKE/flake.lock"
   tail -20 "$log" >&2
   exit 1

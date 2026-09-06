@@ -33,8 +33,10 @@ cp -r "$FLAKE/hardware" "$STAGE/flake/hardware"
 # Exactly the same locking as nixlyos-update, or the staged key never
 # matches: fresh lock (inherits nixlypkgs' tested pins), then nixpkgs stable
 # and home-manager to their branch heads.
-nix flake lock --flake "$STAGE/flake" >/dev/null 2>&1 || exit 0
-nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager --flake "$STAGE/flake" >/dev/null 2>&1 || exit 0
+# cd instead of --flake: the pinned nix (stable nixpkgs) still uses the old
+# CLI where flake lock/update only operate on the current directory.
+(cd "$STAGE/flake" && nix flake lock &&
+ nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager) >/dev/null 2>&1 || exit 0
 
 # Pre-sized Boehm heap: the eval allocates gigabytes; starting big avoids
 # hundreds of GC cycles and cuts eval time by a third or more.
