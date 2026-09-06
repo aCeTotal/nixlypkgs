@@ -1,5 +1,5 @@
-# The NixlyOS command set: hardware detection, system update and channel
-# switching. The scripts live in nixlyos/scripts and get their helpers
+# The NixlyOS command set: hardware detection and system update.
+# The scripts live in nixlyos/scripts and get their helpers
 # (ui.sh, progress.sh, laptop-register) injected as store paths.
 { pkgs, lib, ... }:
 
@@ -25,13 +25,7 @@ let
       ${builtins.readFile (scripts + "/update.sh")}
     '';
   };
-
-  channel = pkgs.writeShellApplication {
-    name = "nixlyos-channel";
-    runtimeInputs = [ pkgs.coreutils pkgs.gnugrep pkgs.gnused ];
-    text = builtins.readFile (scripts + "/channel.sh");
-  };
 in
 {
-  environment.systemPackages = [ detectHw update channel ];
+  environment.systemPackages = [ detectHw update ];
 }

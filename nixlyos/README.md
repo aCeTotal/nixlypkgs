@@ -5,22 +5,20 @@ Machines carry no configuration tree — only `~/.local/nixlyos`:
 
 ```
 ~/.local/nixlyos/
-  flake.nix     tiny; pins the channel (release or testing)
+  flake.nix     tiny; points at nixlypkgs (main)
   flake.lock    the machine's pin — updates only via nixlyos-update
   local.nix     per-machine overrides and secrets (never in this repo)
   hardware/     data written by nixlyos-detect-hw + hardware-configuration.nix
 ```
 
-## Channels
+## Branch
 
-- `release` — tested and safe. Machines default here.
-- `testing` — new changes. Verified on a real machine before promotion.
-
-Switch with `nixlyos-channel release|testing` (nixlycc calls the same tool).
-
-This repo's `flake.lock` is THE system pin: machines only ever run
+Everything tracks `main` while the system is under active development.
+This repo`s `flake.lock` is THE system pin: machines only ever run
 `nix flake update nixlypkgs`, so every input (nixpkgs, chaotic kernel,
-home-manager, …) arrives exactly as tested — never "latest at update time".
+home-manager, ...) arrives exactly as pinned - never "latest at update time".
+Release/testing channels can be reintroduced later by branching and pointing
+machine flakes at the branch.
 
 ## Staged updates
 
@@ -34,11 +32,8 @@ system.
 
 ## Workflow
 
-1. Commit changes on `testing` (optionally `scripts/bump-inputs.sh` to bump
-   inputs/channel first), push.
-2. On a machine on the testing channel: `nixlyos-update`, verify.
-3. Merge `testing` into `release`, push. Every machine gets it on its next
-   `nixlyos-update`.
+1. Commit on `main` (optionally `scripts/bump-inputs.sh` first), push.
+2. `nixlyos-update` on any machine picks it up.
 
 ## Layout
 
@@ -50,7 +45,7 @@ services/          detect-activated extras (drawing tablets, on-demand, ...)
 apps/              programs that ship preconfigured (steam, citrix, mpv, ...)
 home/              home-manager entrypoint + per-app user config
 pkgs/              chrome + citrix overlays local to NixlyOS
-scripts/           detect-hw, update, stage, channel (packaged as nixlyos-*
+scripts/           detect-hw, update, stage, (packaged as nixlyos-*
                    tools by base/nixlyos-tools.nix), bump-inputs (maintainer)
 install.sh         installer: partitioning, LUKS2, ~/.local/nixlyos, nixos-install
 wallpapers/

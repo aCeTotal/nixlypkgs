@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # NixlyOS update. The machine only tracks nixlypkgs: its flake.lock is the
 # tested system pin, so `nix flake update nixlypkgs` pulls code AND every
-# input revision exactly as verified on the testing branch before release.
+# input revision exactly as pinned in nixlypkgs main.
 # On any build failure the previous lock is restored, so the machine always
 # lands on a generation that builds.
 #

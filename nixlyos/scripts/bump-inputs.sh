@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Maintainer-side input bump, run in a nixlypkgs checkout on the testing
-# branch. Bumps the stable channel when a new NixOS release exists (both the
+# Maintainer-side input bump, run in a nixlypkgs checkout. Bumps the stable
+# NixOS channel when a new release exists (both the
 # nixpkgs branch and the matching home-manager branch must exist), then
-# updates every flake input. The result is committed, tested on a machine on
-# the testing channel, and only then merged to release.
+# updates every flake input. Commit, build-test on a machine, then push.
+
 set -euo pipefail
 
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -35,4 +35,4 @@ else
 fi
 
 nix flake update --flake "$REPO"
-echo "done — build-test a machine on the testing channel before merging to release"
+echo "done — build-test a machine before pushing"

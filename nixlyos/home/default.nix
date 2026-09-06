@@ -32,7 +32,6 @@
     
     programs.bash.shellAliases = {
       "update" = "nixlyos-update";
-      "channel" = "nixlyos-channel";
       "nixly" = "cd $HOME/.local/nixlyos/";
       "c" = "claude --dangerously-skip-permissions";
       "ai" = "nixly-ai";

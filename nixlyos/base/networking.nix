@@ -137,7 +137,7 @@
   networking.wireless = {
     enable = true;
     # nixlytile (wheel user) talks to the wpa_supplicant control socket.
-    userControlled.enable = true;
+    userControlled = true;
     # Networks saved from the popup land in imperative.conf (update_config=1).
     allowAuxiliaryImperativeNetworks = true;
     scanOnLowSignal = false;

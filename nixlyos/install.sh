@@ -49,7 +49,7 @@ LUKS_PASSPHRASE_FILE=""
 LUKS_PASSPHRASE_STDIN=0
 NO_PROMPT=0
 NIXLY_USER="total"
-CHANNEL="release"
+
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -195,8 +195,8 @@ nixos-generate-config --root /mnt
 
 HWC=/mnt/etc/nixos/hardware-configuration.nix
 
-# The machine-local state: a tiny flake in ~/.local/nixlyos pointing at the
-# nixlypkgs release channel, plus the hardware data. Everything else comes
+# The machine-local state: a tiny flake in ~/.local/nixlyos pointing at
+# nixlypkgs (main), plus the hardware data. Everything else comes
 # from nixlypkgs.
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 NIXLY_DIR="/mnt/home/$NIXLY_USER/.local/nixlyos"
@@ -211,10 +211,9 @@ cat > "$NIXLY_DIR/flake.nix" <<FLAKE
 {
   description = "NixlyOS machine";
 
-  # Channel: release (tested) or testing (new changes) — switch with
-  # nixlyos-channel, or from nixlycc. Everything else lives in nixlypkgs;
-  # its flake.lock decides every input revision this machine runs.
-  inputs.nixlypkgs.url = "github:aCeTotal/nixlypkgs/$CHANNEL";
+  # Everything lives in nixlypkgs (main); its flake.lock decides every
+  # input revision this machine runs.
+  inputs.nixlypkgs.url = "github:aCeTotal/nixlypkgs";
 
   outputs = { nixlypkgs, ... }: {
     nixosConfigurations.nixlyos = nixlypkgs.lib.mkNixlySystem {
