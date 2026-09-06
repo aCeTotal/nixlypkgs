@@ -29,7 +29,17 @@ nixlyos-detect-hw "$FLAKE/hardware" >>"$log" 2>&1
 
 lockbak="$tmp/flake.lock"
 cp "$FLAKE/flake.lock" "$lockbak" 2>/dev/null || : > "$lockbak"
-if ! nix flake update nixlypkgs --flake "$FLAKE" >>"$log" 2>&1; then
+# Re-lock from scratch instead of `nix flake update nixlypkgs`: update
+# re-resolves the whole subtree to branch heads, while a fresh lock inherits
+# every nested rev from nixlypkgs' own tested flake.lock. On top of that,
+# nixpkgs stable (and home-manager, which tracks the same release) always
+# moves to the newest head of its branch, so stable security updates flow
+# without a maintainer bump. Kernel/chaotic, unstable and our own packages
+# stay exactly as pinned. A failed build still rolls back the whole lock.
+rm -f "$FLAKE/flake.lock"
+if ! { nix flake lock --flake "$FLAKE" &&
+       nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager --flake "$FLAKE"; } >>"$log" 2>&1; then
+  cp "$lockbak" "$FLAKE/flake.lock"
   tail -20 "$log" >&2
   exit 1
 fi
@@ -118,6 +128,8 @@ build_sys() {
   if staged_sys > "$tmp/out"; then
     return 0
   fi
+  # Pre-sized Boehm heap: cold evals run far fewer GC cycles.
+  export GC_INITIAL_HEAP_SIZE=4G
   nix build --no-link --print-out-paths --keep-going "$ATTR" \
     --max-jobs "$(nproc)" --cores 0 \
     --option max-substitution-jobs 128 \

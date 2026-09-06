@@ -33,9 +33,9 @@ in
   systemd.timers.nixlyos-stage = {
     wantedBy = [ "timers.target" ];
     timerConfig = {
-      OnBootSec = "10min";
-      OnUnitActiveSec = "1h";
-      RandomizedDelaySec = "10min";
+      OnBootSec = "2min";
+      OnUnitActiveSec = "5min";
+      RandomizedDelaySec = "1min";
       Persistent = true;
     };
   };

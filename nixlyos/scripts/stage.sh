@@ -28,10 +28,17 @@ mkdir -p "$STAGE"
 rm -rf "$STAGE/flake"
 mkdir -p "$STAGE/flake"
 cp "$FLAKE/flake.nix" "$FLAKE/local.nix" "$STAGE/flake/"
-cp "$FLAKE/flake.lock" "$STAGE/flake/" 2>/dev/null || true
 cp -r "$FLAKE/hardware" "$STAGE/flake/hardware"
 
-nix flake update nixlypkgs --flake "$STAGE/flake" >/dev/null 2>&1 || exit 0
+# Exactly the same locking as nixlyos-update, or the staged key never
+# matches: fresh lock (inherits nixlypkgs' tested pins), then nixpkgs stable
+# and home-manager to their branch heads.
+nix flake lock --flake "$STAGE/flake" >/dev/null 2>&1 || exit 0
+nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager --flake "$STAGE/flake" >/dev/null 2>&1 || exit 0
+
+# Pre-sized Boehm heap: the eval allocates gigabytes; starting big avoids
+# hundreds of GC cycles and cuts eval time by a third or more.
+export GC_INITIAL_HEAP_SIZE=2G
 
 # Same file list and order as tree_key in update.sh.
 key=$(cat "$STAGE/flake"/flake.nix "$STAGE/flake"/flake.lock "$STAGE/flake"/local.nix "$STAGE/flake"/hardware/* 2>/dev/null | sha1sum | cut -d' ' -f1)
