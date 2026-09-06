@@ -88,9 +88,13 @@
       };
       Policy = {
         AutoEnable = true;
-        ReconnectAttempts = 15;
-        ReconnectIntervals = "1,2,4,8,16,32,64,128";
-        ReconnectUUIDs = "00001124-0000-1000-8000-00805f9b34fb,00001200-0000-1000-8000-00805f9b34fb";
+        # Only fires on link loss — a manual disconnect never triggers this.
+        # Last interval repeats, so: quick burst, then every 30 s for ~60 h.
+        ReconnectAttempts = 7200;
+        ReconnectIntervals = "1,2,4,8,16,30";
+        # HID + PnP (pads), plus Audio Sink and Handsfree so headsets get the
+        # same reconnect ladder after link loss.
+        ReconnectUUIDs = "00001124-0000-1000-8000-00805f9b34fb,00001200-0000-1000-8000-00805f9b34fb,0000110b-0000-1000-8000-00805f9b34fb,0000111e-0000-1000-8000-00805f9b34fb";
       };
       LE = {
         MinAdvertisementInterval = 32;

@@ -30,6 +30,7 @@
     ./overhead.nix
     ./wayland.nix
     ./sound.nix
+    ./bluetooth.nix
     ./zram.nix
     ./hibernate.nix
     ./security.nix
