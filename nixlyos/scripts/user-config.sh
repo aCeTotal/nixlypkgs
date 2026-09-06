@@ -60,7 +60,8 @@ hits=""
 while IFS= read -r -d "" f; do
   h=$(sed 's/#.*//' "$f" | grep -nE "$protected" || true)
   if [[ -n $h ]]; then
-    hits+=$(sed "s|^|  ${f#"$DIR"/}:|" <<<"$h")$'\n'
+    prefix="  ${f#"$DIR"/}:"
+    hits+="$prefix${h//$'\n'/$'\n'"$prefix"}"$'\n'
   fi
 done < <(find "$CUSTOM" -name '*.nix' -print0)
 if [[ -n $hits ]]; then
