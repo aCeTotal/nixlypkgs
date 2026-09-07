@@ -1,7 +1,11 @@
-{ pkgs, inputs, system, hwData, ... }:
+{ pkgs, hwData, ... }:
 
 let
-  protonCachyos = import ../apps/steam/proton.nix { inherit inputs system hwData; };
+  # Same variant pick as apps/steam/default.nix: the tool autoconfig defaults to.
+  protonNixlyos =
+    if hwData.resources.cpuLevel >= 3
+    then pkgs.proton-nixlyos
+    else pkgs.proton-nixlyos-generic;
   # Skip prewarm (exit 1) when a game runs or the box is busy.
   prewarmGate = pkgs.writeShellScript "nixly-prewarm-gate" ''
     set -u
@@ -105,8 +109,8 @@ let
       for d in "$S"/steamapps/common/SteamLinuxRuntime*; do
         warm "$d"
       done
-      # Proton-CachyOS from the store, the one autoconfig picks.
-      warm "${protonCachyos}"
+      # proton-nixlyos from the store, the one autoconfig picks.
+      warm "${protonNixlyos}"
       for d in "$S"/steamapps/common/Proton*; do
         warm "$d"
       done

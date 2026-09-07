@@ -82,7 +82,7 @@ let
 
   # The inputs attrset modules see, under the names they already use.
   moduleInputs = {
-    inherit (inputs) chaotic lanzaboote nixos-hardware totalvim mnw;
+    inherit (inputs) lanzaboote nixos-hardware totalvim mnw;
     nixpkgs = inputs.nixos-stable;
     nixpkgs-unstable = inputs.nixpkgs;
     nixlypkgs = self;

@@ -1,10 +1,13 @@
-{ pkgs, inputs, system, hwData, ... }:
+{ pkgs, hwData, ... }:
 
 let
-  protonCachyos = import ./proton.nix { inherit inputs system hwData; };
   # Our own build: Valve bleeding-edge + CachyOS fork patches, from
-  # github:aCeTotal/proton-nixlyos via the nixlypkgs overlay.
-  protonNixlyos = pkgs.proton-nixlyos;
+  # github:aCeTotal/proton-nixlyos via the nixlypkgs overlay. The v3
+  # build SIGILLs on pre-AVX2 CPUs; those get the generic build.
+  protonNixlyos =
+    if hwData.resources.cpuLevel >= 3
+    then pkgs.proton-nixlyos
+    else pkgs.proton-nixlyos-generic;
   gameWrap = pkgs.callPackage ./gamewrap.nix {
     launchParams = import ./launchparams.nix;
   };
@@ -28,9 +31,7 @@ in
       extraPreBwrapCmds = "${autoconfig} || true";
     };
 
-    # proton-nixlyos is the default (via autoconfig); Proton-CachyOS stays
-    # installed as a manual fallback in the Steam UI.
-    extraCompatPackages = [ protonNixlyos protonCachyos ];
+    extraCompatPackages = [ protonNixlyos ];
 
     extraPackages = with pkgs; [
       gamemode

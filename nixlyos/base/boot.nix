@@ -1,4 +1,4 @@
-{ system, inputs, lib, pkgs, hwData, ... }:
+{ lib, pkgs, hwData, ... }:
 
 {
   boot = {
@@ -35,28 +35,15 @@
 
     supportedFilesystems = [ "ext4" "btrfs" "vfat" "ntfs3" ];
 
-    # CachyOS kernel, except on pre-Nehalem CPUs where only the main kernel is tested.
-    # Taken straight from chaotic-nyx's own package set so the store path always
-    # matches their binary cache: the kernel is never built from source here.
-    # The gcc flavor, not the clang/LTO default: out-of-tree modules (nvidia,
-    # xpadneo, xone, msi-ec) fail their build sandbox against the LTO kernel.
-    # `nvidiaPackages.cachyos` ships pointing at the LTO-matched driver, so it
-    # is remapped to the gcc-matched one; the gpu modules pick it up from here.
-    kernelPackages =
-      let
-        chaotic = inputs.chaotic.unrestrictedPackages.${system};
-        cachyPackages = chaotic.linuxPackages_cachyos-gcc;
-      in
-      if hwData.resources.cpuLevel >= 2
-      then
-        # .extend, not //: NixOS re-extends kernelPackages internally, which
-        # drops plain attrset additions.
-        cachyPackages.extend (_final: prev: {
-          nvidiaPackages = prev.nvidiaPackages.extend (_: _: {
-            cachyos = chaotic.nvidia_cachyos-gcc;
-          });
-        })
-      else pkgs.linuxPackages;
+    # NixlyOS gaming-kernel from nixlypkgs (kernel_nixlyos flake): CachyOS-saus
+    # + BORE + scx_lavd, prebuilt via cache.aceclan.no. v3 build on x86-64-v3
+    # CPUs, generic elsewhere. Out-of-tree modules (nvidia, xpadneo, xone,
+    # msi-ec) build locally against it; the gpu modules fall back to
+    # nvidiaPackages.latest since no prebuilt cachyos driver matches.
+    kernelPackages = pkgs.linuxPackagesFor
+      (if hwData.resources.cpuLevel >= 3
+       then pkgs.linux-nixlyos-v3
+       else pkgs.linux-nixlyos);
 
     kernelParams = [
       "quiet"

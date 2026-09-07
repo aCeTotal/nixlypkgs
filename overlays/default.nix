@@ -21,6 +21,7 @@ in {
   kmymoney = callPackage ../pkgs/kmymoney { };
   low-latency-layer = callPackage ../pkgs/low-latency-layer { };
   proton-nixlyos = callPackage ../pkgs/proton-nixlyos { };
+  proton-nixlyos-generic = callPackage ../pkgs/proton-nixlyos { variant = "generic"; };
 
   linux-nixlyos = (import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; }).generic;
   linux-nixlyos-v3 = (import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; }).v3;

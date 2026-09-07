@@ -14,10 +14,6 @@
     nixos-stable.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
     home-manager.url = "github:nix-community/home-manager/release-26.05";
-    # Prebuilt CachyOS kernel + Proton-CachyOS. Never override its nixpkgs
-    # input: the nyxpkgs-unstable tag guarantees every store path exists in
-    # their cache.
-    chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
     lanzaboote.url = "github:nix-community/lanzaboote";
     totalvim = {
       url = "github:aCeTotal/totalvim";
@@ -51,7 +47,7 @@
         let
           pkgs = self.legacyPackages.${system};
         in {
-          inherit (pkgs) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia geforce-now Blender_bin_lts Unreal_editor gaea low-latency-layer proton-nixlyos;
+          inherit (pkgs) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia geforce-now Blender_bin_lts Unreal_editor gaea low-latency-layer proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3;
 
           dwl = pkgs.nixlytile;
           default = pkgs.nixlytile;
