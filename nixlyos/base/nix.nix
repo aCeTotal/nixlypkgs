@@ -92,13 +92,17 @@ in
       max-jobs = hw.maxJobs;
       cores = hw.buildCores;
       http-connections = 50;
-      connect-timeout = 30;
+      # Low so an unreachable substituter never stalls builds; fallback
+      # makes nix move on / build locally instead of waiting.
+      connect-timeout = 5;
       fallback = true;
       min-free = 2147483648;
       max-free = 6442450944;
       trusted-users = [ "root" "@wheel" ];
 
       substituters = [
+        # NixlyOS binary cache: prebuilt nixlypkgs packages for every main commit.
+        "https://cache.aceclan.no"
         "https://cache.nixos.org"
         "https://attic.xuyh0120.win/lantian"
         # Prebuilt CachyOS kernel + nvidia module; without this they build from source.
@@ -106,12 +110,14 @@ in
       ];
 
       trusted-substituters = [
+        "https://cache.aceclan.no"
         "https://cache.nixos.org"
         "https://attic.xuyh0120.win/lantian"
         "https://nyx-cache.chaotic.cx/"
       ];
 
       trusted-public-keys = [
+        "cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak="
         "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
         "lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc="
         "nyx-cache.chaotic.cx:dJxTrgMC3V3cFfyIiBQDQorG6k1LsqurH/srpMSq7qk="
