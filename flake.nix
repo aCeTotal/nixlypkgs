@@ -24,6 +24,10 @@
       flake = false;
     };
     mnw.url = "github:Gerg-L/mnw";
+
+    # NixlyOS gaming-kernel (CachyOS-saus + BORE + scx_lavd, generic + v3).
+    # `nix flake update nixlyos-kernel` etter push til kernel-repoet.
+    nixlyos-kernel.url = "github:aCeTotal/kernel_nixlyos";
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:

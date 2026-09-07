@@ -22,6 +22,11 @@ in {
   low-latency-layer = callPackage ../pkgs/low-latency-layer { };
   proton-nixlyos = callPackage ../pkgs/proton-nixlyos { };
 
+  linux-nixlyos = (import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; }).generic;
+  linux-nixlyos-v3 = (import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; }).v3;
+  linuxPackages_nixlyos = final.linuxPackagesFor final.linux-nixlyos;
+  linuxPackages_nixlyos_v3 = final.linuxPackagesFor final.linux-nixlyos-v3;
+
   flycast = prev.flycast.overrideAttrs (old: {
     postPatch = (old.postPatch or "") + ''
       sed -i '/#include "spvIR.h"/a #include <cstdint>' core/deps/glslang/SPIRV/SpvBuilder.h
