@@ -27,25 +27,13 @@
 let
   nixpkgs = inputs.nixos-stable;
 
-  permittedInsecure = [
-    "freeimage-unstable-2021-11-01"
-    "electron-29.4.6"
-    "dotnet-sdk-6.0.428"
-    "dotnet-runtime-6.0.36"
-    "dotnet-sdk-wrapped-6.0.428"
-    "libxml2-2.13.8"
-    "libsoup-2.74.3"
-  ];
+  # Shared with the flake's packages output (the binary cache builds those
+  # attrs) so cache entries are the exact derivations machines evaluate.
+  pkgsConfig = import ./pkgs-config.nix;
 
   pkgs = import nixpkgs {
     inherit system;
-    config = {
-      allowUnfree = true;
-      permittedInsecurePackages = permittedInsecure;
-      # The old NVIDIA branches need explicit license acceptance on top of
-      # allowUnfree, or eval fails on Kepler and older machines.
-      nvidia.acceptLicense = true;
-    };
+    config = pkgsConfig;
     overlays = [
       self.overlays.default
       (import ../pkgs/chrome/overlay.nix)
@@ -54,20 +42,11 @@ let
 
   pkgsUnstable = import inputs.nixpkgs {
     inherit system;
-    config = {
-      allowUnfree = true;
-      permittedInsecurePackages = permittedInsecure;
-    };
+    config = pkgsConfig;
   };
 
-  totalvimSrc = inputs.totalvim;
-  totalvimVimPlugin = pkgs.callPackage (totalvimSrc + "/plugins/totalvim") { };
-  totalvimPkg = inputs.mnw.lib.wrap {
-    inherit pkgs;
-    inputs = {
-      self.legacyPackages.${system}.vimPlugins.totalvim = totalvimVimPlugin;
-    };
-  } (totalvimSrc + "/nix/mnw");
+  # Same file as flake packages.totalvim, for the same cache-hit reason.
+  totalvimPkg = import ./totalvim.nix { inherit pkgs system inputs; };
 
   hwData = {
     detected = import (hardwareDir + "/detected.nix");

@@ -43,15 +43,52 @@
 
       legacyPackages = forAllSystems mkPkgs;
 
+      # The nixlycaching watcher on the cache server builds every attr in
+      # packages.x86_64-linux on each main commit; whatever is listed here is
+      # what machines get from cache.aceclan.no instead of building locally.
       packages = forAllSystems (system:
         let
-          pkgs = self.legacyPackages.${system};
+          # Machines build everything through mk-system's nixos-stable
+          # instance. Cache entries only help if they are those exact
+          # derivations, so this mirrors that instance (same nixpkgs,
+          # config and overlays) - built from unstable legacyPackages the
+          # store paths would never match a machine eval.
+          stable = import inputs.nixos-stable {
+            inherit system;
+            config = import ./nixlyos/lib/pkgs-config.nix;
+            overlays = [
+              self.overlays.default
+              (import ./nixlyos/pkgs/chrome/overlay.nix)
+            ];
+          };
+          # Every out-of-tree module machines compile against a nixlyos
+          # kernel (nvidia's `.mod` is what boot.extraModulePackages builds;
+          # the rest come from apps/gaming.nix and hardware/msi-ec.nix).
+          kernelModules = suffix: kp:
+            nixpkgs.lib.mapAttrs'
+              (name: nixpkgs.lib.nameValuePair "${name}-nixlyos${suffix}")
+              {
+                nvidia-modules = kp.nvidiaPackages.latest.mod;
+                inherit (kp) xpadneo xone xpad-noone msi-ec;
+              };
         in {
-          inherit (pkgs) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia geforce-now Blender_bin_lts Unreal_editor gaea low-latency-layer proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3;
+          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia geforce-now Blender_bin_lts Unreal_editor gaea low-latency-layer proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly;
 
-          dwl = pkgs.nixlytile;
-          default = pkgs.nixlytile;
-        });
+          totalvim = import ./nixlyos/lib/totalvim.nix {
+            pkgs = stable;
+            inherit system inputs;
+          };
+
+          # Kernel-independent nvidia userspace parts (unfree, so never on
+          # cache.nixos.org): the driver itself and persistenced.
+          nvidia-nixlyos = stable.linuxPackages_nixlyos.nvidiaPackages.latest;
+          nvidia-nixlyos-persistenced = stable.linuxPackages_nixlyos.nvidiaPackages.latest.persistenced;
+
+          dwl = stable.nixlytile;
+          default = stable.nixlytile;
+        }
+        // kernelModules "" stable.linuxPackages_nixlyos
+        // kernelModules "-v3" stable.linuxPackages_nixlyos_v3);
 
       nixosModules = {
         nixlypkgs = { ... }: {

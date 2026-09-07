@@ -37,13 +37,13 @@
 
     # NixlyOS gaming-kernel from nixlypkgs (kernel_nixlyos flake): CachyOS-saus
     # + BORE + scx_lavd, prebuilt via cache.aceclan.no. v3 build on x86-64-v3
-    # CPUs, generic elsewhere. Out-of-tree modules (nvidia, xpadneo, xone,
-    # msi-ec) build locally against it; the gpu modules fall back to
-    # nvidiaPackages.latest since no prebuilt cachyos driver matches.
-    kernelPackages = pkgs.linuxPackagesFor
-      (if hwData.resources.cpuLevel >= 3
-       then pkgs.linux-nixlyos-v3
-       else pkgs.linux-nixlyos);
+    # CPUs, generic elsewhere. The overlay attrs, not a local linuxPackagesFor:
+    # the flake's nvidia-nixlyos* cache packages are built from these same
+    # attrs, and only identical expressions give cache-hitting store paths.
+    kernelPackages =
+      if hwData.resources.cpuLevel >= 3
+      then pkgs.linuxPackages_nixlyos_v3
+      else pkgs.linuxPackages_nixlyos;
 
     kernelParams = [
       "quiet"
