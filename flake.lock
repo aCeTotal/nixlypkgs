@@ -159,11 +159,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1788795199,
-        "narHash": "sha256-R0STMM3e3vuegUIhxAVJkWhzJLEOtHiKsVPOFviDGhs=",
+        "lastModified": 1788807002,
+        "narHash": "sha256-Y4yYH5I8i1nuOStPWHROw/7zAf94MOydKh530QbjpYQ=",
         "owner": "aCeTotal",
         "repo": "kernel_nixlyos",
-        "rev": "70bd3561e6cecb81d2242d8718b63868464f3ff8",
+        "rev": "09a9b25fc93905a880b8caa72b06daeb5c5828a6",
         "type": "github"
       },
       "original": {

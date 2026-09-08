@@ -25,8 +25,8 @@ in {
 
   linux-nixlyos = (import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; }).generic;
   linux-nixlyos-v3 = (import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; }).v3;
-  linuxPackages_nixlyos = final.linuxPackagesFor final.linux-nixlyos;
-  linuxPackages_nixlyos_v3 = final.linuxPackagesFor final.linux-nixlyos-v3;
+  linuxPackages_nixlyos = import ./nvidia-latest.nix inputs final final.linux-nixlyos;
+  linuxPackages_nixlyos_v3 = import ./nvidia-latest.nix inputs final final.linux-nixlyos-v3;
 
   flycast = prev.flycast.overrideAttrs (old: {
     postPatch = (old.postPatch or "") + ''
