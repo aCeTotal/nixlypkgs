@@ -81,7 +81,7 @@ let
 
   wlrootsLocal = stdenv.mkDerivation {
     pname = "wlroots-nixly";
-    version = "";
+    version = "0.20.2";
     src = nixlytileSrc + "/wlroots";
     patches = [
     ];
@@ -145,7 +145,7 @@ in
 
 stdenv.mkDerivation {
   pname = "nixlytile";
-  version = "git";
+  version = "2026.09.08";
 
   passthru.providedSessions = [ "nixlytile" ];
 

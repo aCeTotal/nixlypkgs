@@ -17,7 +17,7 @@
 
 let
   innoextract64 = innoextract.overrideAttrs (old: {
-    version = "unstable-2026-02-23-inno67";
+    version = "1.9.2026.02.23";
     src = fetchFromGitHub {
       owner = "UserUnknownFactor";
       repo = "innoextract_win";

@@ -12,7 +12,7 @@
 
 stdenv.mkDerivation rec {
   pname = "nixlymediaserver";
-  version = "0-unstable-2026-08-23";
+  version = "2026.08.23";
 
   src = fetchFromGitHub {
     owner = "aCeTotal";

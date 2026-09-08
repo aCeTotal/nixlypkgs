@@ -11,7 +11,8 @@ let
 in
 stdenvNoCC.mkDerivation {
   pname = "proton-nixlyos-${variant}";
-  version = pin.version;
+  # pin.version is "YYYYMMDD-<githash>"; keep only the numeric date part.
+  version = lib.head (lib.splitString "-" pin.version);
 
   src = fetchurl {
     url = release.url;

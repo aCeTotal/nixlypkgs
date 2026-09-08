@@ -35,7 +35,7 @@ let
 in
 rustPlatform.buildRustPackage rec {
   pname = "nixlymedia";
-  version = "0-unstable-2026-07-27";
+  version = "2026.08.15";
 
   src = fetchFromGitHub {
     name = "nixlymedia-src-2020527";

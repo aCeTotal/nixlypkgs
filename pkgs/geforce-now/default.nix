@@ -10,7 +10,7 @@
 
 stdenvNoCC.mkDerivation {
   pname = "geforce-now";
-  version = "1.0.0";
+  version = "2026.05.08";
 
   src = fetchurl {
     url = "https://international.download.nvidia.com/GFNLinux/GeForceNOWSetup.bin";
