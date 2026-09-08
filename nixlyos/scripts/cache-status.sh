@@ -15,7 +15,11 @@ repo=$(cd "$(dirname "$0")/../.." && pwd)
 
 attrs=(
   linux-nixlyos
+  linux-nixlyos-modules
+  linux-nixlyos-dev
   linux-nixlyos-v3
+  linux-nixlyos-v3-modules
+  linux-nixlyos-v3-dev
   nvidia-nixlyos
   nvidia-nixlyos-persistenced
   nvidia-modules-nixlyos
