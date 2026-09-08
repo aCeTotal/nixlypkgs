@@ -13,21 +13,28 @@ set -euo pipefail
 cache=https://cache.aceclan.no
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 
-attrs=(
-  linux-nixlyos
-  linux-nixlyos-modules
-  linux-nixlyos-dev
-  linux-nixlyos-v3
-  linux-nixlyos-v3-modules
-  linux-nixlyos-v3-dev
-  nvidia-nixlyos
-  nvidia-nixlyos-persistenced
-  nvidia-modules-nixlyos
-  nvidia-modules-nixlyos-v3
-  nixlytile
-  nixlycc
-  proton-nixlyos
-  proton-nixlyos-generic
+cd "$repo"
+
+# Én eval for alle pakkers outPath (mye raskere enn en nix-prosess per attr)
+paths=$(nix eval '.#packages.x86_64-linux' --json --apply '
+  ps: builtins.mapAttrs (n: p:
+    let t = builtins.tryEval (p.outPath or null);
+    in if t.success then t.value else null)
+    (builtins.removeAttrs ps [ "default" ])' 2>/dev/null
+) || { echo "nix eval av flaken feilet" >&2; exit 1; }
+
+declare -A path
+while IFS=$'\t' read -r a p; do path[$a]=$p; done \
+  < <(jq -r 'to_entries[] | "\(.key)\t\(.value)"' <<<"$paths")
+
+# narinfo-sjekk mot cachen, parallelt
+declare -A code
+while read -r h c; do code[$h]=$c; done < <(
+  for a in "${!path[@]}"; do
+    p=${path[$a]}; [ "$p" = null ] && continue
+    b=${p##*/}; echo "${b%%-*}"
+  done | sort -u | xargs -r -P 16 -I{} sh -c \
+    'printf "%s %s\n" {} "$(curl -s -o /dev/null -w "%{http_code}" '"$cache"'/{}.narinfo)"'
 )
 
 state=$(curl -sf "$cache/watcher/status.json" 2>/dev/null || echo '{}')
@@ -44,17 +51,16 @@ in_list() { # in_list <name> <jq-list-expr>
 
 fmt_min() { echo "$(( $1 / 60 ))m"; }
 
-cd "$repo"
-for a in "${attrs[@]}"; do
-  if ! p=$(nix eval ".#$a.outPath" --raw 2>/dev/null); then
+for a in $(jq -r 'keys[]' <<<"$paths"); do
+  p=${path[$a]}
+  if [ "$p" = null ]; then
     printf '%-8s %4s  %-28s (lokal eval feilet)\n' FAILED - "$a"
     continue
   fi
-  base=$(basename "$p")
+  base=${p##*/}
   hash=${base%%-*}
 
-  code=$(curl -s -o /dev/null -w '%{http_code}' "$cache/$hash.narinfo")
-  if [ "$code" = 200 ]; then
+  if [ "${code[$hash]:-}" = 200 ]; then
     printf '%-8s %4s  %-28s %s\n' CACHED 100% "$a" "$base"
     continue
   fi
