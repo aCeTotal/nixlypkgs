@@ -24,10 +24,6 @@
     # NixlyOS gaming-kernel (CachyOS-saus + BORE + scx_lavd, generic + v3).
     # `nix flake update nixlyos-kernel` etter push til kernel-repoet.
     nixlyos-kernel.url = "github:aCeTotal/kernel_nixlyos";
-
-    # NixlyBrowser (Chromium fork, generic + v3).
-    # `nix flake update nixlybrowser` etter push til browser-repoet.
-    nixlybrowser.url = "github:aCeTotal/nixlybrowser";
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:
@@ -99,11 +95,6 @@
 
           dwl = stable.nixlytile;
           default = stable.nixlytile;
-        }
-        # Browser builds from its own flake (own nixpkgs-pin + toolchain);
-        # only exists for x86_64-linux.
-        // nixpkgs.lib.optionalAttrs (inputs.nixlybrowser.packages ? ${system}) {
-          inherit (inputs.nixlybrowser.packages.${system}) nixlybrowser nixlybrowser-v3;
         }
         // kernelModules "" stable.linuxPackages_nixlyos
         // kernelModules "-v3" stable.linuxPackages_nixlyos_v3);
