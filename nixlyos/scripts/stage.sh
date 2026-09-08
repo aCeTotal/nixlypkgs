@@ -55,6 +55,8 @@ fi
 # either activated or replaced by the next staging round. Gentle resource use:
 # the unit runs at idle priority; substitution stays at nix defaults.
 nix build --keep-going --out-link "$STAGE/result" \
+  --option extra-substituters https://cache.aceclan.no \
+  --option extra-trusted-public-keys cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak= \
   --option connect-timeout 3 \
   --option fallback true \
   "$STAGE/flake#nixosConfigurations.nixlyos.config.system.build.toplevel" \

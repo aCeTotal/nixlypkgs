@@ -79,6 +79,15 @@
             inherit system inputs;
           };
 
+          # The kernels are multi-output and the watcher only pushes an
+          # attr's default output: without these attrs the machines get
+          # `out` from cache but 404 on `modules`/`dev`, and nix then
+          # realises the whole kernel drv locally anyway.
+          linux-nixlyos-modules = stable.linux-nixlyos.modules;
+          linux-nixlyos-dev = stable.linux-nixlyos.dev;
+          linux-nixlyos-v3-modules = stable.linux-nixlyos-v3.modules;
+          linux-nixlyos-v3-dev = stable.linux-nixlyos-v3.dev;
+
           # Kernel-independent nvidia userspace parts (unfree, so never on
           # cache.nixos.org): the driver itself and persistenced.
           nvidia-nixlyos = stable.linuxPackages_nixlyos.nvidiaPackages.latest;

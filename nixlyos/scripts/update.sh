@@ -138,8 +138,13 @@ build_sys() {
   fi
   # Pre-sized Boehm heap: cold evals run far fewer GC cycles.
   export GC_INITIAL_HEAP_SIZE=4G
+  # The cache lines also live in nix.nix, but the running generation's
+  # nix.conf may predate them; injecting here breaks that chicken-and-egg.
+  # The user is in trusted-users, so the daemon accepts both options.
   nix build --no-link --print-out-paths --keep-going "$ATTR" \
     --max-jobs "$(nproc)" --cores 0 \
+    --option extra-substituters https://cache.aceclan.no \
+    --option extra-trusted-public-keys cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak= \
     --option max-substitution-jobs 128 \
     --option http-connections 128 \
     --option connect-timeout 3 \
