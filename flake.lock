@@ -32,6 +32,27 @@
         "type": "github"
       }
     },
+    "chaotic": {
+      "inputs": {
+        "flake-schemas": "flake-schemas",
+        "home-manager": "home-manager",
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1788952943,
+        "narHash": "sha256-jTzUFEMwJdwgII8oqdXjrxmb/0qwKr1BAQeDh2GYiEA=",
+        "owner": "chaotic-cx",
+        "repo": "nyx",
+        "rev": "993022dc14dc16618012d59b1ea07823e5bf377e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "chaotic-cx",
+        "ref": "nyxpkgs-unstable",
+        "repo": "nyx",
+        "type": "github"
+      }
+    },
     "crane": {
       "locked": {
         "lastModified": 1787326676,
@@ -63,9 +84,44 @@
         "type": "github"
       }
     },
+    "flake-schemas": {
+      "locked": {
+        "lastModified": 1780327564,
+        "narHash": "sha256-HiRPtA0spK+Dkgbhz/1zW9glXxNVB+L4Rj2VYmdawb8=",
+        "rev": "6cc9bd98891b1fc6bb2b8cb3277df8bc72799ca6",
+        "revCount": 149,
+        "type": "tarball",
+        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/flake-schemas/0.5.0/019e83cf-9af3-78b1-ac5b-70e68ad1efe1/source.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://flakehub.com/f/DeterminateSystems/flake-schemas/%3D0.5.0.tar.gz"
+      }
+    },
     "home-manager": {
       "inputs": {
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": [
+          "chaotic",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1788651960,
+        "narHash": "sha256-v9wJd32eZ2bvhBzVOd7TIjLQd011P7nwOhjKtWlci5I=",
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "rev": "2c0350c759688177331b8f5242311fae8877bdb3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "type": "github"
+      }
+    },
+    "home-manager_2": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_2"
       },
       "locked": {
         "lastModified": 1787377438,
@@ -85,7 +141,7 @@
     "lanzaboote": {
       "inputs": {
         "crane": "crane",
-        "nixpkgs": "nixpkgs_2",
+        "nixpkgs": "nixpkgs_3",
         "pre-commit": "pre-commit",
         "rust-overlay": "rust-overlay"
       },
@@ -156,7 +212,7 @@
         "cachy-config": "cachy-config",
         "cachy-patches": "cachy-patches",
         "linux-src": "linux-src",
-        "nixpkgs": "nixpkgs_3"
+        "nixpkgs": "nixpkgs_4"
       },
       "locked": {
         "lastModified": 1788807002,
@@ -174,7 +230,7 @@
     },
     "nixos-hardware": {
       "inputs": {
-        "nixpkgs": "nixpkgs_4"
+        "nixpkgs": "nixpkgs_5"
       },
       "locked": {
         "lastModified": 1788335262,
@@ -209,6 +265,22 @@
     },
     "nixpkgs": {
       "locked": {
+        "lastModified": 1788881743,
+        "narHash": "sha256-2V9GZGvPfrNzxFozhI9dcqV+c3QdA8YZrvAAzqEB+dI=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "d6524aaca2ff07876657ae2b323f24be4874944b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
         "lastModified": 1787204541,
         "narHash": "sha256-OURZPknrTjQrlNyxPdqzyqmU/81Wes1CUP/Ft1Rv/YI=",
         "owner": "NixOS",
@@ -223,7 +295,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_2": {
+    "nixpkgs_3": {
       "locked": {
         "lastModified": 1788039129,
         "narHash": "sha256-pa4Q0qErvCvzCaaUph7Sm37RhR4xvPrYI8Lgz6k85+A=",
@@ -239,7 +311,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_3": {
+    "nixpkgs_4": {
       "locked": {
         "lastModified": 1788614874,
         "narHash": "sha256-7QYjT2vHLuX9Z1pdxHXDKCbh1CR3D/2rywB9Tx0MPRg=",
@@ -255,7 +327,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_4": {
+    "nixpkgs_5": {
       "locked": {
         "lastModified": 1767892417,
         "narHash": "sha256-8bW3q88CEg2u4hSP66Vf4lpbLonHz7hqDNBMcCY7E9U=",
@@ -268,7 +340,7 @@
         "url": "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz"
       }
     },
-    "nixpkgs_5": {
+    "nixpkgs_6": {
       "locked": {
         "lastModified": 1788404924,
         "narHash": "sha256-lhEhY8X5EgkQ/eg6IFz4cc8jRuSYSvnxx1al7d1dvZ0=",
@@ -308,14 +380,15 @@
     },
     "root": {
       "inputs": {
-        "home-manager": "home-manager",
+        "chaotic": "chaotic",
+        "home-manager": "home-manager_2",
         "lanzaboote": "lanzaboote",
         "mnw": "mnw",
         "nixly_launcher_src": "nixly_launcher_src",
         "nixlyos-kernel": "nixlyos-kernel",
         "nixos-hardware": "nixos-hardware",
         "nixos-stable": "nixos-stable",
-        "nixpkgs": "nixpkgs_5",
+        "nixpkgs": "nixpkgs_6",
         "totalvim": "totalvim"
       }
     },

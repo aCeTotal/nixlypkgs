@@ -24,6 +24,11 @@
     # NixlyOS gaming-kernel (CachyOS-saus + BORE + scx_lavd, generic + v3).
     # `nix flake update nixlyos-kernel` etter push til kernel-repoet.
     nixlyos-kernel.url = "github:aCeTotal/kernel_nixlyos";
+
+    # MIDLERTIDIG (crash-debug): ferdigbygd CachyOS-kernel + matchende NVIDIA-
+    # driver fra chaotic-nyx. Ingen `follows` her: cache-treff i nyx.chaotic.cx
+    # krever chaotic sin egen nixpkgs-pin.
+    chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:
