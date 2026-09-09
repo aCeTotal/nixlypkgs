@@ -40,16 +40,10 @@
     # CPUs, generic elsewhere. The overlay attrs, not a local linuxPackagesFor:
     # the flake's nvidia-nixlyos* cache packages are built from these same
     # attrs, and only identical expressions give cache-hitting store paths.
-    # MIDLERTIDIG (crash-debug): siste CachyOS-kernel fra chaotic-nyx i stedet
-    # for egenbygd nixlyos-kernel, for aa se om crashene foelger kernelen.
-    # Revert: bytt tilbake til den kommenterte linja under, fjern
-    # linuxPackages_cachyos_nyx i overlays/default.nix, chaotic-inputet i
-    # flake.nix og nyx-substituteren i base/nix.nix.
-    kernelPackages = pkgs.linuxPackages_cachyos_nyx;
-    # kernelPackages =
-    #   if hwData.resources.cpuLevel >= 3
-    #   then pkgs.linuxPackages_nixlyos_v3
-    #   else pkgs.linuxPackages_nixlyos;
+    kernelPackages =
+      if hwData.resources.cpuLevel >= 3
+      then pkgs.linuxPackages_nixlyos_v3
+      else pkgs.linuxPackages_nixlyos;
 
     kernelParams = [
       "quiet"
