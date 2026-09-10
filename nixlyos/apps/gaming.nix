@@ -1,7 +1,7 @@
 { config, lib, pkgs, ... }:
 
 {
-  imports = [ ./steam ];
+  imports = [ ./steam ./geforce-now ];
 
   programs.gamemode = {
     enable = true;
@@ -33,7 +33,6 @@
   };
 
   environment.systemPackages = with pkgs; [
-    (geforce-now.override { browserCommand = "google-chrome-stable"; })
     steamcmd
     mangohud
     goverlay
