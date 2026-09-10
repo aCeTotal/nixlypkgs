@@ -5,9 +5,11 @@
 # On any build failure the previous lock is restored, so the machine always
 # lands on a generation that builds.
 #
-# Output contract: only version transitions ("name  old > new") reach the
-# terminal. Everything else goes to the log. Errors and a required-reboot
-# notice are the only exceptions.
+# Output contract: progress steps (henter, evaluerer, bygger/laster ned,
+# aktiverer) and one "name  old > new" line per changed package — printed as
+# each package finishes — reach the terminal. Everything else goes to the
+# log. Errors and a required-reboot notice are the only exceptions. Without
+# a tty only the version lines print, exactly as before.
 set -euo pipefail
 
 FLAKE="${NIXLYOS_DIR:-$HOME/.local/nixlyos}"
@@ -17,19 +19,54 @@ log="${XDG_STATE_HOME:-$HOME/.local/state}/nixlyos/update.log"
 mkdir -p "$(dirname "$log")"
 : > "$log"
 
+# Eye candy only on a terminal; every escape collapses to "" otherwise, so
+# the non-tty output stays plain and pipeable.
+if [ -t 2 ]; then
+  GRN=$'\033[32m' RED=$'\033[31m' CYN=$'\033[36m' DIM=$'\033[2m' RST=$'\033[0m'
+else
+  GRN= RED= CYN= DIM= RST=
+fi
+
+say() { [ -t 2 ] && printf '%b\n' "$*" >&2 || :; }
+
+# Animated status line for the blocking phases (lock, activation). The build
+# phase animates itself from the nix event stream instead.
+spin_pid=""
+spin_start() {
+  [ -t 2 ] || return 0
+  (
+    trap 'exit 0' TERM
+    f='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏' i=0
+    printf '\033[?25l' >&2
+    while :; do
+      printf '\033[2K\r%b' "${CYN}${f:i%10:1}${RST} ${DIM}$1${RST}" >&2
+      sleep 0.12
+      i=$((i+1))
+    done
+  ) &
+  spin_pid=$!
+}
+spin_stop() { # $1: permanent line to leave behind ("" = just clear)
+  [ -n "$spin_pid" ] && { kill "$spin_pid" 2>/dev/null || :; wait "$spin_pid" 2>/dev/null || :; spin_pid=""; }
+  [ -t 2 ] || return 0
+  printf '\033[2K\r\033[?25h' >&2
+  if [ -n "${1:-}" ]; then printf '%b\n' "$1" >&2; fi
+}
+
 # Ask for the password first, then keep the sudo timestamp warm so the final
 # activation does not hit the five-minute timeout.
 sudo -v
 setsid bash -c 'while sudo -n true; do sleep 50; done' </dev/null >/dev/null 2>&1 &
 sudo_keepalive=$!
 tmp=$(mktemp -d -t nixlyos.XXXXXX)
-trap 'kill -- -"$sudo_keepalive" 2>/dev/null; rm -rf "$tmp"' EXIT
+trap 'kill -- -"$sudo_keepalive" 2>/dev/null; [ -n "$spin_pid" ] && kill "$spin_pid" 2>/dev/null; [ -t 2 ] && printf "\033[?25h" >&2; rm -rf "$tmp"' EXIT
 
+spin_start "Henter siste versjoner …"
 nixlyos-detect-hw "$FLAKE/hardware" >>"$log" 2>&1
 # Seed/refresh custom/{inputs,modules}.nix and the user-inputs flake block.
 # Must run before locking so new inputs get resolved. Its errors (reserved
 # input name, broken inputs.nix) are user mistakes and go to the terminal.
-nixlyos-user-config "$FLAKE" >>"$log" 2>&1 || { tail -5 "$log" >&2; exit 1; }
+nixlyos-user-config "$FLAKE" >>"$log" 2>&1 || { spin_stop ""; tail -5 "$log" >&2; exit 1; }
 
 lockbak="$tmp/flake.lock"
 cp "$FLAKE/flake.lock" "$lockbak" 2>/dev/null || : > "$lockbak"
@@ -47,10 +84,12 @@ rm -f "$FLAKE/flake.lock"
 # resolves to the previous rev and the new flake.nix meets old code.
 if ! (cd "$FLAKE" && nix flake lock --refresh &&
       nix flake update --refresh nixlypkgs/nixos-stable nixlypkgs/home-manager) >>"$log" 2>&1; then
+  spin_stop ""
   cp "$lockbak" "$FLAKE/flake.lock"
   tail -20 "$log" >&2
   exit 1
 fi
+spin_stop "${GRN}✓${RST} ${DIM}Siste versjoner hentet${RST}"
 
 STAMP="${XDG_STATE_HOME:-$HOME/.local/state}/nixlyos/last-build"
 mkdir -p "$(dirname "$STAMP")"
@@ -74,46 +113,129 @@ if [ -s "$STAMP" ]; then read -r skey ssys < "$STAMP"; fi
 
 ATTR="$FLAKE#nixosConfigurations.nixlyos.config.system.build.toplevel"
 
-# Live footer: everything currently building or downloading, one line each,
-# redrawn in place at the bottom. Reads nix's internal-json activity stream.
-# Skipped when stderr is not a terminal.
-render_footer() {
+# Live progress: one status line (spinner + phase/counts) plus one line per
+# active build/download, redrawn in place at the bottom. As each package
+# finishes, a permanent "name  old > new" line is printed above the footer
+# and its name recorded in $tmp/printed so print_diff does not repeat it.
+# Reads nix's internal-json activity stream. Skipped when stderr is no tty.
+render_progress() {
   if [ ! -t 2 ]; then cat >/dev/null; return 0; fi
   jq --unbuffered -rR '
     (try (ltrimstr("@nix ") | fromjson) catch empty) |
     if .action == "start" and (.type == 105 or .type == 108) then
-      "S\t\(.id)\t\(if .type == 105 then "bygger" else "installerer" end)\t\(.fields[0] // .text // "")"
+      "S\t\(.id)\t\(if .type == 105 then "B" else "D" end)\t\(.fields[0] // .text // "")"
     elif .action == "stop" then "E\t\(.id)"
     else empty end
   ' | {
-    declare -A label; order=(); shown=0
-    redraw() {
-      (( shown > 0 )) && printf '\033[%dA' "$shown" >&2
-      local count=0 id
+    declare -A label kind pname pver oldv printed
+    order=(); shown=0; phase=eval
+    frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'; fr=0
+    cols=$(tput cols 2>/dev/null || echo 120)
+    while IFS=$'\t' read -r n v; do oldv[$n]=$v; done < "$tmp/old.tsv"
+    printf '\033[?25l' >&2
+    trap 'printf "\033[?25h" >&2' EXIT
+
+    header() {
+      local nb=0 nd=0 id
       for id in "${order[@]}"; do
         [[ -n ${label[$id]:-} ]] || continue
-        printf '\033[2K%s\n' "${label[$id]}" >&2
-        (( ++count ))
+        if [[ ${kind[$id]} == B ]]; then nb=$((nb+1)); else nd=$((nd+1)); fi
       done
-      local extra=$(( shown - count )) i
-      for (( i=0; i<extra; i++ )); do printf '\033[2K\n' >&2; done
-      (( extra > 0 )) && printf '\033[%dA' "$extra" >&2
-      shown=$count
-    }
-    while IFS=$'\t' read -r ev id verb path; do
-      if [[ $ev == S ]]; then
-        # /nix/store/<hash>-name(.drv) -> name
-        p=${path##*/}; p=${p:33}; p=${p%.drv}
-        [[ -n $p ]] || continue
-        label[$id]="$verb $p"
-        order+=("$id")
+      local s="${CYN}${frames:fr:1}${RST} "
+      if [[ $phase == eval ]]; then
+        s+="${DIM}Evaluerer systemet …${RST}"
       else
-        unset "label[$id]"
+        local p=""
+        (( nb > 0 )) && p="bygger ${nb}"
+        (( nd > 0 )) && p+="${p:+ ${DIM}·${RST} }laster ned ${nd}"
+        [[ -n $p ]] || p="${DIM}venter …${RST}"
+        s+=$p
       fi
-      redraw
+      printf '%b' "$s"
+    }
+
+    redraw() {
+      (( shown > 0 )) && printf '\033[%dA' "$shown" >&2
+      local lines=1 id
+      printf '\033[2K%b\n' "$(header)" >&2
+      for id in "${order[@]}"; do
+        [[ -n ${label[$id]:-} ]] || continue
+        printf '\033[2K  %b\n' "${label[$id]}" >&2
+        lines=$((lines+1))
+      done
+      local extra=$((shown - lines)) i
+      if (( extra > 0 )); then
+        for (( i=0; i<extra; i++ )); do printf '\033[2K\n' >&2; done
+        printf '\033[%dA' "$extra" >&2
+      fi
+      shown=$lines
+    }
+
+    wipe() {
+      (( shown > 0 )) || return 0
+      printf '\033[%dA' "$shown" >&2
+      local i
+      for (( i=0; i<shown; i++ )); do printf '\033[2K\033[B' >&2; done
+      printf '\033[%dA' "$shown" >&2
+      shown=0
+    }
+
+    perm() { wipe; printf '\033[2K%b\n' "$1" >&2; redraw; }
+
+    while :; do
+      if IFS=$'\t' read -t 0.15 -r ev id k path; then
+        case $ev in
+          S)
+            if [[ $phase == eval ]]; then
+              phase=build
+              perm "${GRN}✓${RST} ${DIM}Systemet evaluert${RST}"
+            fi
+            # /nix/store/<hash>-name(.drv) -> name
+            p=${path##*/}; p=${p:33}; p=${p%.drv}
+            [[ -n $p ]] || continue
+            # First "-<digit>" splits package name from version.
+            nm=""; vr=""; pre=""; rest=$p
+            while [[ $rest == *-* ]]; do
+              seg=${rest%%-*}; rest=${rest#*-}; pre+=$seg
+              if [[ $rest == [0-9]* ]]; then nm=$pre; vr=$rest; break; fi
+              pre+=-
+            done
+            verb=bygger; [[ $k == D ]] && verb='laster ned'
+            label[$id]="${DIM}${verb}${RST} ${p:0:cols-16}"
+            kind[$id]=$k
+            pname[$id]=$nm
+            pver[$id]=$vr
+            order+=("$id")
+            redraw
+            ;;
+          E)
+            if [[ -n ${label[$id]:-} ]]; then
+              nm=${pname[$id]}; vr=${pver[$id]}
+              unset "label[$id]"
+              if [[ -n $nm && -z ${printed[$nm]:-} ]]; then
+                o=${oldv[$nm]:-}
+                if [[ -z $o ]]; then
+                  printed[$nm]=1; echo "$nm" >> "$tmp/printed"
+                  perm "  ${GRN}+${RST} $nm ${GRN}$vr${RST}"
+                elif [[ $o != "$vr" ]]; then
+                  printed[$nm]=1; echo "$nm" >> "$tmp/printed"
+                  perm "  $nm  ${DIM}${o}${RST} > ${GRN}${vr}${RST}"
+                else
+                  redraw
+                fi
+              else
+                redraw
+              fi
+            fi
+            ;;
+        esac
+      else
+        rc=$?
+        if (( rc > 128 )); then fr=$(( (fr+1) % 10 )); redraw; continue; fi
+        break
+      fi
     done
-    # Leave a clean prompt line: wipe the footer.
-    (( shown > 0 )) && { printf '\033[%dA' "$shown" >&2; for (( i=0; i<shown; i++ )); do printf '\033[2K\n' >&2; done; printf '\033[%dA' "$shown" >&2; }
+    wipe
   }
 }
 
@@ -134,6 +256,7 @@ staged_sys() {
 build_sys() {
   local rc=0
   if staged_sys > "$tmp/out"; then
+    say "${GRN}✓${RST} ${DIM}Ferdig bygget i bakgrunnen — gjenbruker resultatet${RST}"
     return 0
   fi
   # Pre-sized Boehm heap: cold evals run far fewer GC cycles.
@@ -150,7 +273,7 @@ build_sys() {
     --option connect-timeout 3 \
     --option fallback true \
     --log-format internal-json \
-    >"$tmp/out" 2> >(tee -a "$log" | render_footer) || rc=$?
+    >"$tmp/out" 2> >(tee -a "$log" | render_progress) || rc=$?
   psub=$!
   wait "$psub" 2>/dev/null || true
   return "$rc"
@@ -179,27 +302,34 @@ verlist() {
       END { if (prev != "") print prev "\t" vs }'
 }
 
-# The only regular output: one line per changed program, old > new.
+# One line per changed program, old > new. Packages already printed live by
+# render_progress (recorded in $tmp/printed) are skipped.
 print_diff() {
-  verlist "$running" > "$tmp/old.tsv"
   verlist "$sys" > "$tmp/new.tsv"
   LC_ALL=C join -t "$(printf '\t')" -a1 -a2 -e '-' -o 0,1.2,2.2 "$tmp/old.tsv" "$tmp/new.tsv" |
-    awk -F '\t' '$2 != $3 {
-      if ($2 == "-")      printf "%s  + %s\n", $1, $3
-      else if ($3 == "-") printf "%s  - %s\n", $1, $2
-      else                printf "%s  %s > %s\n", $1, $2, $3
-    }'
+    awk -F '\t' -v pf="$tmp/printed" -v G="$GRN" -v R="$RED" -v D="$DIM" -v N="$RST" '
+      BEGIN { while ((getline l < pf) > 0) seen[l] = 1 }
+      $2 == $3 || ($1 in seen) { next }
+      {
+        if ($2 == "-")      printf "  %s+%s %s %s%s%s\n", G, N, $1, G, $3, N
+        else if ($3 == "-") printf "  %s-%s %s %s%s%s\n", R, N, $1, D, $2, N
+        else                printf "  %s  %s%s%s > %s%s%s\n", $1, D, $2, N, G, $3, N
+      }'
 }
 
 # 0 activated, 2 built but only set for next boot, 3 nothing new, 1 failed.
 rebuild() {
+  verlist "$running" > "$tmp/old.tsv"
+  : > "$tmp/printed"
   build_sys || return 1
   sys=$(<"$tmp/out")
   [ "$sys" = "$running" ] && return 3
   # shellcheck disable=SC2024
   sudo nix-env -p /nix/var/nix/profiles/system --set "$sys" >>"$log" 2>&1 || return 1
   print_diff
-  activate switch && return 0
+  spin_start "Aktiverer nytt system …"
+  if activate switch; then spin_stop "${GRN}✓${RST} ${DIM}Aktivert${RST}"; return 0; fi
+  spin_stop ""
   activate boot && return 2
   return 1
 }
@@ -228,6 +358,8 @@ case $rc in
 esac
 
 printf '%s %s\n' "$(tree_key)" "$(readlink -f /run/current-system)" > "$STAMP"
+
+(( rc == 0 )) && say "${GRN}✓${RST} Oppdatering fullført."
 
 # Silent except when action is needed: kernel/initrd/nvidia only take effect
 # after a reboot, and hiding that would be unsafe.
