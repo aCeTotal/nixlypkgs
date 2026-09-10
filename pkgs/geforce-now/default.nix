@@ -43,7 +43,7 @@ stdenvNoCC.mkDerivation {
     if ! "$FLATPAK" info com.nvidia.geforcenow >/dev/null 2>&1; then
       "$NOTIFY" "GeForce NOW" "Installing on first launch, this can take a few minutes..." || true
       "$FLATPAK" remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-      "$FLATPAK" remote-add --user --if-not-exists geforcenow https://international.download.nvidia.com/GFNLinux/geforcenow.flatpakrepo
+      "$FLATPAK" remote-add --user --if-not-exists geforcenow https://international.download.nvidia.com/GFNLinux/flatpak/geforcenow.flatpakrepo
       if ! "$FLATPAK" install --user --noninteractive --or-update geforcenow com.nvidia.geforcenow; then
         "$NOTIFY" -u critical "GeForce NOW" "Install failed. Check your network connection." || true
         exit 1

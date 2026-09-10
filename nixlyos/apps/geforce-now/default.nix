@@ -24,7 +24,7 @@
     };
     script = ''
       flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-      flatpak remote-add --if-not-exists geforcenow https://international.download.nvidia.com/GFNLinux/geforcenow.flatpakrepo
+      flatpak remote-add --if-not-exists geforcenow https://international.download.nvidia.com/GFNLinux/flatpak/geforcenow.flatpakrepo
       flatpak install --noninteractive --or-update geforcenow com.nvidia.geforcenow
     '';
   };
