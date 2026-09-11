@@ -20,9 +20,10 @@
     nvidiaSettings = false;
     # `cachyos` is chaotic-nyx's prebuilt driver matched to the CachyOS kernel;
     # any other kernel falls back to building `latest` locally.
-    package =
+    package = lib.mkDefault (
       config.boot.kernelPackages.nvidiaPackages.cachyos
-        or config.boot.kernelPackages.nvidiaPackages.latest;
+        or config.boot.kernelPackages.nvidiaPackages.latest
+    );
 
     # reverseSync lets the dGPU render the whole session, halving the cross-GPU
     # copies that otherwise cap the Intel-wired eDP panel around 100 FPS.

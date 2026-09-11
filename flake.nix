@@ -69,6 +69,7 @@
               (name: nixpkgs.lib.nameValuePair "${name}-nixlyos${suffix}")
               {
                 nvidia-modules = kp.nvidiaPackages.latest.mod;
+                nvidia-modules-previous = kp.nvidiaPackages.previous.mod;
                 inherit (kp) xpadneo xone xpad-noone msi-ec;
               };
         in {
@@ -92,6 +93,9 @@
           # cache.nixos.org): the driver itself and persistenced.
           nvidia-nixlyos = stable.linuxPackages_nixlyos.nvidiaPackages.latest;
           nvidia-nixlyos-persistenced = stable.linuxPackages_nixlyos.nvidiaPackages.latest.persistenced;
+          # Previous driver stays cached as a fallback if latest misbehaves.
+          nvidia-nixlyos-previous = stable.linuxPackages_nixlyos.nvidiaPackages.previous;
+          nvidia-nixlyos-previous-persistenced = stable.linuxPackages_nixlyos.nvidiaPackages.previous.persistenced;
 
           dwl = stable.nixlytile;
           default = stable.nixlytile;

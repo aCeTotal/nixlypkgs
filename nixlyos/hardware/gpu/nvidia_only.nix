@@ -27,8 +27,10 @@
     powerManagement.finegrained = false;
     open = false;
     nvidiaSettings = false;
-    # Latest stable branch from nixpkgs; built against the nixlyos kernel.
-    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    # Latest branch (newest NVIDIA driver); built against the nixlyos kernel.
+    # mkDefault so custom/modules.nix can fall back to nvidiaPackages.previous
+    # (always built and cached) if the newest driver misbehaves.
+    package = lib.mkDefault config.boot.kernelPackages.nvidiaPackages.latest;
   };
 
   boot = {

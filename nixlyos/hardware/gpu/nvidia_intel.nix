@@ -38,9 +38,10 @@ in
     nvidiaSettings = false;
     # `cachyos` is chaotic-nyx's prebuilt driver matched to the CachyOS kernel;
     # any other kernel falls back to building `latest` locally.
-    package =
+    package = lib.mkDefault (
       config.boot.kernelPackages.nvidiaPackages.cachyos
-        or config.boot.kernelPackages.nvidiaPackages.latest;
+        or config.boot.kernelPackages.nvidiaPackages.latest
+    );
 
     # nvidia-powerd pins the GPU ceiling at its 10 W floor here, so the driver's
     # static 80 W default is better.
