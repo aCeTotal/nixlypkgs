@@ -17,7 +17,7 @@ NEW="${NIXLYOS_DIR:-$HOME/.local/nixlyos}"
 
 [[ $EUID -ne 0 ]] || die "Kjør som vanlig bruker, ikke root."
 [[ -f "$OLD/flake.nix" ]] || die "Fant ikke gammelt repo i $OLD."
-[[ -e "$NEW/flake.nix" ]] && die "$NEW finnes allerede — maskinen ser ut til å være migrert."
+[[ -e "$NEW/flake.nix" ]] && die "$NEW finnes allerede — maskinen ser ut til å være migrert. (Slett $NEW og kjør på nytt hvis en tidligere migrering ble avbrutt.)"
 for c in curl tar nix sudo; do command -v "$c" >/dev/null || die "Mangler kommando: $c"; done
 
 # Per-machine data carried over from the old repo.
@@ -35,18 +35,22 @@ log "hostname=$HOSTNAME  user=$NIXLY_USER  stateVersion=$STATE_VERSION"
 # The helper scripts (detect-hw, laptop-register, default bindings) come from
 # nixlypkgs main, so the migration always uses the current versions.
 tmp=$(mktemp -d -t nixlyos-migrate.XXXXXX)
-trap 'rm -rf "$tmp"' EXIT
+# Stage everything next to $NEW and move it into place only after the build
+# succeeds, so an aborted run never leaves a half-finished $NEW behind.
+mkdir -p "$(dirname "$NEW")"
+STAGE=$(mktemp -d "$NEW.tmp.XXXXXX")
+trap 'rm -rf "$tmp" "$STAGE"' EXIT
 log "Henter nixlypkgs main"
 curl -fsSL https://github.com/aCeTotal/nixlypkgs/archive/refs/heads/main.tar.gz \
   | tar -xz -C "$tmp"
 SRC="$tmp/nixlypkgs-main/nixlyos"
 [[ -f "$SRC/scripts/detect-hw.sh" ]] || die "Uventet tarball-innhold."
 
-log "Skriver maskinflake til $NEW"
-mkdir -p "$NEW/hardware" "$NEW/custom"
-cp "$HWC" "$NEW/hardware/hardware-configuration.nix"
+log "Skriver maskinflake til $STAGE"
+mkdir -p "$STAGE/hardware" "$STAGE/custom"
+cp "$HWC" "$STAGE/hardware/hardware-configuration.nix"
 
-cat > "$NEW/flake.nix" <<FLAKE
+cat > "$STAGE/flake.nix" <<FLAKE
 {
   description = "NixlyOS machine";
 
@@ -72,7 +76,7 @@ cat > "$NEW/flake.nix" <<FLAKE
 }
 FLAKE
 
-cat > "$NEW/custom/inputs.nix" <<'CUSTOM'
+cat > "$STAGE/custom/inputs.nix" <<'CUSTOM'
 # Extra flake inputs for this machine, pulled into flake.nix on every update.
 # One attribute per input:
 #
@@ -85,7 +89,7 @@ cat > "$NEW/custom/inputs.nix" <<'CUSTOM'
 }
 CUSTOM
 
-cat > "$NEW/custom/modules.nix" <<'CUSTOM'
+cat > "$STAGE/custom/modules.nix" <<'CUSTOM'
 # Your own NixOS module. Anything you would normally put in configuration.nix
 # goes here: packages, services, imports of your own module files in custom/.
 # Inputs declared in custom/inputs.nix arrive through the `inputs` argument.
@@ -97,7 +101,7 @@ cat > "$NEW/custom/modules.nix" <<'CUSTOM'
 }
 CUSTOM
 
-cat > "$NEW/local.nix" <<'LOCAL'
+cat > "$STAGE/local.nix" <<'LOCAL'
 # Per-machine overrides. Anything set here stays local and never reaches the
 # public nixlypkgs repo — passwords, keys and machine-specific tweaks belong
 # here. Empty by default.
@@ -108,19 +112,19 @@ cat > "$NEW/local.nix" <<'LOCAL'
 LOCAL
 
 # Keybindings: nixlytile reads and inotify-watches this file directly.
-cp "$SRC/scripts/bindings-default.conf" "$NEW/bindings.conf"
+cp "$SRC/scripts/bindings-default.conf" "$STAGE/bindings.conf"
 
 log "Kjører hardware-deteksjon"
-REGISTER="$SRC/scripts/laptop-register" bash "$SRC/scripts/detect-hw.sh" "$NEW/hardware"
+REGISTER="$SRC/scripts/laptop-register" bash "$SRC/scripts/detect-hw.sh" "$STAGE/hardware"
 
 # cd instead of --flake: works on both old and new (pinned) nix CLI.
 log "Låser flake"
-(cd "$NEW" && nix flake lock)
+(cd "$STAGE" && nix flake lock)
 
 # Build against cache.aceclan.no so everything prebuilt is substituted instead
 # of compiled locally. The user is in trusted-users on the old arch, so the
 # daemon accepts the extra substituter.
-ATTR="$NEW#nixosConfigurations.nixlyos.config.system.build.toplevel"
+ATTR="$STAGE#nixosConfigurations.nixlyos.config.system.build.toplevel"
 log "Bygger nytt system (henter fra cache.aceclan.no)"
 sys=$(nix build --no-link --print-out-paths --keep-going "$ATTR" \
   --max-jobs "$(nproc)" --cores 0 \
@@ -130,6 +134,9 @@ sys=$(nix build --no-link --print-out-paths --keep-going "$ATTR" \
   --option http-connections 128 \
   --option connect-timeout 3 \
   --option fallback true)
+
+# Build succeeded — move the finished flake into place before activating.
+mv -T "$STAGE" "$NEW"
 
 log "Aktiverer"
 sudo nix-env -p /nix/var/nix/profiles/system --set "$sys"
