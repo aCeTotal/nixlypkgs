@@ -14,7 +14,7 @@ writeScriptBin "htpc-steam-shortcuts" ''
   APPS = [
       ("RetroArch",   "/run/current-system/sw/bin/retroarch", ""),
       ("nixlymedia",  "/run/current-system/sw/bin/nixlymedia", ""),
-      ("GeForce NOW", "/run/current-system/sw/bin/geforce-now", ""),
+      ("GeForce NOW", "/run/current-system/sw/bin/flatpak", "run com.nvidia.geforcenow"),
   ]
 
   def parse(data):
@@ -92,8 +92,8 @@ writeScriptBin "htpc-steam-shortcuts" ''
                     file=sys.stderr)
               shutil.copy2(path, path + ".nixly_backup")
               shortcuts = {}
-      have = {v.get("appname", "").lower()
-              for v in shortcuts.values() if isinstance(v, dict)}
+      by_name = {v.get("appname", "").lower(): v
+                 for v in shortcuts.values() if isinstance(v, dict)}
       changed = False
       nxt = 0
       for k in shortcuts:
@@ -102,7 +102,15 @@ writeScriptBin "htpc-steam-shortcuts" ''
           except ValueError:
               pass
       for name, exe, opts in APPS:
-          if name.lower() in have:
+          cur = by_name.get(name.lower())
+          if cur is not None:
+              # Repoint entries whose exe/opts changed in a rebuild (e.g. the
+              # old geforce-now wrapper binary that no longer exists).
+              if cur.get("Exe") != f'"{exe}"' or cur.get("LaunchOptions") != opts:
+                  cur["Exe"] = f'"{exe}"'
+                  cur["LaunchOptions"] = opts
+                  cur["appid"] = shortcut_appid(f'"{exe}"', name)
+                  changed = True
               continue
           shortcuts[str(nxt)] = entry(name, exe, opts)
           nxt += 1

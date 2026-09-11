@@ -13,7 +13,6 @@ in {
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
   nixlymedia = callPackage ../pkgs/nixlymedia { };
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };
-  geforce-now = callPackage ../pkgs/geforce-now { };
   libepoxy-nixly = callPackage ../pkgs/libepoxy { };
   Blender_bin_lts = callPackage ../pkgs/blender_bin_lts { };
   Unreal_editor = callPackage ../pkgs/unreal_editor { };

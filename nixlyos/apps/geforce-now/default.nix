@@ -5,13 +5,10 @@
 
   services.flatpak.enable = true;
 
-  environment.systemPackages = [ pkgs.geforce-now ];
-
   # Mirrors what NVIDIA's GeForceNOWSetup.bin installer does: add flathub
   # (needed for the org.freedesktop.Platform.GL.nvidia-* driver runtimes),
-  # add NVIDIA's GeForce NOW remote, then install/update the app.
-  # The geforce-now wrapper also self-installs (user scope) on first launch
-  # if this service has not completed yet, so no manual step ever.
+  # add NVIDIA's GeForce NOW remote, then install/update the app. The
+  # flatpak's own exported desktop file is the only launcher entry.
   systemd.services.geforce-now-install = {
     description = "Install NVIDIA GeForce NOW flatpak";
     wantedBy = [ "multi-user.target" ];

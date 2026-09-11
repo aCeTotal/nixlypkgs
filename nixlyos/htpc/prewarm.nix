@@ -12,7 +12,6 @@ let
   closure = pkgs.writeClosure [
     raFull
     pkgs.nixlymedia
-    pkgs.geforce-now
     pkgs.retroarch-assets
     pkgs.libretro-shaders-slang
   ];
