@@ -1,21 +1,18 @@
-# Non-Steam shortcuts for Big Picture: RetroArch, nixlymedia and GeForce NOW
-# appear as apps in the Steam library, so the couch user switches between
-# them with the controller alone. htpc-steam runs this before every Steam
-# start (Steam only reads shortcuts.vdf at startup).
+# Cleanup of the old non-Steam shortcuts (RetroArch, nixlymedia,
+# GeForce NOW). The apps now run permanently on their own nixlytile
+# workspaces (workspace-apps.nix), so a Big Picture shortcut would just
+# start a second instance. htpc-steam runs this before every Steam start
+# (Steam only reads shortcuts.vdf at startup) so entries written by
+# earlier installs get removed too. Idempotent no-op once they're gone.
 { python3, writeScriptBin }:
 
-writeScriptBin "htpc-steam-shortcuts" ''
+writeScriptBin "htpc-steam-shortcuts-cleanup" ''
   #!${python3}/bin/python3
-  """Ensure the HTPC apps exist in every Steam user's shortcuts.vdf."""
-  import glob, os, shutil, struct, sys, zlib
+  """Remove the old HTPC app shortcuts from every Steam user's shortcuts.vdf."""
+  import glob, os, struct, sys
 
-  # /run/current-system paths survive updates; store paths would go stale
-  # inside shortcuts.vdf after every rebuild.
-  APPS = [
-      ("RetroArch",   "/run/current-system/sw/bin/retroarch", ""),
-      ("nixlymedia",  "/run/current-system/sw/bin/nixlymedia", ""),
-      ("GeForce NOW", "/run/current-system/sw/bin/flatpak", "run com.nvidia.geforcenow"),
-  ]
+  # Names written by the previous htpc-steam-shortcuts script.
+  REMOVE = {"retroarch", "nixlymedia", "geforce now"}
 
   def parse(data):
       """Binary VDF -> dict. Raises on anything malformed."""
@@ -54,75 +51,32 @@ writeScriptBin "htpc-steam-shortcuts" ''
       out += b"\x08"
       return bytes(out)
 
-  def shortcut_appid(exe, name):
-      crc = zlib.crc32((exe + name).encode()) | 0x80000000
-      return crc - 2**32 if crc >= 2**31 else crc
-
-  def entry(name, exe, opts):
-      return {
-          "appid": shortcut_appid(f'"{exe}"', name),
-          "appname": name,
-          "Exe": f'"{exe}"',
-          "StartDir": f'"{os.path.expanduser("~")}"',
-          "icon": "",
-          "ShortcutPath": "",
-          "LaunchOptions": opts,
-          "IsHidden": 0,
-          "AllowDesktopConfig": 1,
-          "AllowOverlay": 1,
-          "OpenVR": 0,
-          "Devkit": 0,
-          "DevkitGameID": "",
-          "DevkitOverrideAppID": 0,
-          "LastPlayTime": 0,
-          "FlatpakAppID": "",
-          "tags": {},
-      }
-
   def patch(path):
-      shortcuts = {}
-      if os.path.exists(path):
-          with open(path, "rb") as f:
-              raw = f.read()
-          try:
-              shortcuts = parse(raw).get("shortcuts", {})
-          except Exception as e:
-              # Unreadable file: keep a backup, start fresh.
-              print(f"[htpc-steam-shortcuts] {path} unparsable ({e}), rewriting",
-                    file=sys.stderr)
-              shutil.copy2(path, path + ".nixly_backup")
-              shortcuts = {}
-      by_name = {v.get("appname", "").lower(): v
-                 for v in shortcuts.values() if isinstance(v, dict)}
-      changed = False
-      nxt = 0
-      for k in shortcuts:
-          try:
-              nxt = max(nxt, int(k) + 1)
-          except ValueError:
-              pass
-      for name, exe, opts in APPS:
-          cur = by_name.get(name.lower())
-          if cur is not None:
-              # Repoint entries whose exe/opts changed in a rebuild (e.g. the
-              # old geforce-now wrapper binary that no longer exists).
-              if cur.get("Exe") != f'"{exe}"' or cur.get("LaunchOptions") != opts:
-                  cur["Exe"] = f'"{exe}"'
-                  cur["LaunchOptions"] = opts
-                  cur["appid"] = shortcut_appid(f'"{exe}"', name)
-                  changed = True
-              continue
-          shortcuts[str(nxt)] = entry(name, exe, opts)
-          nxt += 1
-          changed = True
-      if not changed:
+      if not os.path.exists(path):
           return
+      with open(path, "rb") as f:
+          raw = f.read()
+      try:
+          shortcuts = parse(raw).get("shortcuts", {})
+      except Exception as e:
+          # Unparsable file: not ours to fix — leave it alone.
+          print(f"[htpc-steam-shortcuts-cleanup] {path} unparsable ({e}), skipping",
+                file=sys.stderr)
+          return
+      kept = [v for v in shortcuts.values()
+              if not (isinstance(v, dict)
+                      and v.get("appname", "").lower() in REMOVE)]
+      if len(kept) == len(shortcuts):
+          return
+      # Reindex 0..n-1 the way Steam writes the file itself.
+      shortcuts = {str(i): v for i, v in enumerate(kept)}
       blob = b"\x00shortcuts\x00" + dump_obj(shortcuts) + b"\x08"
       tmp = path + ".tmp"
       with open(tmp, "wb") as f:
           f.write(blob)
       os.replace(tmp, path)
-      print(f"[htpc-steam-shortcuts] patched {path}", file=sys.stderr)
+      print(f"[htpc-steam-shortcuts-cleanup] removed old shortcuts from {path}",
+            file=sys.stderr)
 
   def main():
       roots = [
@@ -143,7 +97,7 @@ writeScriptBin "htpc-steam-shortcuts" ''
               try:
                   patch(os.path.join(cfg, "shortcuts.vdf"))
               except Exception as e:
-                  print(f"[htpc-steam-shortcuts] {cfg}: {e}", file=sys.stderr)
+                  print(f"[htpc-steam-shortcuts-cleanup] {cfg}: {e}", file=sys.stderr)
 
   if __name__ == "__main__":
       main()

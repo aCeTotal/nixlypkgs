@@ -167,16 +167,58 @@ in
     log-level "info"
 
     ${if isHtpc then ''
-    // HTPC autostart: absolutt minimum rundt Steam Big Picture.
-    // Ingen clipman/appd/mcontrolcenter/activity-prewarm — alt som
-    // stjeler RAM/CPU/IO fra spill og streaming er kuttet.
+    // HTPC-modus i kompositoren: statusbar alltid skjult, faste
+    // app-workspaces (reglene under), gamepad hold-L1/R1 1,5 s for aa
+    // skli mellom workspaces, ingen workspace-komprimering.
+    htpc true
+
+    // Fast workspace per app. Appene under mappes SKJULT inn paa sitt
+    // workspace naar det ikke er aktivt — de stjeler aldri fokus og
+    // dukker aldri opp paa et annet workspace. "steam" matcher ogsaa
+    // steamwebhelper (guide-menyen) og steam_app_* (spill), saa alt
+    // Steam-relatert holder seg paa workspace 1.
+    window-rule {
+        app-id    "steam"
+        workspace 1
+    }
+    window-rule {
+        app-id    "retroarch"
+        workspace 2
+    }
+    window-rule {
+        app-id    "RetroArch"
+        workspace 2
+    }
+    // Flatpak-Electron rapporterer app-id ulikt mellom versjoner —
+    // begge stavemaater dekkes (regel-match er substring, case-sensitiv).
+    window-rule {
+        app-id    "geforcenow"
+        workspace 3
+    }
+    window-rule {
+        app-id    "GeForce NOW"
+        workspace 3
+    }
+    window-rule {
+        app-id    "nixlymedia"
+        workspace 4
+    }
+
+    // HTPC autostart: Steam Big Picture (ws 1) + RetroArch (ws 2) +
+    // GeForce NOW (ws 3) + nixlymedia (ws 4). Alle fire holdes i live
+    // av hver sin supervisor-loekke (session.nix / workspace-apps.nix):
+    // krasjer en app startes den umiddelbart paa nytt og window-rule
+    // legger den rett tilbake paa sitt workspace.
     autostart "swaybg -i \"$HOME/Pictures/wallpapers/beach.jpg\" -m fill"
     // Steam er en X11-klient — xwayland-satellite maa opp foerst.
     autostart "xwayland-satellite"
     autostart "${setRandrPrimary}"
-    // Rett i Big Picture; htpc-steam skriver snarveier (RetroArch,
-    // nixlymedia, GeForce NOW) og holder Steam i live hele sesjonen.
+    // Rett i Big Picture; htpc-steam rydder bort gamle snarveier
+    // (appene har egne workspaces) og holder Steam i live hele sesjonen.
     autostart "htpc-steam"
+    autostart "htpc-retroarch"
+    autostart "htpc-geforcenow"
+    autostart "htpc-nixlymedia"
     '' else ''
     // Autostart — one process per entry.
     // thunar --daemon fjernet: Nautilus er filbehandleren (Super+e), og

@@ -6,6 +6,7 @@
 {
   imports = [
     ./session.nix
+    ./workspace-apps.nix
     ./media.nix
     ./auto-update.nix
     ./prewarm.nix

@@ -5,20 +5,19 @@
 { pkgs, lib, config, ... }:
 
 let
-  shortcuts = pkgs.callPackage ./steam-shortcuts.nix { };
+  shortcutsCleanup = pkgs.callPackage ./steam-shortcuts.nix { };
 
   htpcSteam = pkgs.writeShellScriptBin "htpc-steam" ''
     # Keep Big Picture alive: quitting Steam on a couch box just means a
     # black screen, so it is relaunched until the session ends.
-    # Shortcuts are (re)written before every launch, not just the first:
-    # Steam only reads shortcuts.vdf at startup, and on the very first
-    # boot userdata/ does not exist until the user has logged in once —
-    # the rewrite after Steam exits/restarts covers that case. Output
-    # goes to the journal so a missing shortcut is diagnosable
-    # (journalctl -t htpc-steam-shortcuts). Best-effort: never block
-    # Big Picture.
+    # The old RetroArch/nixlymedia/GeForce NOW shortcuts are removed
+    # before every launch (Steam only reads shortcuts.vdf at startup):
+    # the apps live on their own nixlytile workspaces now, and a Big
+    # Picture shortcut would just start a second instance. Output goes
+    # to the journal (journalctl -t htpc-steam-shortcuts). Best-effort:
+    # never block Big Picture.
     while :; do
-      ${shortcuts}/bin/htpc-steam-shortcuts 2>&1 \
+      ${shortcutsCleanup}/bin/htpc-steam-shortcuts-cleanup 2>&1 \
         | ${pkgs.systemd}/bin/systemd-cat -t htpc-steam-shortcuts || true
       steam -tenfoot
       sleep 2
@@ -26,5 +25,5 @@ let
   '';
 in
 lib.mkIf (config.nixlyos.mode == "htpc") {
-  environment.systemPackages = [ htpcSteam shortcuts ];
+  environment.systemPackages = [ htpcSteam shortcutsCleanup ];
 }
