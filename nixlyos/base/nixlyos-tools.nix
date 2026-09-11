@@ -27,7 +27,7 @@ let
 
   update = pkgs.writeShellApplication {
     name = "nixlyos-update";
-    runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.gnugrep pkgs.gawk pkgs.jq ];
+    runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.gnugrep pkgs.gawk pkgs.jq pkgs.git ];
     # sudo comes from the system (wrapper with setuid), not from nixpkgs.
     text = ''
       export PATH=/run/wrappers/bin:$PATH

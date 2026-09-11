@@ -24,7 +24,7 @@ mkdir -p "$(dirname "$log")"
 if [ -t 2 ]; then
   GRN=$'\033[32m' RED=$'\033[31m' CYN=$'\033[36m' DIM=$'\033[2m' RST=$'\033[0m'
 else
-  GRN= RED= CYN= DIM= RST=
+  GRN='' RED='' CYN='' DIM='' RST=''
 fi
 
 say() { [ -t 2 ] && printf '%b\n' "$*" >&2 || :; }
@@ -33,6 +33,7 @@ say() { [ -t 2 ] && printf '%b\n' "$*" >&2 || :; }
 # phase animates itself from the nix event stream instead.
 spin_pid=""
 spin_start() {
+  step_t=$SECONDS
   [ -t 2 ] || return 0
   (
     trap 'exit 0' TERM
@@ -52,6 +53,22 @@ spin_stop() { # $1: permanent line to leave behind ("" = just clear)
   printf '\033[2K\r\033[?25h' >&2
   if [ -n "${1:-}" ]; then printf '%b\n' "$1" >&2; fi
 }
+# ✓-line with elapsed time for the step started by spin_start.
+tick() { spin_stop "${GRN}✓${RST} ${DIM}$1 ($((SECONDS - step_t))s)${RST}"; }
+
+# Closure as "name<TAB>versions" lines: hash prefix stripped, versions of the
+# same package collected, unversioned paths (config files etc.) dropped.
+verlist() {
+  nix path-info -r "$1" 2>>"$log" |
+    awk '{ p=substr($0,45);
+      if (!match(p, /-[0-9]/)) next
+      print substr(p,1,RSTART-1) "\t" substr(p,RSTART+1)
+    }' | LC_ALL=C sort -u |
+    awk -F '\t' '
+      $1 != prev { if (prev != "") print prev "\t" vs; prev=$1; vs=$2; next }
+      { vs = vs ", " $2 }
+      END { if (prev != "") print prev "\t" vs }'
+}
 
 # Ask for the password first, then keep the sudo timestamp warm so the final
 # activation does not hit the five-minute timeout.
@@ -59,17 +76,90 @@ sudo -v
 setsid bash -c 'while sudo -n true; do sleep 50; done' </dev/null >/dev/null 2>&1 &
 sudo_keepalive=$!
 tmp=$(mktemp -d -t nixlyos.XXXXXX)
-trap 'kill -- -"$sudo_keepalive" 2>/dev/null; [ -n "$spin_pid" ] && kill "$spin_pid" 2>/dev/null; [ -t 2 ] && printf "\033[?25h" >&2; rm -rf "$tmp"' EXIT
+trap 'kill -- -"$sudo_keepalive" 2>/dev/null; [ -n "$spin_pid" ] && kill "$spin_pid" 2>/dev/null; [ -n "${ver_pid:-}" ] && kill "$ver_pid" 2>/dev/null; [ -t 2 ] && printf "\033[?25h" >&2; rm -rf "$tmp"' EXIT
 
-spin_start "Henter siste versjoner …"
-nixlyos-detect-hw "$FLAKE/hardware" >>"$log" 2>&1
-# Seed/refresh custom/{inputs,modules}.nix and the user-inputs flake block.
-# Must run before locking so new inputs get resolved. Its errors (reserved
-# input name, broken inputs.nix) are user mistakes and go to the terminal.
-nixlyos-user-config "$FLAKE" >>"$log" 2>&1 || { spin_stop ""; tail -5 "$log" >&2; exit 1; }
+STAMP="${XDG_STATE_HOME:-$HOME/.local/state}/nixlyos/last-build"
+mkdir -p "$(dirname "$STAMP")"
+
+# The local tree is tiny, so its content plus the running system identify the
+# last known result and let the eval be skipped entirely.
+tree_key() { cat "$FLAKE"/flake.nix "$FLAKE"/flake.lock "$FLAKE"/local.nix "$FLAKE"/custom/* "$FLAKE"/hardware/* 2>/dev/null | sha1sum | cut -d' ' -f1; }
+
+up_to_date() {
+  printf '%s %s\n' "$(tree_key)" "$running" > "$STAMP"
+  echo "Alt er oppdatert."
+  exit 0
+}
+
+# Hardware detection and user config touch separate paths — run in parallel.
+# user-config errors (reserved input name, broken inputs.nix) are user
+# mistakes and go to the terminal.
+spin_start "Validerer maskinvare og brukerkonfig …"
+nixlyos-detect-hw "$FLAKE/hardware" >"$tmp/hw.log" 2>&1 &
+hw_pid=$!
+nixlyos-user-config "$FLAKE" >"$tmp/uc.log" 2>&1 || {
+  spin_stop ""
+  cat "$tmp/hw.log" "$tmp/uc.log" >>"$log" 2>/dev/null || :
+  tail -5 "$tmp/uc.log" >&2
+  exit 1
+}
+wait "$hw_pid"
+cat "$tmp/hw.log" "$tmp/uc.log" >>"$log" 2>/dev/null || :
+tick "Konfig validert"
+
+# The old closure listing only reads the local store — overlap it with the
+# network work below.
+running=$(readlink -f /run/current-system)
+verlist "$running" > "$tmp/old.tsv" &
+ver_pid=$!
+
+# Fast path — pacman-style "nothing to do" in a second or two: one parallel
+# git ls-remote per moving input (nixlypkgs + the two branch-tracking ones).
+# If no remote head moved and the local tree still matches the stamp, the
+# whole lock/eval/build machinery is skipped. Any doubt (missing node,
+# network error) falls through to the full path.
+remote_moved() {
+  local specs n=0 j
+  specs=$(jq -r '
+    .nodes | to_entries[]
+    | select(.key == "nixlypkgs" or .key == "nixos-stable" or .key == "home-manager")
+    | select(.value.original.type? == "github")
+    | "\(.value.original.owner)/\(.value.original.repo)\t\(.value.original.ref // "HEAD")\t\(.value.locked.rev)"
+  ' "$FLAKE/flake.lock" 2>/dev/null) || return 0
+  [ "$(printf '%s\n' "$specs" | grep -c .)" -eq 3 ] || return 0
+  local repo ref rev pids=()
+  while IFS=$'\t' read -r repo ref rev; do
+    printf '%s' "$rev" > "$tmp/want.$n"
+    { r=$(git ls-remote "https://github.com/$repo" \
+            "$([ "$ref" = HEAD ] && echo HEAD || echo "refs/heads/$ref")" \
+            2>/dev/null | head -1 | cut -f1) || :
+      printf '%s' "$r" > "$tmp/head.$n"
+    } &
+    pids+=($!)
+    n=$((n+1))
+  done <<< "$specs"
+  wait "${pids[@]}" 2>/dev/null || :
+  for (( j=0; j<n; j++ )); do
+    [ -s "$tmp/head.$j" ] || return 0
+    [ "$(cat "$tmp/head.$j")" = "$(cat "$tmp/want.$j")" ] || return 0
+  done
+  return 1
+}
+
+skey="" ssys=""
+if [ -s "$STAMP" ]; then read -r skey ssys < "$STAMP"; fi
+if [ -s "$FLAKE/flake.lock" ] && [ "$skey" = "$(tree_key)" ] && [ "$ssys" = "$running" ]; then
+  spin_start "Sjekker etter oppdateringer …"
+  if ! remote_moved; then
+    tick "Ingen nye versjoner"
+    up_to_date
+  fi
+  tick "Oppdateringer funnet"
+fi
 
 lockbak="$tmp/flake.lock"
 cp "$FLAKE/flake.lock" "$lockbak" 2>/dev/null || : > "$lockbak"
+spin_start "Henter siste versjoner …"
 # Re-lock from scratch instead of `nix flake update nixlypkgs`: update
 # re-resolves the whole subtree to branch heads, while a fresh lock inherits
 # every nested rev from nixlypkgs' own tested flake.lock. On top of that,
@@ -89,27 +179,9 @@ if ! (cd "$FLAKE" && nix flake lock --refresh &&
   tail -20 "$log" >&2
   exit 1
 fi
-spin_stop "${GRN}✓${RST} ${DIM}Siste versjoner hentet${RST}"
+tick "Siste versjoner hentet"
 
-STAMP="${XDG_STATE_HOME:-$HOME/.local/state}/nixlyos/last-build"
-mkdir -p "$(dirname "$STAMP")"
-
-# The local tree is tiny, so its content plus the running system identify the
-# last known result and let the eval be skipped entirely.
-tree_key() { cat "$FLAKE"/flake.nix "$FLAKE"/flake.lock "$FLAKE"/local.nix "$FLAKE"/custom/* "$FLAKE"/hardware/* 2>/dev/null | sha1sum | cut -d' ' -f1; }
-
-key=$(tree_key)
-running=$(readlink -f /run/current-system)
-
-up_to_date() {
-  printf '%s %s\n' "$key" "$running" > "$STAMP"
-  echo "Alt er oppdatert."
-  exit 0
-}
-
-skey="" ssys=""
-if [ -s "$STAMP" ]; then read -r skey ssys < "$STAMP"; fi
-[ "$skey" = "$key" ] && [ "$ssys" = "$running" ] && up_to_date
+[ "$skey" = "$(tree_key)" ] && [ "$ssys" = "$running" ] && up_to_date
 
 ATTR="$FLAKE#nixosConfigurations.nixlyos.config.system.build.toplevel"
 
@@ -128,7 +200,7 @@ render_progress() {
     else empty end
   ' | {
     declare -A label kind pname pver oldv printed
-    order=(); shown=0; phase=eval
+    order=(); shown=0; phase='eval'
     frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'; fr=0
     cols=$(tput cols 2>/dev/null || echo 120)
     while IFS=$'\t' read -r n v; do oldv[$n]=$v; done < "$tmp/old.tsv"
@@ -188,7 +260,7 @@ render_progress() {
           S)
             if [[ $phase == eval ]]; then
               phase=build
-              perm "${GRN}✓${RST} ${DIM}Systemet evaluert${RST}"
+              perm "${GRN}✓${RST} ${DIM}Systemet evaluert (${SECONDS}s)${RST}"
             fi
             # /nix/store/<hash>-name(.drv) -> name
             p=${path##*/}; p=${p:33}; p=${p%.drv}
@@ -266,11 +338,12 @@ build_sys() {
   # The user is in trusted-users, so the daemon accepts both options.
   nix build --no-link --print-out-paths --keep-going "$ATTR" \
     --max-jobs "$(nproc)" --cores 0 \
-    --option extra-substituters https://cache.aceclan.no \
+    --option extra-substituters 'https://cache.aceclan.no?priority=5' \
     --option extra-trusted-public-keys cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak= \
     --option max-substitution-jobs 128 \
     --option http-connections 128 \
     --option connect-timeout 3 \
+    --option download-buffer-size 536870912 \
     --option fallback true \
     --log-format internal-json \
     >"$tmp/out" 2> >(tee -a "$log" | render_progress) || rc=$?
@@ -288,20 +361,6 @@ activate() { # switch|boot
     "$sys/bin/switch-to-configuration" "$1" >>"$log" 2>&1
 }
 
-# Closure as "name<TAB>versions" lines: hash prefix stripped, versions of the
-# same package collected, unversioned paths (config files etc.) dropped.
-verlist() {
-  nix path-info -r "$1" 2>>"$log" |
-    awk '{ p=substr($0,45);
-      if (!match(p, /-[0-9]/)) next
-      print substr(p,1,RSTART-1) "\t" substr(p,RSTART+1)
-    }' | LC_ALL=C sort -u |
-    awk -F '\t' '
-      $1 != prev { if (prev != "") print prev "\t" vs; prev=$1; vs=$2; next }
-      { vs = vs ", " $2 }
-      END { if (prev != "") print prev "\t" vs }'
-}
-
 # One line per changed program, old > new. Packages already printed live by
 # render_progress (recorded in $tmp/printed) are skipped.
 print_diff() {
@@ -312,14 +371,14 @@ print_diff() {
       $2 == $3 || ($1 in seen) { next }
       {
         if ($2 == "-")      printf "  %s+%s %s %s%s%s\n", G, N, $1, G, $3, N
-        else if ($3 == "-") printf "  %s-%s %s %s%s%s\n", R, N, $1, D, $2, N
+        else if ($3 == "-") printf "  %s-%s %s %s%s%s  %sfjernet%s\n", R, N, $1, D, $2, N, R, N
         else                printf "  %s  %s%s%s > %s%s%s\n", $1, D, $2, N, G, $3, N
       }'
 }
 
 # 0 activated, 2 built but only set for next boot, 3 nothing new, 1 failed.
 rebuild() {
-  verlist "$running" > "$tmp/old.tsv"
+  wait "$ver_pid" 2>/dev/null || :
   : > "$tmp/printed"
   build_sys || return 1
   sys=$(<"$tmp/out")
@@ -328,7 +387,7 @@ rebuild() {
   sudo nix-env -p /nix/var/nix/profiles/system --set "$sys" >>"$log" 2>&1 || return 1
   print_diff
   spin_start "Aktiverer nytt system …"
-  if activate switch; then spin_stop "${GRN}✓${RST} ${DIM}Aktivert${RST}"; return 0; fi
+  if activate switch; then tick "Aktivert"; return 0; fi
   spin_stop ""
   activate boot && return 2
   return 1
@@ -359,7 +418,7 @@ esac
 
 printf '%s %s\n' "$(tree_key)" "$(readlink -f /run/current-system)" > "$STAMP"
 
-(( rc == 0 )) && say "${GRN}✓${RST} Oppdatering fullført."
+(( rc == 0 )) && say "${GRN}✓${RST} Oppdatering fullført ${DIM}(${SECONDS}s totalt)${RST}"
 
 # Silent except when action is needed: kernel/initrd/nvidia only take effect
 # after a reboot, and hiding that would be unsafe.
