@@ -1,4 +1,4 @@
-{ pkgs, hwData, ... }:
+{ pkgs, lib, config, hwData, ... }:
 
 let
   # Our own build: Valve bleeding-edge + CachyOS fork patches, from
@@ -25,7 +25,13 @@ in
     package = pkgs.steam.override {
       # `-cef-disable-gpu-compositing` for the nixlytile/xwayland-satellite
       # black-window fix; the flag is vendor-agnostic (Intel/AMD/Nvidia).
-      extraArgs = "-cef-disable-gpu-compositing";
+      # NOT on the HTPC: it forces the CEF UI onto software compositing,
+      # and at 4K that makes Big Picture unusably slow. If black windows
+      # ever show up in Big Picture, fix that regression instead of
+      # re-adding the flag here.
+      extraArgs =
+        lib.optionalString (config.nixlyos.mode != "htpc")
+          "-cef-disable-gpu-compositing";
       # Runs on the host before bubblewrap, on every launch: proton-nixlyos
       # everywhere, Library start page, notification popups off. Never fatal.
       extraPreBwrapCmds = "${autoconfig} || true";

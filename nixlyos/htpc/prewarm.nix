@@ -61,7 +61,11 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
   systemd.timers.htpc-prewarm = {
     wantedBy = [ "timers.target" ];
     timerConfig = {
-      OnBootSec = "45s";
+      # 3min, not 45s: the first vmtouch pass pulls gigabytes off disk and
+      # collides with Steam's cold start (idle IO class is a no-op on
+      # NVMe's `none` scheduler). Big Picture gets the disk to itself
+      # first; prewarm catches up right after.
+      OnBootSec = "3min";
       OnUnitActiveSec = "10min";
       Persistent = false;
     };
