@@ -6,13 +6,10 @@
     ({ pkgs, pkgs-unstable, ... }: {
       home.packages =
         (with pkgs; [
-          Unreal_editor
           brave
-          celluloid
           citrix-workspace-nixly
           claude
           discord
-          gaea
           google-chrome
           nixlymedia
           onlyoffice-desktopeditors
