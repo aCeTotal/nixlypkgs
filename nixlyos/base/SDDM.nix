@@ -2,7 +2,8 @@
 
 let
   opts = import ./options.nix;
-  isHtpc = opts.systemMode == 2;
+  # HTPC always auto-logs in; nixlyos.mode comes from local.nix (mode.nix).
+  isHtpc = config.nixlyos.mode == "htpc";
   autoLogin = opts.autoLogin or true;
 in
 {

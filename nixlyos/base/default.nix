@@ -6,6 +6,8 @@
 
 {
   imports = [
+    ./mode.nix
+    ./mode-switch.nix
     ./input.nix
     ./distro.nix
     ./boot.nix
@@ -49,7 +51,7 @@
     ../services/drawingtablet.nix
     ../apps/citrix.nix
     ../apps/dcspit.nix
-    ./htpc.nix
+    ../htpc
     ./capture.nix
     ./idle.nix
     ../hardware/profile.nix

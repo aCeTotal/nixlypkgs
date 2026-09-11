@@ -1,32 +1,15 @@
+# HTPC A/V stack: RetroArch (full core set, 4K XMB), mpv for nixlymedia
+# playback, and always-100%-unmuted sinks. apps/retroarch.nix (the smaller
+# desktop RetroArch) is disabled in htpc mode so the two never collide.
 { pkgs, lib, config, nixlyUser, ... }:
 
-let
-  opts = import ./options.nix;
-  htpcEnabled = (opts.systemMode or 1) == 2;
-in
-lib.mkIf htpcEnabled {
+lib.mkIf (config.nixlyos.mode == "htpc") {
 
   # RetroArch only; mpv comes from home-manager below.
   environment.systemPackages =
     (with pkgs; [
-      (retroarch.withCores (cores: with cores; [
-        nestopia
-        snes9x
-        bsnes
-        genesis-plus-gx
-        mupen64plus
-        beetle-psx-hw
-        pcsx-rearmed
-        mgba
-        gambatte
-        beetle-saturn
-        flycast
-        melonds
-        mame
-        stella
-        ppsspp
-        fbneo
-      ]))
+      nixlymedia
+      (import ./retroarch-full.nix { inherit pkgs; })
       retroarch-assets
       retroarch-joypad-autoconfig
       libretro-shaders-slang
@@ -115,7 +98,9 @@ lib.mkIf htpcEnabled {
     programs.mpv = {
       enable = true;
 
-      config = {
+      # mkForce: apps/mpv.nix (desktop defaults) also sets programs.mpv.config;
+      # on the HTPC this TV-tuned config owns every key.
+      config = lib.mkForce {
         # Operational
         idle = "no";
         terminal = "no";

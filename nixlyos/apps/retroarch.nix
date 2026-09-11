@@ -1,6 +1,9 @@
-{ pkgs, lib, nixlyUser, ... }:
+{ pkgs, lib, config, nixlyUser, ... }:
 
-{
+# HTPC mode ships its own RetroArch (htpc/media.nix) with a larger core set
+# and a declarative config; two retroarch wrappers in systemPackages would
+# collide, so this desktop variant is off there.
+lib.mkIf (config.nixlyos.mode != "htpc") {
   # RetroArch with cores, XMB theme and udev joypad autoconfig; config is written
   # on each home-manager activation, so in-app tweaks last until the next rebuild.
 
