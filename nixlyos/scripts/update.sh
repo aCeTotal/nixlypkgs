@@ -15,12 +15,6 @@ set -euo pipefail
 FLAKE="${NIXLYOS_DIR:-$HOME/.local/nixlyos}"
 [[ -f "$FLAKE/flake.nix" ]] || { echo "error: missing $FLAKE/flake.nix" >&2; exit 1; }
 
-# HTPC tracks ONLY the tested nixlypkgs pin: nixos-stable and home-manager
-# stay exactly as locked in nixlypkgs' own flake.lock instead of moving to
-# their branch heads. The couch box then updates to precisely the config
-# revision pushed to nixlypkgs main, nothing else.
-MODE=$(cat /etc/nixlyos-mode 2>/dev/null || echo desktop)
-
 log="${XDG_STATE_HOME:-$HOME/.local/state}/nixlyos/update.log"
 mkdir -p "$(dirname "$log")"
 : > "$log"
@@ -126,12 +120,9 @@ ver_pid=$!
 # network error) falls through to the full path.
 remote_moved() {
   local specs n=0 j moving=3
-  # HTPC: only nixlypkgs moves, so only its head matters.
-  [ "$MODE" = htpc ] && moving=1
-  specs=$(jq -r --arg mode "$MODE" '
+  specs=$(jq -r '
     .nodes | to_entries[]
-    | select(.key == "nixlypkgs"
-             or ($mode != "htpc" and (.key == "nixos-stable" or .key == "home-manager")))
+    | select(.key == "nixlypkgs" or .key == "nixos-stable" or .key == "home-manager")
     | select(.value.original.type? == "github")
     | "\(.value.original.owner)/\(.value.original.repo)\t\(.value.original.ref // "HEAD")\t\(.value.locked.rev)"
   ' "$FLAKE/flake.lock" 2>/dev/null) || return 0
@@ -182,8 +173,7 @@ rm -f "$FLAKE/flake.lock"
 # --refresh: skip the 1h github fetcher cache, or a push made minutes ago
 # resolves to the previous rev and the new flake.nix meets old code.
 if ! (cd "$FLAKE" && nix flake lock --refresh &&
-      { [ "$MODE" = htpc ] ||
-        nix flake update --refresh nixlypkgs/nixos-stable nixlypkgs/home-manager; }) >>"$log" 2>&1; then
+      nix flake update --refresh nixlypkgs/nixos-stable nixlypkgs/home-manager) >>"$log" 2>&1; then
   spin_stop ""
   cp "$lockbak" "$FLAKE/flake.lock"
   tail -20 "$log" >&2
