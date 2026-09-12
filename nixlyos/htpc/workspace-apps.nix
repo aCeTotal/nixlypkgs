@@ -17,7 +17,10 @@ in
 lib.mkIf (config.nixlyos.mode == "htpc") {
   environment.systemPackages = [
     (mkAppLoop "htpc-retroarch" "retroarch")
-    (mkAppLoop "htpc-geforcenow" "flatpak run com.nvidia.geforcenow")
+    # --password-store=basic: the CEF client otherwise asks the keyring
+    # for a master password on a box that autologs in without one.
+    (mkAppLoop "htpc-geforcenow"
+      "flatpak run com.nvidia.geforcenow --password-store=basic")
     (mkAppLoop "htpc-nixlymedia" "nixlymedia")
   ];
 }
