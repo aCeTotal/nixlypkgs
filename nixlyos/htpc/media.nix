@@ -4,7 +4,7 @@
 { pkgs, lib, config, nixlyUser, ... }:
 
 let
-  # The guide button belongs to nixlytile alone (htpc_guide.c workspace
+  # The guide button belongs to nixlytile alone (htpc_guide.c app
   # menu): strip RetroArch's guide→menu bind from every controller
   # profile. The RetroArch menu is still reachable with L3+R3
   # (input_menu_toggle_gamepad_combo below).

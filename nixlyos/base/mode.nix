@@ -1,5 +1,5 @@
 # System mode: "desktop" (default) or "htpc" (couch box: auto-login,
-# Steam Big Picture session, nightly auto-update, htpc/ modules active).
+# one-app-at-a-time session, nightly auto-update, htpc/ modules active).
 #
 # Set per machine in the LOCAL file ~/.local/nixlyos/local.nix:
 #

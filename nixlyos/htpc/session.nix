@@ -1,29 +1,75 @@
-# HTPC session: the machine boots straight into Steam Big Picture.
-# SDDM auto-logs in (SDDM.nix gates on nixlyos.mode), nixlytile starts
-# htpc-steam from its autostart list (home/nixlytile.nix), and htpc-steam
-# keeps Big Picture alive for the whole session.
+# HTPC session: ONE app at a time on one workspace. nixlytile starts
+# htpc-app from its autostart list (home/nixlytile.nix); it launches the
+# current app — RetroArch at boot — and relaunches it on crash or user
+# quit. The guide menu (nixlytile htpc_guide.c) runs `htpc-switch <app>`,
+# which records the new app and kills the running one's process group;
+# the supervisor then starts the new app immediately.
 { pkgs, lib, config, ... }:
 
 let
   shortcutsCleanup = pkgs.callPackage ./steam-shortcuts.nix { };
 
-  htpcSteam = pkgs.writeShellScriptBin "htpc-steam" ''
-    # Keep Big Picture alive: quitting Steam on a couch box just means a
-    # black screen, so it is relaunched until the session ends.
-    # The old RetroArch/nixlymedia/GeForce NOW shortcuts are removed
-    # before every launch (Steam only reads shortcuts.vdf at startup):
-    # the apps live on their own nixlytile workspaces now, and a Big
-    # Picture shortcut would just start a second instance. Output goes
-    # to the journal (journalctl -t htpc-steam-shortcuts). Best-effort:
-    # never block Big Picture.
+  htpcApp = pkgs.writeShellScriptBin "htpc-app" ''
+    state="''${XDG_RUNTIME_DIR:-/tmp}/htpc-app"
+    [ -s "$state" ] || printf retroarch > "$state"
     while :; do
-      ${shortcutsCleanup}/bin/htpc-steam-shortcuts-cleanup 2>&1 \
-        | ${pkgs.systemd}/bin/systemd-cat -t htpc-steam-shortcuts || true
-      steam -tenfoot
-      sleep 2
+      app=$(cat "$state")
+      case "$app" in
+        steam)
+          # Steam only reads shortcuts.vdf at startup: drop the old
+          # per-app shortcuts before every launch so they cannot start
+          # second instances. Best-effort, never blocks Big Picture.
+          ${shortcutsCleanup}/bin/htpc-steam-shortcuts-cleanup 2>&1 \
+            | ${pkgs.systemd}/bin/systemd-cat -t htpc-steam-shortcuts || true
+          setsid steam -tenfoot &
+          ;;
+        geforcenow)
+          # --password-store=basic: the CEF client otherwise asks the
+          # keyring for a master password on a box that autologs in
+          # without one.
+          setsid flatpak run com.nvidia.geforcenow --password-store=basic &
+          ;;
+        nixlymedia)
+          setsid nixlymedia &
+          ;;
+        *)
+          setsid retroarch &
+          ;;
+      esac
+      printf %s $! > "$state.pid"
+      wait $!
+      rm -f "$state.pid"
+      # Crash/quit of the same app: brief pause so a boot-looping app
+      # cannot spin. A switch (state changed) starts instantly.
+      [ "$(cat "$state")" = "$app" ] && sleep 0.3
     done
+  '';
+
+  # htpc-switch <steam|retroarch|geforcenow|nixlymedia> — called by the
+  # nixlytile guide menu. setsid above made the app a session/process
+  # group leader, so killing -pid takes its whole tree; the supervisor's
+  # wait returns the moment the leader dies and the new app starts while
+  # stragglers get the delayed KILL.
+  htpcSwitch = pkgs.writeShellScriptBin "htpc-switch" ''
+    app="$1"
+    state="''${XDG_RUNTIME_DIR:-/tmp}/htpc-app"
+    cur=$(cat "$state" 2>/dev/null || true)
+    [ "$app" = "$cur" ] && exit 0
+    printf %s "$app" > "$state"
+    pid=$(cat "$state.pid" 2>/dev/null || true)
+    [ -n "$pid" ] || exit 0
+    kill -TERM -- -"$pid" 2>/dev/null || true
+    if [ "$cur" = geforcenow ]; then
+      # bwrap children may sit outside the group; flatpak knows them.
+      ${pkgs.flatpak}/bin/flatpak kill com.nvidia.geforcenow 2>/dev/null || true
+    fi
+    for _ in $(seq 20); do
+      kill -0 -- -"$pid" 2>/dev/null || exit 0
+      sleep 0.1
+    done
+    kill -KILL -- -"$pid" 2>/dev/null || true
   '';
 in
 lib.mkIf (config.nixlyos.mode == "htpc") {
-  environment.systemPackages = [ htpcSteam shortcutsCleanup ];
+  environment.systemPackages = [ htpcApp htpcSwitch shortcutsCleanup ];
 }

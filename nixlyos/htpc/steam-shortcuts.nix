@@ -1,9 +1,9 @@
 # Cleanup of the old non-Steam shortcuts (RetroArch, nixlymedia,
-# GeForce NOW). The apps now run permanently on their own nixlytile
-# workspaces (workspace-apps.nix), so a Big Picture shortcut would just
-# start a second instance. htpc-steam runs this before every Steam start
-# (Steam only reads shortcuts.vdf at startup) so entries written by
-# earlier installs get removed too. Idempotent no-op once they're gone.
+# GeForce NOW). The apps are launched by the htpc-app supervisor
+# (session.nix), so a Big Picture shortcut would just start a second
+# instance. htpc-app runs this before every Steam start (Steam only
+# reads shortcuts.vdf at startup) so entries written by earlier installs
+# get removed too. Idempotent no-op once they're gone.
 { python3, writeScriptBin }:
 
 writeScriptBin "htpc-steam-shortcuts-cleanup" ''

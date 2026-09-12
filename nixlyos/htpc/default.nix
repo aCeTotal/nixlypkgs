@@ -6,9 +6,7 @@
 {
   imports = [
     ./session.nix
-    ./workspace-apps.nix
     ./media.nix
-    ./audio-focus.nix
     ./playlists.nix
     ./bios-sync.nix
     ./retroarch-4k.nix
