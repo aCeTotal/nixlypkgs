@@ -104,19 +104,16 @@ in
         # NixlyOS binary cache: prebuilt nixlypkgs packages for every main commit.
         "https://cache.aceclan.no"
         "https://cache.nixos.org"
-        "https://attic.xuyh0120.win/lantian"
       ];
 
       trusted-substituters = [
         "https://cache.aceclan.no"
         "https://cache.nixos.org"
-        "https://attic.xuyh0120.win/lantian"
       ];
 
       trusted-public-keys = [
         "cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak="
         "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
-        "lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc="
       ];
     };
 

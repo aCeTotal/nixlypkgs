@@ -335,10 +335,12 @@ build_sys() {
   export GC_INITIAL_HEAP_SIZE=4G
   # The cache lines also live in nix.nix, but the running generation's
   # nix.conf may predate them; injecting here breaks that chicken-and-egg.
+  # Full substituters override (not extra-) so a stale cache entry in the
+  # running generation's nix.conf can never stall or abort the build.
   # The user is in trusted-users, so the daemon accepts both options.
   nix build --no-link --print-out-paths --keep-going "$ATTR" \
     --max-jobs "$(nproc)" --cores 0 \
-    --option extra-substituters 'https://cache.aceclan.no?priority=5' \
+    --option substituters 'https://cache.aceclan.no?priority=5 https://cache.nixos.org' \
     --option extra-trusted-public-keys cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak= \
     --option max-substitution-jobs 128 \
     --option http-connections 128 \
