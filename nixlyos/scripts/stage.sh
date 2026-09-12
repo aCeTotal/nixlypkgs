@@ -35,11 +35,14 @@ if [[ -d "$FLAKE/custom" ]]; then cp -r "$FLAKE/custom" "$STAGE/flake/custom"; f
 
 # Exactly the same locking as nixlyos-update, or the staged key never
 # matches: fresh lock (inherits nixlypkgs' tested pins), then nixpkgs stable
-# and home-manager to their branch heads.
+# and home-manager to their branch heads — except on HTPC, which tracks only
+# the tested nixlypkgs pin (mirrors the MODE gate in update.sh).
 # cd instead of --flake: the pinned nix (stable nixpkgs) still uses the old
 # CLI where flake lock/update only operate on the current directory.
+MODE=$(cat /etc/nixlyos-mode 2>/dev/null || echo desktop)
 (cd "$STAGE/flake" && nix flake lock &&
- nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager) >/dev/null 2>&1 || exit 0
+ { [ "$MODE" = htpc ] ||
+   nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager; }) >/dev/null 2>&1 || exit 0
 
 # Pre-sized Boehm heap: the eval allocates gigabytes; starting big avoids
 # hundreds of GC cycles and cuts eval time by a third or more.

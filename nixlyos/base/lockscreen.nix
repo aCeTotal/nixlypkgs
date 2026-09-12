@@ -1,9 +1,11 @@
-{ pkgs, nixlyUser, ... }:
+{ pkgs, lib, config, nixlyUser, ... }:
 
 let
   lockscreen = pkgs.nixly_lockscreen;
   pamService = "nixly-lockscreen";
   idleTimeoutSeconds = 180;
+  # HTPC never asks for a password: no idle lock on the couch box.
+  isHtpc = config.nixlyos.mode == "htpc";
 in
 {
   environment.systemPackages = [ lockscreen ];
@@ -18,7 +20,7 @@ in
     '';
   };
 
-  systemd.user.services.nixly-idled = {
+  systemd.user.services.nixly-idled = lib.mkIf (!isHtpc) {
     description = "nixly_lockscreen idle daemon";
     partOf = [ "graphical-session.target" ];
     after = [ "graphical-session.target" ];

@@ -29,4 +29,8 @@ in
     user = nixlyUser;
   };
 
+  # HTPC: no greeter ever — also re-login after logout or a crashed session,
+  # otherwise SDDM shows the password prompt the second time around.
+  services.displayManager.sddm.autoLogin.relogin = isHtpc;
+
 }
