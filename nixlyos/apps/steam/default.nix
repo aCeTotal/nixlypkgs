@@ -29,6 +29,9 @@ in
       # and at 4K that makes Big Picture unusably slow. If black windows
       # ever show up in Big Picture, fix that regression instead of
       # re-adding the flag here.
+      # (Sep 2026: the HTPC black-screen-at-boot turned out to be a
+      # nixlytile segfault on `htpc true` at initial config load, NOT
+      # this flag — see nixlytile config_loader.c.)
       extraArgs =
         lib.optionalString (config.nixlyos.mode != "htpc")
           "-cef-disable-gpu-compositing";

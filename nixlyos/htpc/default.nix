@@ -8,6 +8,9 @@
     ./session.nix
     ./workspace-apps.nix
     ./media.nix
+    ./playlists.nix
+    ./bios-sync.nix
+    ./retroarch-4k.nix
     ./auto-update.nix
     ./prewarm.nix
     ./controllers.nix

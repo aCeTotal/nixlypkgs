@@ -19,4 +19,8 @@ pkgs.retroarch.withCores (cores: with cores; [
   stella
   ppsspp
   fbneo
+  # PS2 and GameCube/Wii — the ROM share has folders for both
+  # (playlists in rom-playlists.nix point straight at these cores).
+  pcsx2
+  dolphin
 ])

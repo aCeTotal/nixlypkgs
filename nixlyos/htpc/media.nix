@@ -3,6 +3,19 @@
 # desktop RetroArch) is disabled in htpc mode so the two never collide.
 { pkgs, lib, config, nixlyUser, ... }:
 
+let
+  # The guide button belongs to nixlytile alone (htpc_guide.c workspace
+  # menu): strip RetroArch's guide→menu bind from every controller
+  # profile. The RetroArch menu is still reachable with L3+R3
+  # (input_menu_toggle_gamepad_combo below).
+  joypadAutoconfigNoGuide =
+    pkgs.runCommand "retroarch-joypad-autoconfig-noguide" { } ''
+      cp -r ${pkgs.retroarch-joypad-autoconfig} $out
+      chmod -R u+w $out
+      find $out -name '*.cfg' \
+        -exec sed -i '/^input_menu_toggle_btn/d' {} +
+    '';
+in
 lib.mkIf (config.nixlyos.mode == "htpc") {
 
   # RetroArch only; mpv comes from home-manager below.
@@ -46,10 +59,11 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
       video_ctx_scaling = "true"
       video_force_aspect = "true"
 
-      # xBR Lv2 edge smoothing; flip off per core if performance drops.
+      # Shaders: per-core auto presets in retroarch-4k.nix (xBR on 2D
+      # cores only — the global video_shader key is ignored since RA 1.8,
+      # and 3D cores upscale internally instead).
       video_shader_enable = "true"
       video_shader_dir = "${pkgs.libretro-shaders-slang}/share/libretro/shaders/shaders_slang"
-      video_shader = "${pkgs.libretro-shaders-slang}/share/libretro/shaders/shaders_slang/edge-smoothing/xbr/xbr-lv2.slangp"
 
       # Audio
       # audio_volume in dB, 0.0 = unity = 100%
@@ -90,7 +104,12 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
 
       # Asset / autoconfig paths
       assets_directory = "${pkgs.retroarch-assets}/share/retroarch/assets"
-      joypad_autoconfig_dir = "${pkgs.retroarch-joypad-autoconfig}/share/libretro/autoconfig"
+      joypad_autoconfig_dir = "${joypadAutoconfigNoGuide}/share/libretro/autoconfig"
+
+      # Playlists: auto-generated from the NFS ROM share (playlists.nix),
+      # one per system, every entry pinned to its core.
+      playlist_directory = "~/.config/retroarch/playlists"
+      content_show_playlists = "true"
     '';
 
     # mpv: 4K60 on Arc via gpu-next, Vulkan and VAAPI, with display-resample and
