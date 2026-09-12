@@ -12,6 +12,7 @@
     ./playlists.nix
     ./bios-sync.nix
     ./retroarch-4k.nix
+    ./gpu-perf.nix
     ./auto-update.nix
     ./prewarm.nix
     ./controllers.nix
