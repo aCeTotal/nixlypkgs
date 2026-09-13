@@ -50,7 +50,10 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
       # frame, which pins the emulator at exactly 10 fps. Costs at most
       # one frame of extra latency.
       video_max_swapchain_images = "4"
-      video_threaded = "true"
+      # Threaded video decouples the core from the video driver via an
+      # extra queue — with Vulkan it only adds a frame of latency and
+      # jitter (it exists for weak single-core hardware). Off on Arc.
+      video_threaded = "false"
       video_frame_delay = "0"
       video_frame_delay_auto = "true"
       video_gpu_screenshot = "true"
@@ -272,7 +275,10 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
       Install.WantedBy = [ "graphical-session.target" ];
       Service = {
         Type = "simple";
-        Restart = "on-failure";
+        # always, ikke on-failure: `pactl subscribe | while read` gir
+        # exit 0 når pipewire-pulse restarter (EOF på pipen), og da
+        # ville unmute-vaktholdet vært dødt resten av sesjonen.
+        Restart = "always";
         RestartSec = 2;
         ExecStart = pkgs.writeShellScript "htpc-audio-watch" ''
           set -u
