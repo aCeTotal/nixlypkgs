@@ -2,8 +2,14 @@
 # hardware/ (cpu, gpu, machine profile) is appended by lib.mkNixlySystem from
 # the scanner data in ~/.local/nixlyos; services/ holds detect-activated
 # extras; apps/ holds programs that ship preconfigured.
-{ ... }:
+{ lib, hwData, ... }:
 
+let
+  # x86-only stacks: Steam/Proton/Wine (gaming), the proton-path-baking
+  # prewarm, and the Citrix binary bundle have no aarch64 builds, and even
+  # referencing them fails the eval on an ARM SBC.
+  isX86 = hwData.platform.arch == "x86_64";
+in
 {
   imports = [
     ./mode.nix
@@ -19,7 +25,9 @@
     # ./lockscreen.nix  # disabled: no auto-lock/lockscreen
     ./nfs.nix
     ./ssh.nix
-    ../apps/gaming.nix
+  ]
+  ++ lib.optional isX86 ../apps/gaming.nix
+  ++ [
     ../apps/gametune.nix
     ./packages.nix
     ../apps/totalvim.nix
@@ -28,7 +36,9 @@
     ./system_services.nix
     ./docs.nix
     ./perf.nix
-    ./prewarm.nix
+  ]
+  ++ lib.optional isX86 ./prewarm.nix
+  ++ [
     ./overhead.nix
     ./wayland.nix
     ./sound.nix
@@ -49,7 +59,9 @@
     ../apps/mpv.nix
     ../apps/retroarch.nix
     ../services/drawingtablet.nix
-    ../apps/citrix.nix
+  ]
+  ++ lib.optional isX86 ../apps/citrix.nix
+  ++ [
     ../apps/dcspit.nix
     ../htpc
     ./capture.nix

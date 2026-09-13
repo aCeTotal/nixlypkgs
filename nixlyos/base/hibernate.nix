@@ -4,7 +4,10 @@ let
   hw = hwData.resources;
   nvidia = builtins.elem "nvidia" config.services.xserver.videoDrivers;
 in
-{
+# The whole mechanism depends on the HibernateLocation EFI variable, which
+# does not exist on extlinux/BIOS machines (ARM SBCs, legacy VMs) — those
+# would pay the multi-GiB swapfile without hibernate ever working.
+lib.mkIf (hwData.platform.bootMode == "efi") {
   # Lid close on battery = suspend-then-hibernate (idle.nix): S3 for the
   # first 2 h (instant wake), then an RTC alarm wakes the machine just long
   # enough to write the hibernation image and power off (0 W). If the

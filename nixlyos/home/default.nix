@@ -1,11 +1,14 @@
-{ config, pkgs, inputs, lib, nixlyUser, ... }:
+{ config, pkgs, inputs, lib, nixlyUser, hwData, ... }:
 
 {
 
-    imports = [
+    imports =
       # No user/steam.nix: its wildcard CompatToolMapping at priority 250 broke
       # the Steam Linux Runtime, and autoconfig.nix now owns all Steam config.
-      ./blender_setup.nix
+      # Blender_bin_lts is an x86-only binary bundle; referencing it on an ARM
+      # SBC fails the eval.
+      lib.optional (hwData.platform.arch == "x86_64") ./blender_setup.nix
+      ++ [
       # programs
       ./git.nix
       ./bash.nix

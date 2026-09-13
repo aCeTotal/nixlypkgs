@@ -27,6 +27,12 @@ slug() {
   printf '%s\n' "$s"
 }
 
+# Machine architecture: ARM SBCs (Raspberry Pi etc.) have no DMI and no PCI
+# GPU, so they are identified from the device tree further down.
+machine=$(uname -m)
+is_arm=0
+[[ $machine == aarch64 ]] && is_arm=1
+
 # CPU: vendor, cores, feature level.
 cpu_name="" cpu_flags="" nproc=0
 while IFS= read -r line; do
@@ -38,6 +44,8 @@ while IFS= read -r line; do
   esac
 done < /proc/cpuinfo
 (( nproc > 0 )) || nproc=1
+# ARM cpuinfo has no vendor_id; the arm cpu module is vendor-neutral.
+(( is_arm )) && cpu_name="arm"
 
 # x86-64 psABI level, used to pick conservative settings on old CPUs.
 has_flag() { [[ $cpu_flags == *" $1 "* ]]; }
@@ -238,6 +246,87 @@ candidates=()
 [[ -n $vendor_slug && -n $board   ]] && candidates+=("$vendor_slug-$(slug "$board")")
 [[ -n $vendor_slug && -n $family  ]] && candidates+=("$vendor_slug-$(slug "$family")")
 
+# ARM SBC: no DMI, so vendor/model come from the device tree. The compatible
+# list ("raspberrypi,5-model-bbrcm,bcm2712" NUL-separated) gives both the SoC
+# and nixos-hardware candidates: every entry slugged (vendor,board ->
+# vendor-board) matches nixos-hardware's naming for most boards, and the
+# Raspberry Pi SoC ids map to the raspberry-pi-N modules explicitly. Unknown
+# candidates cost nothing (the static loader filters on hasAttr), so a board
+# without a nixos-hardware module just falls back to the generic ARM setup.
+soc=""
+if (( is_arm )); then
+  dt_model="" dt_compat=""
+  [[ -r /proc/device-tree/model ]] && dt_model=$(tr -d '\0' < /proc/device-tree/model)
+  [[ -r /proc/device-tree/compatible ]] && dt_compat=$(tr '\0' ',' < /proc/device-tree/compatible)
+
+  case ",$dt_compat" in
+    *,brcm,bcm2712*) soc=rpi5;;
+    *,brcm,bcm2711*) soc=rpi4;;
+    *,brcm,bcm2837*) soc=rpi3;;
+    *,brcm,bcm2836*) soc=rpi2;;
+    *)               soc=generic-arm;;
+  esac
+
+  candidates=()
+  case $soc in
+    rpi5) candidates+=("raspberry-pi-5");;
+    rpi4) candidates+=("raspberry-pi-4");;
+    rpi3) candidates+=("raspberry-pi-3");;
+    rpi2) candidates+=("raspberry-pi-2");;
+  esac
+  IFS=',' read -r -a dt_entries <<< "$dt_compat"
+  for e in "${dt_entries[@]}"; do
+    [[ -n $e ]] && candidates+=("$(slug "$e")")
+  done
+
+  sys_vendor=${dt_compat%%,*}
+  vendor_slug=$(slug "$sys_vendor")
+  product=$dt_model
+fi
+
+# Virtualisation: a guest gets the matching hardware/virt module (guest
+# agent, virtio initrd, software-rendering failsafe). systemd-detect-virt is
+# always present on NixOS; the DMI fallback covers running from other distros.
+virt=none
+if command -v systemd-detect-virt >/dev/null 2>&1; then
+  v=$(systemd-detect-virt --vm 2>/dev/null || true)
+else
+  case "$sys_vendor $product" in
+    QEMU*)              v=qemu;;
+    *VMware*)           v=vmware;;
+    "innotek GmbH"*)    v=oracle;;
+    *Microsoft*Virtual*) v=microsoft;;
+    *Parallels*)        v=parallels;;
+    *)                  v=none;;
+  esac
+fi
+case "$v" in
+  qemu|kvm|bochs|amazon) virt=kvm;;
+  vmware)                virt=vmware;;
+  oracle)                virt=virtualbox;;
+  microsoft)             virt=hyperv;;
+  parallels)             virt=parallels;;
+  none|"")               virt=none;;
+  *)                     virt=kvm;;   # unknown hypervisor: virtio + llvmpipe is the safe guess
+esac
+
+# Bootloader mode: EFI machines keep systemd-boot; an SBC booted via
+# U-Boot/RPi firmware needs extlinux; a legacy-BIOS machine (typically a VM
+# with default firmware) needs grub on the disk that holds the root FS.
+boot_mode=efi boot_device=""
+if [[ ! -d /sys/firmware/efi ]]; then
+  if (( is_arm )); then
+    boot_mode=extlinux
+  else
+    boot_mode=bios
+    if command -v findmnt >/dev/null 2>&1 && command -v lsblk >/dev/null 2>&1; then
+      rootsrc=$(findmnt -no SOURCE / 2>/dev/null || true)
+      pk=$(lsblk -no PKNAME "${rootsrc%%\[*}" 2>/dev/null | head -n1 || true)
+      [[ -n $pk ]] && boot_device="/dev/$pk"
+    fi
+  fi
+fi
+
 # Register of explicit overrides, first match wins.
 # Line format: vendor-glob, product-glob, comma-separated modules, nvidia branch.
 reg_modules="" reg_branch=""
@@ -401,6 +490,18 @@ write_generated "$OUT/detected.nix" \
   nvidiaBranch = \"${nvidia_branch:-latest}\";
 }"
 
+# platform.nix: architecture, SBC SoC, boot path and hypervisor. mk-system
+# derives the nix system from arch and picks the virt guest module; boot.nix
+# picks systemd-boot versus extlinux from bootMode.
+write_generated "$OUT/platform.nix" \
+"{
+  arch = \"$( ((is_arm)) && echo aarch64 || echo x86_64 )\";
+  soc = $( [[ -n $soc ]] && printf '"%s"' "$soc" || echo null );
+  bootMode = \"$boot_mode\";
+  bootDevice = $( [[ -n $boot_device ]] && printf '"%s"' "$boot_device" || echo null );
+  virt = \"$virt\";
+}"
+
 # profile.nix: nixos-hardware module names and flags, mapped to modules by
 # the static loader in the nixlyos tree.
 cand_nix="" gen_nix=""
@@ -438,6 +539,7 @@ write_generated "$OUT/selection.nix" \
 case $cpu_name in
   intel) cpu_pretty="Intel";;
   amd)   cpu_pretty="AMD";;
+  arm)   cpu_pretty="ARM";;
   *)     cpu_pretty="Unknown";;
 esac
 gpu_names=()
@@ -451,4 +553,6 @@ line="$cpu_pretty CPU"
 for i in "${!gpu_names[@]}"; do
   (( i == 0 )) && line+=" + ${gpu_names[i]}" || line+=" | ${gpu_names[i]}"
 done
+[[ -n $soc ]] && line+=" ($soc)"
+[[ $virt != none ]] && line+=" [VM: $virt]"
 echo "ok: $line detected -> $OUT"

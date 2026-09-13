@@ -8,7 +8,9 @@ lib.mkIf (config.nixlyos.mode != "htpc") {
   # on each home-manager activation, so in-app tweaks last until the next rebuild.
 
   environment.systemPackages = with pkgs; [
-    (retroarch.withCores (cores: [
+    # availableOn: drop cores without an ARM build (parallel-n64) on SBCs
+    # instead of failing the eval.
+    (retroarch.withCores (cores: builtins.filter (lib.meta.availableOn stdenv.hostPlatform) [
       # N64
       cores.mupen64plus
       cores.parallel-n64
@@ -130,7 +132,7 @@ lib.mkIf (config.nixlyos.mode != "htpc") {
 
       # Online updater: lets the in-app updater fetch icon and thumbnail packs.
       network_on_demand_thumbnails = "true"
-      core_updater_buildbot_url = "https://buildbot.libretro.com/nightly/linux/x86_64/latest/"
+      core_updater_buildbot_url = "https://buildbot.libretro.com/nightly/linux/${pkgs.stdenv.hostPlatform.linuxArch}/latest/"
       core_updater_buildbot_assets_url = "https://buildbot.libretro.com/assets/"
       core_updater_auto_extract_archive = "true"
       core_updater_show_experimental_cores = "false"

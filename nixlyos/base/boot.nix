@@ -1,17 +1,39 @@
 { lib, pkgs, hwData, ... }:
 
+let
+  platform = hwData.platform;
+  isArm = platform.arch == "aarch64";
+  bootMode = platform.bootMode or "efi";
+in
 {
   boot = {
-    loader = {
-      efi = {
-        canTouchEfiVariables = true;
-        efiSysMountPoint = "/boot";
-      };
+    # EFI machines (all existing NixlyOS installs): systemd-boot, unchanged.
+    # extlinux: ARM SBC booted by U-Boot/RPi firmware; same values as the
+    # nixos-hardware raspberry-pi modules set, so nothing conflicts.
+    # bios: legacy-BIOS machine (typically a VM with default firmware); grub
+    # on the detected root disk, "nodev" (config only, no MBR write) when
+    # detection found none.
+    loader =
+      if bootMode == "extlinux" then {
+        generic-extlinux-compatible.enable = true;
+        grub.enable = false;
+        timeout = 0;
+      } else if bootMode == "bios" then {
+        grub.enable = true;
+        grub.device =
+          if (platform.bootDevice or null) != null then platform.bootDevice else "nodev";
+        grub.configurationLimit = 2;
+        timeout = 0;
+      } else {
+        efi = {
+          canTouchEfiVariables = true;
+          efiSysMountPoint = "/boot";
+        };
 
-      systemd-boot.enable = true;
-      systemd-boot.configurationLimit = 2;
-      timeout = 0;
-    };
+        systemd-boot.enable = true;
+        systemd-boot.configurationLimit = 2;
+        timeout = 0;
+      };
 
     # lanzaboote = {
     #   enable = true;
@@ -41,10 +63,19 @@
     # the flake's nvidia-nixlyos* cache packages are built from these same
     # attrs, and only identical expressions give cache-hitting store paths.
     kernelPackages =
-      if hwData.resources.cpuLevel >= 3
+      # ARM: mainline latest from cache.nixos.org. Full Raspberry Pi 4/5
+      # support without the hours-long on-device build the nixos-hardware
+      # rpi fork kernel would mean (this plain assignment outranks that
+      # module's mkDefault).
+      if isArm
+      then pkgs.linuxPackages_latest
+      else if hwData.resources.cpuLevel >= 3
       then pkgs.linuxPackages_nixlyos_v3
       else pkgs.linuxPackages_nixlyos;
 
+    # The !isArm optionals are x86-only knobs; on an ARM SBC 8250.nr_uarts=0
+    # would even kill the serial console, and the rest are unknown-parameter
+    # noise. Kept inline so the x86 param order (and thus the drv) is unchanged.
     kernelParams = [
       "quiet"
       "loglevel=3"
@@ -52,10 +83,16 @@
       "udev.log_priority=3"
       "systemd.show_status=false"
       "rd.systemd.show_status=false"
-      "8250.nr_uarts=0"
+    ]
+    ++ lib.optional (!isArm) "8250.nr_uarts=0"
+    ++ [
       "transparent_hugepage=always"
-      "random.trust_cpu=on"
+    ]
+    ++ lib.optional (!isArm) "random.trust_cpu=on"
+    ++ [
       "nowatchdog"
+    ]
+    ++ lib.optionals (!isArm) [
       "nmi_watchdog=0"
       # Worth 10-15 % CPU on older Intel; accepted on a single-user desktop.
       "mitigations=off"
@@ -67,12 +104,14 @@
       # battery budget. Was 0 / performance (gaming-latency biased).
       "nvme_core.default_ps_max_latency_us=100000"
       "pcie_aspm=powersave"
+    ]
+    ++ [
       # auditd is disabled, but the kernel audit path still taxes every
       # syscall until told otherwise.
       "audit=0"
     ];
 
-    blacklistedKernelModules = [ "8250_pci" ];
+    blacklistedKernelModules = lib.optionals (!isArm) [ "8250_pci" ];
 
     # Idle power: HD-audio codec autosuspend (steady idle draw otherwise), and
     # i915 panel self-refresh + framebuffer compression (panel/iGPU savings).
