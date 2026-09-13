@@ -219,10 +219,10 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
       };
     };
 
-    # Force every sink to 100 % unmuted once WirePlumber is live.
+    # Force every sink to 80 % unmuted once WirePlumber is live.
     systemd.user.services.htpc-audio-unmute =
       let
-        setAllSinks = pkgs.writeShellScript "htpc-audio-set-all-sinks-100" ''
+        setAllSinks = pkgs.writeShellScript "htpc-audio-set-all-sinks-80" ''
           set -u
           WPCTL=${pkgs.wireplumber}/bin/wpctl
           "$WPCTL" status | ${pkgs.gawk}/bin/awk '
@@ -233,12 +233,12 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
             }
           ' | while read -r id; do
             "$WPCTL" set-mute   "$id" 0   || true
-            "$WPCTL" set-volume "$id" 1.0 || true
+            "$WPCTL" set-volume "$id" 0.8 || true
           done
         '';
       in {
         Unit = {
-          Description = "HTPC: unmute all sinks and set volume to 100%";
+          Description = "HTPC: unmute all sinks and set volume to 80%";
           After = [ "graphical-session.target" "wireplumber.service" ];
           PartOf = [ "graphical-session.target" ];
         };
@@ -257,10 +257,10 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
         };
       };
 
-    # New sinks are forced to 100 % unmuted; existing ones are left alone.
+    # New sinks are forced to 80 % unmuted; existing ones are left alone.
     systemd.user.services.htpc-audio-watch = {
       Unit = {
-        Description = "HTPC: force new audio sinks to 100% unmuted";
+        Description = "HTPC: force new audio sinks to 80% unmuted";
         After = [ "htpc-audio-unmute.service" "pipewire.service" ];
         PartOf = [ "graphical-session.target" ];
       };
@@ -284,7 +284,7 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
                   }
                 ' | while read -r id; do
                   "$WPCTL" set-mute   "$id" 0   || true
-                  "$WPCTL" set-volume "$id" 1.0 || true
+                  "$WPCTL" set-volume "$id" 0.8 || true
                 done
                 ;;
             esac

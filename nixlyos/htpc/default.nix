@@ -7,6 +7,7 @@
   imports = [
     ./session.nix
     ./media.nix
+    ./audio.nix
     ./playlists.nix
     ./bios-sync.nix
     ./retroarch-4k.nix
