@@ -8,12 +8,14 @@
     ./session.nix
     ./media.nix
     ./audio.nix
+    ./hdmi-audio.nix
     ./playlists.nix
     ./bios-sync.nix
     ./retroarch-4k.nix
     ./gpu-perf.nix
     ./auto-update.nix
     ./prewarm.nix
+    ./rom-cache.nix
     ./controllers.nix
     ./geforce-now.nix
     ./qos.nix
