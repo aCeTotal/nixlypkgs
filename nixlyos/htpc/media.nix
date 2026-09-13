@@ -44,7 +44,12 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
       video_vsync = "true"
       video_adaptive_vsync = "true"
       video_hard_sync = "false"
-      video_max_swapchain_images = "3"
+      # 4 = RetroArch's maximum. One more image for Mesa's Wayland WSI
+      # to pipeline with: with 3 the compositor can hold enough of them
+      # that vkAcquireNextImage runs into its 100 ms timeout every
+      # frame, which pins the emulator at exactly 10 fps. Costs at most
+      # one frame of extra latency.
+      video_max_swapchain_images = "4"
       video_threaded = "true"
       video_frame_delay = "0"
       video_frame_delay_auto = "true"

@@ -32,13 +32,28 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
       (preset2d "mGBA")
       (preset2d "Gambatte")
       {
+        # PS2 fills the panel: aspect 24 = Full (stretch to viewport),
+        # which covers the whole 4K screen whether or not the running
+        # title has a widescreen patch. Per-core so 2D systems keep
+        # their correct pixel aspect. Core library name = LRPS2.
+        "retroarch/config/LRPS2/LRPS2.cfg".text = ''
+          aspect_ratio_index = "24"
+        '';
+      }
+      {
         "retroarch/retroarch-core-options.cfg".text = ''
           # N64: paraLLEl-RDP on Vulkan, 8x internal (~1920p, VI scales to 4K).
           mupen64plus-rdp-plugin = "parallel"
           mupen64plus-parallel-rdp-upscaling = "8x"
 
-          # PS2: 6x internal resolution = ~2160p.
-          pcsx2_upscale_multiplier = "6x Native (~2160p/4K)"
+          # PS2: native internal resolution. Upscaling forces PCSX2's
+          # texture cache to invalidate and read back scaled render
+          # targets every frame — latency-bound stalls the GPU counters
+          # don't show (Arc sat at 4 % busy while the game ran 9 fps).
+          # Widescreen hint renders true 16:9 where a patch exists, so
+          # the picture fills the 4K panel instead of pillarboxing.
+          pcsx2_upscale_multiplier = "1x Native (PS2)"
+          pcsx2_widescreen_hint = "enabled"
 
           # GC/Wii: 6x EFB scale = 3840x3168. Drop to "4x Native
           # (2560x2112) for 1440p" if a Wii title stutters.
