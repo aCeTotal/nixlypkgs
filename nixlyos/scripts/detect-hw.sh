@@ -264,7 +264,7 @@ if (( is_arm )); then
     *,brcm,bcm2711*) soc=rpi4;;
     *,brcm,bcm2837*) soc=rpi3;;
     *,brcm,bcm2836*) soc=rpi2;;
-    *)               soc=generic-arm;;
+    *)               soc="generic-arm";;
   esac
 
   candidates=()
