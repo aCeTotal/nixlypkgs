@@ -42,8 +42,35 @@ let
     [ -n "$rt" ] && warm "/var/lib/flatpak/runtime/$rt"
     exit 0
   '';
+  # Boot-time warm of ONLY the app that is on screen at boot (the
+  # supervisor starts RetroArch): its closure demand-pages off a cold
+  # disk for the first minutes otherwise, since the full prewarm timer
+  # deliberately waits 3 min.  Sequential vmtouch readahead of exactly
+  # these paths is strictly faster than the app faulting them in one
+  # page at a time, so this cannot make the cold start worse.
+  firstWarmScript = pkgs.writeShellScript "htpc-prewarm-first" ''
+    set -u
+    VMTOUCH=${pkgs.vmtouch}/bin/vmtouch
+    while IFS= read -r p; do
+      [ -e "$p" ] && "$VMTOUCH" -t -q -m 512M "$p" 2>/dev/null || true
+    done < ${closure}
+    exit 0
+  '';
 in
 lib.mkIf (config.nixlyos.mode == "htpc") {
+
+  systemd.services.htpc-prewarm-first = {
+    description = "Warm the boot HTPC app (RetroArch/nixlymedia) at startup";
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${firstWarmScript}";
+      Nice = 19;
+      CPUSchedulingPolicy = "idle";
+      IOSchedulingClass = "idle";
+      MemoryHigh = "8G";
+    };
+  };
 
   systemd.services.htpc-prewarm = {
     description = "Keep HTPC apps (RetroArch/nixlymedia/GeForce NOW) in RAM";

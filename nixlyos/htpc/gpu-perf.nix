@@ -17,13 +17,25 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
       Type = "oneshot";
       ExecStart = pkgs.writeShellScript "htpc-gpu-clocks" ''
         set -u
-        for card in /sys/class/drm/card*; do
-          [ -e "$card/gt_RP0_freq_mhz" ] || continue
-          rp0=$(cat "$card/gt_RP0_freq_mhz")
-          # max first: min may never exceed max.
-          echo "$rp0" > "$card/gt_max_freq_mhz"   || true
-          echo "$rp0" > "$card/gt_boost_freq_mhz" || true
-          echo "$rp0" > "$card/gt_min_freq_mhz"   || true
+        # Wait for i915 to expose the freq knobs: as a plain oneshot this
+        # raced module init on fast boots — the glob matched nothing, the
+        # service "succeeded", and the GPU spent the whole session on
+        # SLPC's utilisation scaling (idle clocks in menus/light emu
+        # loads = the fresh-boot slowness, until a heavy app happened to
+        # ramp it).
+        pinned=0
+        for _ in $(seq 60); do
+          for card in /sys/class/drm/card*; do
+            [ -e "$card/gt_RP0_freq_mhz" ] || continue
+            rp0=$(cat "$card/gt_RP0_freq_mhz")
+            # max first: min may never exceed max.
+            echo "$rp0" > "$card/gt_max_freq_mhz"   || true
+            echo "$rp0" > "$card/gt_boost_freq_mhz" || true
+            echo "$rp0" > "$card/gt_min_freq_mhz"   || true
+            pinned=1
+          done
+          [ "$pinned" = 1 ] && break
+          sleep 1
         done
         # Display-class PCI devices (0x03xxxx): keep runtime PM off.
         for dev in /sys/bus/pci/devices/*; do

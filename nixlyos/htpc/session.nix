@@ -12,6 +12,24 @@ let
   htpcApp = pkgs.writeShellScriptBin "htpc-app" ''
     state="''${XDG_RUNTIME_DIR:-/tmp}/htpc-app"
     [ -s "$state" ] || printf retroarch > "$state"
+
+    # Boot readiness gate: htpc-app autostarts in parallel with
+    # xwayland-satellite and the TV's HDMI mode-set.  The FIRST app
+    # launched before X/:0 answers (or before the output is configured)
+    # picks a different video path than every later launch — RetroArch
+    # auto-selects its video driver from what it finds at startup, so
+    # the boot instance ran degraded until it was toggled away and back.
+    # Wait until xrandr sees a connected output (proves both satellite
+    # and the compositor output are up), bounded so a broken X never
+    # blocks the session.
+    export DISPLAY="''${DISPLAY:-:0}"
+    for _ in $(seq 30); do
+      if ${pkgs.xorg.xrandr}/bin/xrandr 2>/dev/null | grep -q ' connected'; then
+        break
+      fi
+      sleep 0.5
+    done
+
     while :; do
       app=$(cat "$state")
       case "$app" in
