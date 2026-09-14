@@ -61,16 +61,14 @@ in
   };
 
   boot = {
-    initrd.kernelModules = [ "nvidia" "nvidia_uvm" "nvidia_modeset" "nvidia_drm" ];
-    # Cmdline, not extraModprobeConfig: the nvidia modules load in the initrd.
+    # Stage 2: i915 drives early KMS.
+    kernelModules = [ "nvidia" "nvidia_uvm" "nvidia_modeset" "nvidia_drm" ];
     kernelParams = [
       "nvidia_drm.modeset=1"
       "nvidia_drm.fbdev=1"
-      # PAT for GPU mappings, faster CPU-to-GPU uploads.
-      "nvidia.NVreg_UsePageAttributeTable=1"
-      # Skip zeroing new GPU memory; accepted on a single-user desktop.
+      # Skip zeroing new GPU memory.
       "nvidia.NVreg_InitializeSystemMemoryAllocations=0"
-      # No-op on Turing, correct if the GPU is ever swapped.
+      # No-op before Ampere vbios.
       "nvidia.NVreg_EnableResizableBar=1"
     ];
   };

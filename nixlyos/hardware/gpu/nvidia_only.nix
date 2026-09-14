@@ -34,15 +34,14 @@
   };
 
   boot = {
-    initrd.kernelModules = [ "nvidia" "nvidia_uvm" "nvidia_modeset" "nvidia_drm" ];
+    # Stage 2: loads before display-manager.
+    kernelModules = [ "nvidia" "nvidia_uvm" "nvidia_modeset" "nvidia_drm" ];
     kernelParams = [
       "nvidia_drm.modeset=1"
       "nvidia_drm.fbdev=1"
-      # PAT for GPU mappings, faster CPU-to-GPU uploads.
-      "nvidia.NVreg_UsePageAttributeTable=1"
-      # Skip zeroing new GPU memory; accepted on a single-user desktop.
+      # Skip zeroing new GPU memory.
       "nvidia.NVreg_InitializeSystemMemoryAllocations=0"
-      # ReBAR needs an Ampere+ vbios, otherwise a no-op.
+      # No-op before Ampere vbios.
       "nvidia.NVreg_EnableResizableBar=1"
     ];
   };

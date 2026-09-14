@@ -55,18 +55,19 @@ in
   };
 
   boot = {
-    initrd.kernelModules = [ "nvidia" "nvidia_uvm" "nvidia_modeset" ]
+    # Stage 2: loads before display-manager.
+    kernelModules = [ "nvidia" "nvidia_uvm" "nvidia_modeset" ]
       ++ lib.optional gbmOk "nvidia_drm";
 
     kernelParams =
-      # PAT for GPU mappings; present in every branch here.
+      # PAT supported by every branch.
       [ "nvidia.NVreg_UsePageAttributeTable=1" ]
       ++ lib.optionals gbmOk [
         "nvidia_drm.modeset=1"
         "nvidia_drm.fbdev=1"
-        # ReBAR arrived in 465; unknown params break modprobe in the initrd.
+        # ReBAR arrived in 465.
         "nvidia.NVreg_EnableResizableBar=1"
-        # Skip zeroing new GPU memory; accepted on a single-user desktop.
+        # Skip zeroing new GPU memory.
         "nvidia.NVreg_InitializeSystemMemoryAllocations=0"
       ];
   };

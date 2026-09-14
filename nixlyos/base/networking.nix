@@ -5,10 +5,13 @@
   ...
 }:
 
+let
+  # nixlyos kernel: bbr3 builtin.
+  hasBbr3 = lib.hasInfix "nixlyos" config.boot.kernelPackages.kernel.name;
+in
 {
   # Networking and VPN kernel modules.
-  boot.kernelModules = [
-    "tcp_bbr"
+  boot.kernelModules = lib.optional (!hasBbr3) "tcp_bbr" ++ [
     # IPsec/IKEv2
     "af_key"
     "ah4"
@@ -44,7 +47,7 @@
 
     # BBR plus cake: least bufferbloat, highest throughput.
     "net.core.default_qdisc" = "cake";
-    "net.ipv4.tcp_congestion_control" = "bbr";
+    "net.ipv4.tcp_congestion_control" = if hasBbr3 then "bbr3" else "bbr";
 
     # TCP path/feature tuning.
     "net.ipv4.tcp_mtu_probing" = 1;

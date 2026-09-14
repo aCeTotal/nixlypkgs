@@ -35,12 +35,11 @@
   };
 
   boot = {
-    initrd.kernelModules = [ "nvidia" "nvidia_uvm" "nvidia_modeset" "nvidia_drm" ];
+    # Stage 2: loads before display-manager.
+    kernelModules = [ "nvidia" "nvidia_uvm" "nvidia_modeset" "nvidia_drm" ];
     kernelParams = [
       "nvidia_drm.modeset=1"
       "nvidia_drm.fbdev=1"
-      # PAT for GPU mappings, faster CPU-to-GPU uploads.
-      "nvidia.NVreg_UsePageAttributeTable=1"
     ];
   };
 
