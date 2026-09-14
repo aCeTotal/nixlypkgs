@@ -96,21 +96,54 @@ in
     }
   ];
 
-  # Automounts trigger on access.
+  # Automounts trigger on access. TimeoutIdleSec=0: never tear down an idle
+  # mount — an unmount drops the page cache, attribute cache and the eight
+  # TCP connections, and the next access pays the whole mount latency again.
+  # The automount layer is kept only so a down server never blocks boot and
+  # access after an outage re-mounts lazily.
   systemd.automounts = [
     {
       where = "/mnt/nfs/Bigdisk1";
       automountConfig = {
-        TimeoutIdleSec = "2min";
+        TimeoutIdleSec = 0;
       };
       wantedBy = [ "multi-user.target" ];
     }
     {
       where = "/mnt/nfs/Bigdisk2";
       automountConfig = {
-        TimeoutIdleSec = "2min";
+        TimeoutIdleSec = 0;
       };
       wantedBy = [ "multi-user.target" ];
     }
   ];
+
+  # Keep the mounts permanently alive and warm: statfs every 30 s mounts
+  # them at boot (the automount alone waits for first access), keeps the
+  # TCP connections hot so they never idle out, and re-mounts after a
+  # server outage. statfs is a real FSSTAT RPC (not attribute-cached), so
+  # each tick genuinely exercises the wire. Per-disk in background so one
+  # unreachable export never delays the other; soft,timeo=5,retrans=2
+  # bounds each attempt to a few seconds.
+  systemd.services.nfs-keepalive = {
+    description = "Keep NFS mounts mounted and their connections warm";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = pkgs.writeShellScript "nfs-keepalive" ''
+        for d in /mnt/nfs/*; do
+          ${pkgs.coreutils}/bin/stat -f "$d" > /dev/null 2>&1 &
+        done
+        wait
+        exit 0
+      '';
+    };
+  };
+  systemd.timers.nfs-keepalive = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "15s";
+      OnUnitActiveSec = "30s";
+      AccuracySec = "5s";
+    };
+  };
 }

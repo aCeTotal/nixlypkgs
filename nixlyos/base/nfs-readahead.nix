@@ -14,9 +14,9 @@
 # ends up waiting on requests it will not use. 1 MB, not "as big as
 # possible".
 #
-# The automount tears the mount down after 2 min idle (base/nfs.nix) and the
-# fresh bdi comes back with the kernel default, so this is bound to the
-# mount units and re-runs on every mount.
+# The mounts are kept up permanently now (base/nfs.nix), but a re-mount
+# after a server outage still comes back with a fresh bdi at the kernel
+# default, so this stays bound to the mount units and re-runs on every mount.
 { pkgs, ... }:
 
 {

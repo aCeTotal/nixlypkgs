@@ -27,9 +27,6 @@
     "i915.force_probe=5690,5691,5692,5693,5694,5695,5696,5697,56a0,56a1,56a2,56a3,56a5,56a6"
     "xe.force_probe=!5690,!5691,!5692,!5693,!5694,!5695,!5696,!5697,!56a0,!56a1,!56a2,!56a3,!56a5,!56a6"
 
-    # Runtime PM off on the HDA codec; the HDMI sink otherwise vanishes after idle.
-    "snd_hda_intel.power_save=0"
-
     # Keep KMS state across boot stages so slow TVs are not renegotiated into a fallback mode.
     "i915.fastboot=1"
   ];
@@ -39,9 +36,13 @@
   # GuC/HuC blobs live in linux-firmware; explicit so an Intel-only host is self-contained.
   hardware.enableRedistributableFirmware = true;
 
-  # Same power-save off at module level, which wins on reload.
-  boot.extraModprobeConfig = ''
-    options snd_hda_intel power_save=0 power_save_controller=N
+  # Keep runtime PM off for the DG2 HDA controller and its HDMI codec only: with
+  # PM on, the HDMI sink vanishes after idle. Scoped here instead of the old global
+  # snd_hda_intel power_save=0, which also kept the PCH codec (ALC1220) in D0 so
+  # the S/PDIF carrier never dropped and the amp hissed on idle.
+  services.udev.extraRules = ''
+    ACTION=="add", SUBSYSTEM=="pci", ATTR{class}=="0x040300", ATTR{vendor}=="0x8086", ATTR{device}=="0x4f9?", ATTR{power/control}="on"
+    ACTION=="add", SUBSYSTEM=="hdaudio", ATTRS{vendor}=="0x8086", ATTRS{device}=="0x4f9?", ATTR{power/control}="on"
   '';
 
   environment.systemPackages = with pkgs; [

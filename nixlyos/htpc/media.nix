@@ -51,10 +51,7 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
         done
       '';
 
-      # Unmute every sink and set it to 80 %, EXCEPT the silence-gate null sink
-      # (audio-gate.nix), which stays at 100 % so it can be the single volume
-      # control — its monitor is post-volume and feeds a loopback to the
-      # display sink, so attenuating both would halve the volume twice.
+      # Unmute every sink and set it to 80 %.
       setAllSinks = pkgs.writeShellScript "htpc-audio-set-all-sinks-80" ''
         set -u
         WPCTL=${pkgs.wireplumber}/bin/wpctl
@@ -64,8 +61,6 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
           insinks && match($0, /[0-9]+\./) { print substr($0, RSTART, RLENGTH-1) }
         ' | while read -r id; do
           "$WPCTL" set-mute "$id" 0 || true
-          "$WPCTL" inspect "$id" 2>/dev/null \
-            | ${pkgs.gnugrep}/bin/grep -q 'node.name = "nixly_gate"' && continue
           "$WPCTL" set-volume "$id" 0.8 || true
         done
       '';

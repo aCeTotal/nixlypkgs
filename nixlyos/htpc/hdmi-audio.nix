@@ -14,6 +14,14 @@
 { pkgs, lib, config, ... }:
 
 lib.mkIf (config.nixlyos.mode == "htpc") {
+  # No silent-stream keepalive: with it on, the codec feeds the TV a
+  # permanent silent stream + audio infoframe, so the sink's idle
+  # suspend never pulls the infoframe and the TV/eARC receiver never
+  # mutes when nothing is playing.
+  boot.extraModprobeConfig = ''
+    options snd_hda_codec_intelhdmi enable_silent_stream=N
+  '';
+
   systemd.services.htpc-hdmi-audio = {
     description = "Force a modeset so i915 enables the HDMI/DP audio codec";
     wantedBy = [ "multi-user.target" ];

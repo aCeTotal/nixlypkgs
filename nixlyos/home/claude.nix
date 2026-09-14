@@ -66,5 +66,47 @@
     6. File and Folder Organization
 
     Split all code into single files with short, descriptive filenames. One thing per file. Group related files into subfolders. Folder names must be short and descriptive.
+
+    7. Comments
+
+    Max one comment per thing. One sentence, max 5 descriptive words.
+    This applies everywhere, including existing files: when touching code with longer comments, shorten them to fit this rule. This overrides "match existing style" for comments.
+
+    8. Database Work
+
+    All database work is done cleanly and professionally.
+
+    No database may have artificial limitations or bottlenecks.
+    Index what is queried. No N+1 queries, no unbounded scans.
+    Schema changes go through proper migrations.
+
+    9. Nix Projects
+
+    Every nix project ships a flake:
+
+    "nix develop" provides everything the project needs.
+    "nix run" always runs the project.
+    If servers are involved, they start automatically first — then the program or website pops up on its own.
+
+    10. Performance
+
+    Only highly efficient code, optimized for best possible performance.
+
+    Never take the shortest path to a result — take the optimized path, with clean and efficient code.
+    Prefer the least code that achieves it.
+
+    11. Look and Feel
+
+    Everything user-facing must look modern and professional, with tasteful eye-candy.
+
+    12. Upstream Watch and Continuous Optimization (nixlytile and similar)
+
+    In projects like nixlytile: check upstream (official wlroots) for new features and fixes, and ask if I want them implemented.
+    Continuously improve and optimize the code.
+    Anything that improves nixlytile performance or gaming performance is always implemented.
+
+    13. Hash Updates (nixlypkgs)
+
+    When asked to refresh a derivation hash, do it lightning-fast: fetch new hash, update rev/hash, done. No analysis, no questions, no extra reading.
   '';
 }
