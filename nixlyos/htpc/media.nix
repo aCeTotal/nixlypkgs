@@ -31,7 +31,45 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
   # The Intel Arc VAAPI/Vulkan stack lives in hardware/gpu/intel.nix.
 
   # Home-manager configs for the user
-  home-manager.users.${nixlyUser} = { pkgs, ... }: {
+  home-manager.users.${nixlyUser} = { pkgs, ... }:
+    let
+      # Unmute anything currently muted — sinks, sources (mics) and streams
+      # alike. wpctl's "[MUTED]" tag is not localized, so this survives a
+      # Norwegian locale where pactl would print "Dempet". Only touching
+      # already-muted nodes keeps our own set-mute from looping against the
+      # pactl-subscribe watcher below.
+      unmuteMuted = pkgs.writeShellScript "htpc-audio-unmute-muted" ''
+        set -u
+        WPCTL=${pkgs.wireplumber}/bin/wpctl
+        "$WPCTL" status | ${pkgs.gawk}/bin/awk '
+          /Sinks:/   {on=1} /Sources:/ {on=1} /Streams:/ {on=1}
+          /Filters:/ {on=0} /Video/    {on=0} /Settings/ {on=0}
+          on && match($0, /[0-9]+\./) { print substr($0, RSTART, RLENGTH-1) }
+        ' | sort -u | while read -r id; do
+          "$WPCTL" get-volume "$id" 2>/dev/null \
+            | ${pkgs.gnugrep}/bin/grep -q MUTED && "$WPCTL" set-mute "$id" 0 || true
+        done
+      '';
+
+      # Unmute every sink and set it to 80 %, EXCEPT the silence-gate null sink
+      # (audio-gate.nix), which stays at 100 % so it can be the single volume
+      # control — its monitor is post-volume and feeds a loopback to the
+      # display sink, so attenuating both would halve the volume twice.
+      setAllSinks = pkgs.writeShellScript "htpc-audio-set-all-sinks-80" ''
+        set -u
+        WPCTL=${pkgs.wireplumber}/bin/wpctl
+        "$WPCTL" status | ${pkgs.gawk}/bin/awk '
+          /Sinks:/ {insinks=1; next}
+          /Sources:/ {insinks=0}
+          insinks && match($0, /[0-9]+\./) { print substr($0, RSTART, RLENGTH-1) }
+        ' | while read -r id; do
+          "$WPCTL" set-mute "$id" 0 || true
+          "$WPCTL" inspect "$id" 2>/dev/null \
+            | ${pkgs.gnugrep}/bin/grep -q 'node.name = "nixly_gate"' && continue
+          "$WPCTL" set-volume "$id" 0.8 || true
+        done
+      '';
+    in {
 
     # RetroArch: XMB menu, 4K fullscreen Vulkan on Intel Arc, pipewire audio.
     xdg.configFile."retroarch/retroarch.cfg".text = ''
@@ -228,47 +266,36 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
     };
 
     # Force every sink to 80 % unmuted once WirePlumber is live.
-    systemd.user.services.htpc-audio-unmute =
-      let
-        setAllSinks = pkgs.writeShellScript "htpc-audio-set-all-sinks-80" ''
+    systemd.user.services.htpc-audio-unmute = {
+      Unit = {
+        Description = "HTPC: unmute all sinks and set volume to 80%";
+        After = [ "graphical-session.target" "wireplumber.service" ];
+        PartOf = [ "graphical-session.target" ];
+      };
+      Install.WantedBy = [ "graphical-session.target" ];
+      Service = {
+        Type = "oneshot";
+        ExecStart = pkgs.writeShellScript "htpc-audio-unmute" ''
           set -u
           WPCTL=${pkgs.wireplumber}/bin/wpctl
-          "$WPCTL" status | ${pkgs.gawk}/bin/awk '
-            /Sinks:/ {insinks=1; next}
-            /Sources:/ {insinks=0}
-            insinks && match($0, /[0-9]+\./) {
-              id=substr($0, RSTART, RLENGTH-1); print id
-            }
-          ' | while read -r id; do
-            "$WPCTL" set-mute   "$id" 0   || true
-            "$WPCTL" set-volume "$id" 0.8 || true
+          for _ in 1 2 3 4 5; do
+            "$WPCTL" get-volume @DEFAULT_AUDIO_SINK@ >/dev/null 2>&1 && break
+            sleep 1
           done
+          ${setAllSinks}
+          # ...and unmute every source (mic) and stream too — nothing muted.
+          ${unmuteMuted}
         '';
-      in {
-        Unit = {
-          Description = "HTPC: unmute all sinks and set volume to 80%";
-          After = [ "graphical-session.target" "wireplumber.service" ];
-          PartOf = [ "graphical-session.target" ];
-        };
-        Install.WantedBy = [ "graphical-session.target" ];
-        Service = {
-          Type = "oneshot";
-          ExecStart = pkgs.writeShellScript "htpc-audio-unmute" ''
-            set -u
-            WPCTL=${pkgs.wireplumber}/bin/wpctl
-            for _ in 1 2 3 4 5; do
-              "$WPCTL" get-volume @DEFAULT_AUDIO_SINK@ >/dev/null 2>&1 && break
-              sleep 1
-            done
-            ${setAllSinks}
-          '';
-        };
       };
+    };
 
     # New sinks are forced to 80 % unmuted; existing ones are left alone.
+    # New/changed sources (mics) and streams are unmuted as well — apps like
+    # nixlymedia mute their own PipeWire stream node right after creating it
+    # (its egui volume control), which the sink-only sweep never caught.
     systemd.user.services.htpc-audio-watch = {
       Unit = {
-        Description = "HTPC: force new audio sinks to 80% unmuted";
+        Description = "HTPC: keep sinks/sources/streams unmuted";
         After = [ "htpc-audio-unmute.service" "pipewire.service" ];
         PartOf = [ "graphical-session.target" ];
       };
@@ -282,21 +309,15 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
         RestartSec = 2;
         ExecStart = pkgs.writeShellScript "htpc-audio-watch" ''
           set -u
-          WPCTL=${pkgs.wireplumber}/bin/wpctl
           ${pkgs.pulseaudio}/bin/pactl subscribe 2>/dev/null | while IFS= read -r line; do
             case "$line" in
               "Event 'new' on sink "*)
                 sleep 0.3
-                "$WPCTL" status | ${pkgs.gawk}/bin/awk '
-                  /Sinks:/ {insinks=1; next}
-                  /Sources:/ {insinks=0}
-                  insinks && match($0, /[0-9]+\./) {
-                    id=substr($0, RSTART, RLENGTH-1); print id
-                  }
-                ' | while read -r id; do
-                  "$WPCTL" set-mute   "$id" 0   || true
-                  "$WPCTL" set-volume "$id" 0.8 || true
-                done
+                ${setAllSinks}
+                ;;
+              "Event 'new' on sink-input "*|"Event 'change' on sink-input "*|"Event 'new' on source "*)
+                sleep 0.2
+                ${unmuteMuted}
                 ;;
             esac
           done

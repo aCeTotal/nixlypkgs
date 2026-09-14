@@ -9,6 +9,7 @@
     ./media.nix
     ./audio.nix
     ./hdmi-audio.nix
+    ./audio-gate.nix
     ./playlists.nix
     ./bios-sync.nix
     ./retroarch-4k.nix
