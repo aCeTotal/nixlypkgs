@@ -42,12 +42,13 @@ let
     [ -n "$rt" ] && warm "/var/lib/flatpak/runtime/$rt"
     exit 0
   '';
-  # Boot-time warm of ONLY the app that is on screen at boot (the
-  # supervisor starts RetroArch): its closure demand-pages off a cold
-  # disk for the first minutes otherwise, since the full prewarm timer
-  # deliberately waits 3 min.  Sequential vmtouch readahead of exactly
-  # these paths is strictly faster than the app faulting them in one
-  # page at a time, so this cannot make the cold start worse.
+  # Same sweep, but off the boot critical path. Measured 2026-09-15: this
+  # was the single longest unit at boot (11.9 s, systemd-analyze blame) and
+  # it ran while the supervisor cold-started RetroArch on a SATA SSD — it
+  # cannot warm an app that is already launching, it can only take disk
+  # bandwidth from it. Waiting until the boot app is up means its own reads
+  # win the queue, and the sweep still lands long before anything else is
+  # selected from the guide.
   firstWarmScript = pkgs.writeShellScript "htpc-prewarm-first" ''
     set -u
     VMTOUCH=${pkgs.vmtouch}/bin/vmtouch
@@ -59,9 +60,17 @@ let
 in
 lib.mkIf (config.nixlyos.mode == "htpc") {
 
+  systemd.timers.htpc-prewarm-first = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      # The boot app owns the disk until it is on screen (measured ~2 s).
+      OnBootSec = "20s";
+      Persistent = false;
+    };
+  };
+
   systemd.services.htpc-prewarm-first = {
     description = "Warm the boot HTPC app (RetroArch/nixlymedia) at startup";
-    wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "oneshot";
       ExecStart = "${firstWarmScript}";

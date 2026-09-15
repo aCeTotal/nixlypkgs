@@ -13,6 +13,7 @@
     ./bios-sync.nix
     ./retroarch-4k.nix
     ./gpu-perf.nix
+    ./gpu-clock.nix
     ./auto-update.nix
     ./prewarm.nix
     ./rom-cache.nix

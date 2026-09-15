@@ -19,6 +19,10 @@ in
     ./boot.nix
     ./SDDM.nix
     ./networking.nix
+    ./shape.nix
+    ./speedtest.nix
+    ./nic-latency.nix
+    ./dns-ecs.nix
     ./tailscale.nix
     ./ssh_gate.nix
     ./nix.nix

@@ -167,11 +167,32 @@ in
     log-level "info"
 
     ${if isHtpc then ''
-    // HTPC-modus i kompositoren: statusbar alltid skjult, EN app om
-    // gangen paa ett workspace. Guide-menyen (htpc_guide.c) kjoerer
-    // "htpc-switch <app>" som dreper appen som kjoerer og lar
-    // htpc-supervisoren (htpc/session.nix) starte den valgte.
+    // HTPC-modus i kompositoren: statusbar alltid skjult.
     htpc true
+
+    // Fast app-grid. Maalt 2026-09-15: drep-og-start kostet 9,2 s for
+    // Steam. Med ett workspace per app mapper de inaktive skjult
+    // (client_target_ws -> hidden_fs), wsfreeze SIGSTOPper dem og
+    // htpc_ws_refresh_fx tiner den som skal vises — bytte blir et
+    // workspace-bytte i stedet for en kaldstart.
+    // nixlymedia foerst: workspace 1 er aktivt ved oppstart, og en
+    // boot-app plassert lenger ute ville mappet SKJULT paa svart skjerm.
+    window-rule {
+      app-id "nixlymedia"
+      workspace 1
+    }
+    window-rule {
+      app-id "RetroArch"
+      workspace 2
+    }
+    window-rule {
+      app-id "GeForceNOW"
+      workspace 3
+    }
+    window-rule {
+      app-id "steam"
+      workspace 4
+    }
 
     // HTPC autostart: htpc-app-supervisoren starter RetroArch ved boot
     // og holder den valgte appen i live — krasjer den startes samme app

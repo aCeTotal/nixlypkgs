@@ -1,18 +1,92 @@
-# HTPC session: ONE app at a time on one workspace. nixlytile starts
-# htpc-app from its autostart list (home/nixlytile.nix); it launches the
-# current app — RetroArch at boot — and relaunches it on crash or user
-# quit. The guide menu (nixlytile htpc_guide.c) runs `htpc-switch <app>`,
-# which records the new app and kills the running one's process group;
-# the supervisor then starts the new app immediately.
+# HTPC session: one app per workspace, all of them resident. The guide
+# menu (nixlytile htpc_guide.c) switches workspace instead of killing —
+# measured 2026-09-15, a Steam restart cost 9.2 s against one frame for a
+# switch. It calls `htpc-start <app>` only when that workspace is empty
+# (first use or after a crash), and `htpc-stop geforcenow` when leaving
+# GeForce NOW, which cannot survive being frozen: NVIDIA drops the session.
+#
+# Each app gets its own supervisor loop, so quitting one brings it back
+# exactly like the old single-app supervisor did.
 { pkgs, lib, config, ... }:
 
 let
   shortcutsCleanup = pkgs.callPackage ./steam-shortcuts.nix { };
 
-  htpcApp = pkgs.writeShellScriptBin "htpc-app" ''
-    state="''${XDG_RUNTIME_DIR:-/tmp}/htpc-app"
-    [ -s "$state" ] || printf retroarch > "$state"
+  htpcStart = pkgs.writeShellScriptBin "htpc-start" ''
+    # Re-exec of self under setsid: the supervisor loop for one app, in
+    # its own process group so htpc-stop can take the whole tree.
+    if [ "$1" = __loop ]; then
+      app="$2"
+      loop=1
+    else
+      app="$1"
+      loop=0
+    fi
 
+    launch() {
+      case "$app" in
+        steam)
+          # Steam only reads shortcuts.vdf at startup: drop the old
+          # per-app shortcuts before every launch so they cannot start
+          # second instances. Best-effort, never blocks Big Picture.
+          ${shortcutsCleanup}/bin/htpc-steam-shortcuts-cleanup 2>&1 \
+            | ${pkgs.systemd}/bin/systemd-cat -t htpc-steam-shortcuts || true
+          steam -tenfoot
+          ;;
+        geforcenow) nixly-gfn ;;
+        nixlymedia) nixlymedia ;;
+        *)          retroarch ;;
+      esac
+    }
+
+    if [ "$loop" = 1 ]; then
+      while :; do
+        launch
+        # A boot-looping app must not spin.
+        sleep 0.3
+      done
+    fi
+
+    run="''${XDG_RUNTIME_DIR:-/tmp}"
+    pidfile="$run/htpc-app.$app.pid"
+
+    # Already supervised: the guide only wants it on screen.
+    if [ -s "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+      exit 0
+    fi
+
+    # RP1 for nixlymedia/GFN (VRM noise on eARC), full range for games.
+    htpc-gpu-clock "$app" 2>/dev/null || true
+
+    setsid "$0" __loop "$app" >/dev/null 2>&1 &
+    printf %s $! > "$pidfile"
+  '';
+
+  htpcStop = pkgs.writeShellScriptBin "htpc-stop" ''
+    app="$1"
+    run="''${XDG_RUNTIME_DIR:-/tmp}"
+    pidfile="$run/htpc-app.$app.pid"
+    pid=$(cat "$pidfile" 2>/dev/null || true)
+    rm -f "$pidfile"
+
+    if [ "$app" = geforcenow ]; then
+      # bwrap children may sit outside the group; flatpak knows them.
+      ${pkgs.flatpak}/bin/flatpak kill com.nvidia.geforcenow 2>/dev/null || true
+      ${pkgs.systemd}/bin/systemctl stop --no-block gfn-focus.service 2>/dev/null || true
+    fi
+
+    [ -n "$pid" ] || exit 0
+    kill -TERM -- -"$pid" 2>/dev/null || true
+    i=0
+    while [ "$i" -lt 6 ]; do
+      kill -0 -- -"$pid" 2>/dev/null || exit 0
+      sleep 0.05
+      i=$((i + 1))
+    done
+    kill -KILL -- -"$pid" 2>/dev/null || true
+  '';
+
+  htpcApp = pkgs.writeShellScriptBin "htpc-app" ''
     # Boot readiness gate: htpc-app autostarts in parallel with
     # xwayland-satellite and the TV's HDMI mode-set.  The FIRST app
     # launched before X/:0 answers (or before the output is configured)
@@ -24,70 +98,15 @@ let
     # blocks the session.
     export DISPLAY="''${DISPLAY:-:0}"
     for _ in $(seq 30); do
-      if ${pkgs.xorg.xrandr}/bin/xrandr 2>/dev/null | grep -q ' connected'; then
+      if ${pkgs.xrandr}/bin/xrandr 2>/dev/null | grep -q ' connected'; then
         break
       fi
       sleep 0.5
     done
 
-    while :; do
-      app=$(cat "$state")
-      case "$app" in
-        steam)
-          # Steam only reads shortcuts.vdf at startup: drop the old
-          # per-app shortcuts before every launch so they cannot start
-          # second instances. Best-effort, never blocks Big Picture.
-          ${shortcutsCleanup}/bin/htpc-steam-shortcuts-cleanup 2>&1 \
-            | ${pkgs.systemd}/bin/systemd-cat -t htpc-steam-shortcuts || true
-          setsid steam -tenfoot &
-          ;;
-        geforcenow)
-          # --password-store=basic: the CEF client otherwise asks the
-          # keyring for a master password on a box that autologs in
-          # without one.
-          setsid flatpak run com.nvidia.geforcenow --password-store=basic &
-          ;;
-        nixlymedia)
-          setsid nixlymedia &
-          ;;
-        *)
-          setsid retroarch &
-          ;;
-      esac
-      printf %s $! > "$state.pid"
-      wait $!
-      rm -f "$state.pid"
-      # Crash/quit of the same app: brief pause so a boot-looping app
-      # cannot spin. A switch (state changed) starts instantly.
-      [ "$(cat "$state")" = "$app" ] && sleep 0.3
-    done
-  '';
-
-  # htpc-switch <steam|retroarch|geforcenow|nixlymedia> — called by the
-  # nixlytile guide menu. setsid above made the app a session/process
-  # group leader, so killing -pid takes its whole tree; the supervisor's
-  # wait returns the moment the leader dies and the new app starts while
-  # stragglers get the delayed KILL.
-  htpcSwitch = pkgs.writeShellScriptBin "htpc-switch" ''
-    app="$1"
-    state="''${XDG_RUNTIME_DIR:-/tmp}/htpc-app"
-    cur=$(cat "$state" 2>/dev/null || true)
-    [ "$app" = "$cur" ] && exit 0
-    printf %s "$app" > "$state"
-    pid=$(cat "$state.pid" 2>/dev/null || true)
-    [ -n "$pid" ] || exit 0
-    kill -TERM -- -"$pid" 2>/dev/null || true
-    if [ "$cur" = geforcenow ]; then
-      # bwrap children may sit outside the group; flatpak knows them.
-      ${pkgs.flatpak}/bin/flatpak kill com.nvidia.geforcenow 2>/dev/null || true
-    fi
-    for _ in $(seq 20); do
-      kill -0 -- -"$pid" 2>/dev/null || exit 0
-      sleep 0.1
-    done
-    kill -KILL -- -"$pid" 2>/dev/null || true
+    htpc-start nixlymedia
   '';
 in
 lib.mkIf (config.nixlyos.mode == "htpc") {
-  environment.systemPackages = [ htpcApp htpcSwitch shortcutsCleanup ];
+  environment.systemPackages = [ htpcApp htpcStart htpcStop shortcutsCleanup ];
 }

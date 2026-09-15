@@ -128,6 +128,15 @@ in
     dhcpV4Config.RouteMetric = 100;
     linkConfig.RequiredForOnline = "no";
   };
+  # Phone tethering that shows up as usb0 (RNDIS keeps the kernel name, so
+  # the wired match never sees it). Metric 200: better than WiFi, still
+  # behind real ethernet when both are plugged in.
+  systemd.network.networks."42-usb" = {
+    matchConfig.Name = "usb*";
+    networkConfig.DHCP = "yes";
+    dhcpV4Config.RouteMetric = 200;
+    linkConfig.RequiredForOnline = "no";
+  };
   systemd.network.networks."45-wifi" = {
     matchConfig.Name = "wl*";
     networkConfig.DHCP = "yes";
