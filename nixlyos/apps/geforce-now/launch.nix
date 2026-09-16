@@ -25,7 +25,26 @@ let
     trap 'kill -TERM $pid 2>/dev/null' TERM INT
     wait $pid
   '';
+
+  # Icon resolves from the flatpak's exported hicolor theme.
+  desktopItem = pkgs.makeDesktopItem {
+    name = "com.nvidia.geforcenow";
+    desktopName = "NVIDIA GeForce NOW";
+    genericName = "NVIDIA GeForce NOW";
+    exec = "${gfn}/bin/nixly-gfn";
+    icon = "com.nvidia.geforcenow";
+    categories = [ "Network" "Game" ];
+  };
 in
 {
   environment.systemPackages = [ gfn ];
+
+  # XDG_DATA_HOME outranks flatpak's exports dir, so the same desktop ID
+  # replaces NVIDIA's entry instead of adding a second one next to it.
+  home-manager.sharedModules = [
+    {
+      xdg.dataFile."applications/com.nvidia.geforcenow.desktop".source =
+        "${desktopItem}/share/applications/com.nvidia.geforcenow.desktop";
+    }
+  ];
 }
