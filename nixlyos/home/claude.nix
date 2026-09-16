@@ -99,13 +99,7 @@
 
     Everything user-facing must look modern and professional, with tasteful eye-candy.
 
-    12. Upstream Watch and Continuous Optimization (nixlytile and similar)
-
-    In projects like nixlytile: check upstream (official wlroots) for new features and fixes, and ask if I want them implemented.
-    Continuously improve and optimize the code.
-    Anything that improves nixlytile performance or gaming performance is always implemented.
-
-    13. Hash Updates (nixlypkgs)
+    12. Hash Updates (nixlypkgs)
 
     When asked to refresh a derivation hash, do it lightning-fast: fetch new hash, update rev/hash, done. No analysis, no questions, no extra reading.
   '';
