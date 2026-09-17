@@ -6,11 +6,12 @@
   boot = {
     kernelModules = [ "kvm-amd" ];
     # mkBefore must wrap the whole list; `set ++ list` is a type error.
-    kernelParams = lib.mkBefore ([
+    # AMD-Vi always on, never iommu=pt: passthrough mode would leave host
+    # devices doing untranslated DMA, which is the attack it exists to stop.
+    kernelParams = lib.mkBefore [
       "amd_pstate=active"
-    ] ++ (lib.optionals (config.virtualisation.libvirtd.enable or false) [
-      "amd_iommu=on" "iommu=pt"
-    ]));
+      "amd_iommu=on"
+    ];
   };
   environment.systemPackages = with pkgs; [
     lm_sensors

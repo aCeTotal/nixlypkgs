@@ -82,6 +82,27 @@ in
       ExecStart = "${pkgs.nixlytile}/bin/nixly-fand";
       Restart = "on-failure";
       RestartSec = 5;
+      # It only writes EC registers and sysfs hwmon; nothing else.
+      NoNewPrivileges = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      PrivateTmp = true;
+      PrivateNetwork = true;
+      ProtectHostname = true;
+      ProtectKernelModules = true;
+      ProtectKernelLogs = true;
+      ProtectControlGroups = true;
+      RestrictAddressFamilies = [ "AF_UNIX" ];
+      RestrictNamespaces = true;
+      RestrictRealtime = true;
+      LockPersonality = true;
+      MemoryDenyWriteExecute = true;
+      SystemCallArchitectures = "native";
+      SystemCallFilter = [ "@system-service" "@raw-io" ];
+      CapabilityBoundingSet = [ "CAP_SYS_RAWIO" "CAP_DAC_OVERRIDE" ];
+      # /sys and /dev stay writable under strict; only /run needs listing
+      # (the control socket). NVML lives behind /run/opengl-driver.
+      ReadWritePaths = [ "/run" ];
     };
   };
 

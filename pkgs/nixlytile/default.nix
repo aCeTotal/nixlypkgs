@@ -75,8 +75,8 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "e767dea1b1ff2cf17fb65b51b172b5e5ca65d790";
-    hash = "sha256-xp5ju46DnpShB5yvFBANigbe/wxTuz5+XVMW4u6ZVbQ=";
+    rev = "c6d004b00b3c56071a865d145181889f7210c42c";
+    hash = "sha256-rbA8lY+5UbLBimxhtj+DBN862KTvO5Q+to9EHmBcn+g=";
   };
 
   wlrootsLocal = stdenv.mkDerivation {
@@ -145,7 +145,7 @@ in
 
 stdenv.mkDerivation {
   pname = "nixlytile";
-  version = "2026.09.13";
+  version = "2026.09.17";
 
   passthru.providedSessions = [ "nixlytile" ];
 
@@ -218,7 +218,8 @@ stdenv.mkDerivation {
     wrapProgram $out/bin/nixlytile \
       --set WLR_RENDERER vulkan \
       --prefix PATH : ${lib.makeBinPath runtimeDeps} \
-      --prefix XDG_DATA_DIRS : "${nixlycc}/share:${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share:${shared-mime-info}/share"
+      --prefix XDG_DATA_DIRS : "${nixlycc}/share:${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share:${shared-mime-info}/share" \
+      --run 'l="''${XDG_STATE_HOME:-$HOME/.local/state}/nixlytile"; mkdir -p "$l" && { [ -s "$l/session.log" ] && mv -f "$l/session.log" "$l/session.log.1"; exec 2>>"$l/session.log"; echo "=== session start $(date -Is) ===" >&2; }'
 
     runHook postInstall
   '';

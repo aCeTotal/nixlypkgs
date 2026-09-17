@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ lib, nixlyUser, ... }:
 
 {
   services.openssh = {
@@ -7,12 +7,21 @@
     openFirewall = false;
     settings = {
       PermitRootLogin = "no";
-      PasswordAuthentication = true;
+      # Keys only: brute force has nothing to guess. Tailscale SSH does its
+      # own tailnet auth and never reaches sshd, so the usual login is
+      # unaffected; a LAN login needs a key in authorizedKeys.
+      PasswordAuthentication = false;
+      PermitEmptyPasswords = false;
       KbdInteractiveAuthentication = false;
       PubkeyAuthentication = true;
+      AuthenticationMethods = "publickey";
+      AllowUsers = [ nixlyUser ];
       X11Forwarding = false;
       AllowTcpForwarding = "yes";
-      AllowAgentForwarding = "yes";
+      # A compromised remote host must not be able to use local keys.
+      AllowAgentForwarding = "no";
+      MaxSessions = 4;
+      MaxStartups = "3:50:10";
       UseDns = false;
       ClientAliveInterval = 30;
       ClientAliveCountMax = 3;
@@ -44,7 +53,7 @@
         ServerAliveInterval 20
         ServerAliveCountMax 3
         AddKeysToAgent yes
-        ForwardAgent yes
+        ForwardAgent no
     '';
   };
 }

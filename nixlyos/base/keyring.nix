@@ -1,5 +1,9 @@
-{ pkgs, ... }:
+{ pkgs, lib, config, ... }:
 
+# HTPC only. A desktop login goes through PAM with a real password, so the
+# keyring unlocks normally and stays encrypted; blanking it there would
+# hand every secret to anything that can read the file.
+#
 # Autologin means PAM never sees a password, so pam_gnome_keyring can
 # never unlock an encrypted login keyring — that is exactly the
 # "Authentication required: the login keyring did not get unlocked"
@@ -40,7 +44,7 @@ EOF
   '';
 in
 {
-  systemd.user.services.nixly-keyring-sanitize = {
+  systemd.user.services.nixly-keyring-sanitize = lib.mkIf (config.nixlyos.mode == "htpc") {
     description = "Blank login keyring so autologin never prompts";
     wantedBy = [ "default.target" ];
     before = [ "gnome-keyring-daemon.service" ];

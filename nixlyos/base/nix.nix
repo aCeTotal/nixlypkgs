@@ -165,6 +165,11 @@ in
     MemoryHigh = "80%";
     MemoryMax = "90%";
     Delegate = "memory cpu io";
+    # Builds inherit this: under pressure the kernel takes a build, never
+    # the session. Weights keep the desktop first for CPU and disk too.
+    OOMScoreAdjust = 500;
+    CPUWeight = 20;
+    IOWeight = 20;
   };
 
   # fstrim: same reasoning, async at night and never replayed at boot.

@@ -24,6 +24,28 @@
       ExecStart = "${pkgs.nixlytile}/bin/nixly-diskd";
       Restart = "on-failure";
       RestartSec = 5;
+      # Root with mount and mkfs powers, so fence off everything it does
+      # not need. No PrivateMounts: the mounts it makes must be visible
+      # to the rest of the system.
+      NoNewPrivileges = true;
+      ProtectSystem = "full";
+      ProtectHome = false;
+      ProtectHostname = true;
+      ProtectKernelModules = true;
+      ProtectKernelLogs = true;
+      ProtectControlGroups = true;
+      PrivateNetwork = true;
+      RestrictAddressFamilies = [ "AF_UNIX" ];
+      RestrictNamespaces = true;
+      RestrictRealtime = true;
+      LockPersonality = true;
+      MemoryDenyWriteExecute = true;
+      SystemCallArchitectures = "native";
+      SystemCallFilter = [ "@system-service" "@mount" "@raw-io" ];
+      CapabilityBoundingSet = [
+        "CAP_SYS_ADMIN" "CAP_CHOWN" "CAP_FOWNER" "CAP_DAC_OVERRIDE"
+        "CAP_MKNOD" "CAP_SYS_RAWIO"
+      ];
     };
   };
 }

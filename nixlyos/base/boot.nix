@@ -32,14 +32,10 @@ in
 
         systemd-boot.enable = true;
         systemd-boot.configurationLimit = 2;
+        # Without this the boot menu edits kernel params: init=/bin/sh is root.
+        systemd-boot.editor = false;
         timeout = 0;
       };
-
-    # lanzaboote = {
-    #   enable = true;
-    #   pkiBundle = "/var/lib/sbctl";
-    #   configurationLimit = 1;
-    # };
 
     initrd.systemd.enable = true;
     # Preload NVMe and btrfs so the root FS comes up without a device wait.
@@ -94,8 +90,12 @@ in
     ]
     ++ lib.optionals (!isArm) [
       "nmi_watchdog=0"
-      # Worth 10-15 % CPU on older Intel; accepted on a single-user desktop.
-      "mitigations=off"
+      # All CPU mitigations on (kernel default). SMT stays enabled: nosmt
+      # costs far more than the cross-thread leaks are worth here.
+      "mitigations=auto"
+      # IOMMU strict unmap: a hot-plugged PCIe/Thunderbolt device never sees
+      # stale DMA mappings. Costs a TLB flush per unmap.
+      "iommu.strict=1"
       "split_lock_detect=off"
       # Battery target (95 Wh / 10 h ≈ 9.5 W) needs these idle savings:
       # NVMe Autonomous Power State Transition (deep drive sleep after ~100 ms
@@ -106,9 +106,9 @@ in
       "pcie_aspm=powersave"
     ]
     ++ [
-      # auditd is disabled, but the kernel audit path still taxes every
-      # syscall until told otherwise.
-      "audit=0"
+      # audit.nix watches the persistence points; the rules are path-based,
+      # so the syscall path stays untaxed until one of them is touched.
+      "audit=1"
     ];
 
     blacklistedKernelModules = lib.optionals (!isArm) [ "8250_pci" ];
@@ -121,19 +121,12 @@ in
     '';
   };
 
-  # sbctl manages the Secure Boot keys.
-  environment.systemPackages = [ pkgs.sbctl ];
-
-  security.tpm2 = {
-    enable = true;
-    pkcs11.enable = true;
-    tctiEnvironment.enable = true;
-  };
-
-  # No sbctl status check on activation while lanzaboote is disabled.
+  # Secure Boot keys, lanzaboote and TPM live in secureboot.nix.
 
   boot.kernel.sysctl = {
-    "kernel.sysrq" = 1;
+    # sync + remount-ro + reboot only: emergency SUB works, memory dumps and
+    # process kills from the keyboard do not.
+    "kernel.sysrq" = 176;
     "kernel.kptr_restrict" = 2;
     "kernel.dmesg_restrict" = 1;
     "kernel.unprivileged_bpf_disabled" = 1;

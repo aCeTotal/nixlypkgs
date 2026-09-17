@@ -26,7 +26,7 @@ in
     ./tailscale.nix
     ./ssh_gate.nix
     ./nix.nix
-    # ./lockscreen.nix  # disabled: no auto-lock/lockscreen
+    ./lockscreen.nix
     ./nfs.nix
     ./nfs-readahead.nix
     ./ssh.nix
@@ -51,6 +51,11 @@ in
     ./zram.nix
     ./hibernate.nix
     ./security.nix
+    ./attack-surface.nix
+    ./secureboot.nix
+    ./snapshots.nix
+    ./audit.nix
+    ./usb
     ./keyring.nix
     ./power.nix
     ./diskd.nix
