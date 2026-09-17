@@ -25,6 +25,7 @@
       ./caveman.nix
       ./claude.nix
       ./discord_rpc.nix
+      ./vulnix.nix
     ];
 
     home = {

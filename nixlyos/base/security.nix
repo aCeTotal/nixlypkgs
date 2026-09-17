@@ -17,6 +17,7 @@
 
   # Audit rules live in audit.nix.
 
+  # Profiles live in sandbox.nix.
   programs.firejail.enable = true;
 
   # USB device policy and the pre-mount scanner live in usb/.

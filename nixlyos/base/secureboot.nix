@@ -7,8 +7,6 @@ let
     name = "nixly-secureboot";
     runtimeInputs = with pkgs; [ sbctl systemd coreutils gnugrep ];
     text = ''
-      pki=${cfg.pkiBundle}
-
       status() {
         sbctl status || true
         echo

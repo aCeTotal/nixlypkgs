@@ -51,6 +51,7 @@ in
     ./zram.nix
     ./hibernate.nix
     ./security.nix
+    ./sandbox.nix
     ./attack-surface.nix
     ./secureboot.nix
     ./snapshots.nix
