@@ -56,7 +56,9 @@ in
     ./secureboot.nix
     ./snapshots.nix
     ./audit.nix
+    ./scanbox
     ./usb
+    ./downloads
     ./keyring.nix
     ./power.nix
     ./diskd.nix

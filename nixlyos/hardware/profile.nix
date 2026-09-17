@@ -18,7 +18,8 @@ lib.warnIf (missing != [ ])
   imports =
     map (n: hw.${n}) generic'
     ++ lib.optional (model != null) hw.${model}
-    ++ lib.optional p.msiEc ./msi-ec.nix;
+    ++ lib.optional p.msiEc ./msi-ec.nix
+    ++ [ ./fans.nix ];
 
   # common-pc-laptop enables TLP when power-profiles-daemon is off, and TLP
   # would then own the governor and override perf.nix, so it is kept off.

@@ -15,11 +15,16 @@ clamd_linger=600
 label=$(blkid -o value -s LABEL "$node" 2>/dev/null || true)
 [ -n "$label" ] || label=$dev
 size=$(lsblk -bdno SIZE "$node" 2>/dev/null || echo 0)
+# The card belongs to the device, not the partition.
+disk=$(lsblk -no PKNAME "$node" 2>/dev/null | head -1)
+[ -n "$disk" ] || disk=$dev
 
 files=0
 done_n=0
 threats=0
+unscannable=0
 scripts=0
+hits=0
 found=""
 
 # One atomic rewrite per update; a half-written state never reaches the reader.
@@ -28,11 +33,13 @@ put() {
   {
     echo "state=$1"
     echo "dev=$dev"
+    echo "disk=$disk"
     echo "label=$label"
     echo "size=$size"
     echo "files=$files"
     echo "done=$done_n"
     echo "threats=$threats"
+    echo "unscannable=$unscannable"
     echo "scripts=$scripts"
     echo "found=$found"
     echo "msg=${2:-}"
@@ -48,6 +55,8 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$dir/mnt"
+# Root-only: the state files stay readable, the device does not.
+chmod 700 "$dir/mnt"
 put detected
 
 # Newest signatures without paying for them: the refresh runs alongside the
@@ -87,14 +96,39 @@ put scanning
 batch=()
 flush() {
   [ ${#batch[@]} -gt 0 ] || return 0
-  local out hit
+  local out line hit sig inner rc
   # --multiscan spreads the batch over clamd's threads; --fdpass hands it
   # open descriptors so it never re-opens a path under our feet.
-  out=$(clamdscan --fdpass --multiscan --no-summary --infected "${batch[@]}" 2>/dev/null)
+  # A detection makes clamdscan exit nonzero; that is the normal case here.
+  out=$(clamdscan --fdpass --multiscan --no-summary --infected "${batch[@]}" 2>/dev/null) || true
   if [ -n "$out" ]; then
-    threats=$(( threats + $(grep -c 'FOUND$' <<<"$out") ))
-    hit=$(grep -m1 'FOUND$' <<<"$out" | sed 's/.*: //; s/ FOUND$//')
-    [ -n "$found" ] || found=$hit
+    # A file the engine had to give up on counts separately from a detection.
+    while IFS= read -r line; do
+      hit=${line%%: *}
+      sig=${line##*: }
+      sig=${sig% FOUND}
+      if [ "${sig#*Limits.Exceeded}" != "$sig" ]; then
+        # Too big to read in one piece: unpack it and scan the parts.
+        if inner=$(nixly-scan-expand "$hit"); then
+          rc=0
+        else
+          rc=$?
+        fi
+        case $rc in
+          0) continue ;;
+          1) sig="contains $(head -1 <<<"$inner")"
+             threats=$(( threats + 1 )) ;;
+          *) sig="too large to scan, could not be unpacked"
+             unscannable=$(( unscannable + 1 )) ;;
+        esac
+      else
+        threats=$(( threats + 1 ))
+      fi
+      if [ "$hits" -lt 5 ]; then
+        found="${found:+$found|}$(basename "$hit") — $sig"
+        hits=$(( hits + 1 ))
+      fi
+    done < <(grep 'FOUND$' <<<"$out")
   fi
   done_n=$(( done_n + ${#batch[@]} ))
   batch=()
@@ -116,13 +150,15 @@ rmdir "$mnt" 2>/dev/null
 
 if [ "$threats" -gt 0 ]; then
   put infected "$threats threat(s)"
+elif [ "$unscannable" -gt 0 ]; then
+  put unverified "$unscannable file(s) past the scan limits"
 else
   put clean
 fi
 
 # Keep the loaded signature set around: plugging in a second stick within the
 # next few minutes then scans instantly instead of reloading ~1 GB.
-systemctl stop nixly-clamd-stop.timer 2>/dev/null
+systemctl stop nixly-clamd-stop.timer 2>/dev/null || true
 systemd-run --quiet --unit=nixly-clamd-stop --on-active=$clamd_linger \
-  systemctl stop clamav-daemon.service 2>/dev/null
+  systemctl stop clamav-daemon.service 2>/dev/null || true
 true

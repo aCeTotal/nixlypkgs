@@ -1,8 +1,7 @@
 # HTPC slimming: background consumers that only make sense on a desktop
 # are off, so RAM/CPU/IO stay with Steam, RetroArch, GeForce NOW and
 # nixlymedia. Session-side trimming (no appd, no clipman watchers, no
-# mcontrolcenter, no activity-prewarm) lives in home/nixlytile.nix's HTPC
-# autostart list.
+# activity-prewarm) lives in home/nixlytile.nix's HTPC autostart list.
 { lib, config, ... }:
 
 lib.mkIf (config.nixlyos.mode == "htpc") {

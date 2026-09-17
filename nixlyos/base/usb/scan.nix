@@ -1,11 +1,14 @@
 { pkgs, lib, hwData, ... }:
 
 let
+  expand = pkgs.callPackage ../scanbox/expand.nix { };
+
   scan = pkgs.writeShellApplication {
     name = "nixly-usbscan";
     runtimeInputs = with pkgs; [
       clamav
       coreutils
+      expand
       findutils
       gnugrep
       gnused

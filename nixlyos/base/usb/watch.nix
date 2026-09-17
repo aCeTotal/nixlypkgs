@@ -5,6 +5,8 @@ let
     name = "nixly-usbwatch";
     runtimeInputs = with pkgs; [
       coreutils
+      gnugrep
+      gnused
       inotify-tools
       libnotify
       nautilus

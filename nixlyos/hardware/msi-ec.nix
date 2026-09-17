@@ -3,7 +3,6 @@
 let
   kp = config.boot.kernelPackages;
   msiEcPkg = if kp ? msi-ec then kp.msi-ec else if kp ? msi_ec then kp.msi_ec else null;
-  mccPkg = if pkgs ? mcontrolcenter then pkgs.mcontrolcenter else null;
 
   # Every EC firmware version msi-ec has a config for, extracted from the driver
   # source at build time.
@@ -60,9 +59,6 @@ in
   boot.extraModprobeConfig = lib.mkAfter ''
     options ec_sys write_support=1
   '';
-
-  # Install mcontrolcenter if available.
-  environment.systemPackages = lib.mkAfter (lib.optional (mccPkg != null) mccPkg);
 
   # Make the msi-ec sysfs nodes writable from userspace.
   services.udev.extraRules = ''

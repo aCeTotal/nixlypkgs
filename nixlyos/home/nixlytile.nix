@@ -54,8 +54,6 @@ in
     jq
     nixly_launcher
   ];
-  # mcontrolcenter is installed system-wide in hardware/msi-ec.nix; the GUI
-  # autostarts from config.kdl below, the only mechanism that works here.
 
   home.file."Pictures/wallpapers/beach.jpg".source = ../wallpapers/beach.jpg;
 
@@ -232,7 +230,6 @@ in
     autostart "sh -c 'sleep 8; exec nice -n 19 appd'"
     // Steam startes ALDRI automatisk — hverken ved innlogging eller av
     // nixly-activity-prewarm. Brukeren starter den selv.
-    autostart "mcontrolcenter"
     ''}
   '';
 }

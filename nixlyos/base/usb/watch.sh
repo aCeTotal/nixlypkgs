@@ -1,33 +1,60 @@
 #!/usr/bin/env bash
-# Session side of the USB scanner: turns /run/nixly-usbscan/*.state into one
-# slide-in card per device with a live progress bar, then mounts a clean
-# device and opens it in the file manager.
+# Session side of the USB scanner: one card per device, never per partition.
+# Isolated while it is being verified, then mounted or blocked.
 set -uo pipefail
 
 dir=/run/nixly-usbscan
-declare -A nid
-declare -A mounted
+declare -A nid card mounted opened
 
-bar() {
-  local pct=$1 filled=$(( $1 * 16 / 100 )) i out=""
-  for (( i = 0; i < 16; i++ )); do
-    if [ "$i" -lt "$filled" ]; then out+="█"; else out+="░"; fi
-  done
-  printf '%s %d%%' "$out" "$pct"
-}
+# Fields of the state file last read by load().
+f_state="" f_dev="" f_disk="" f_label="" f_threats=0 f_unscannable=0
+f_found="" f_msg=""
 
-human() {
-  numfmt --to=iec --suffix=B "${1:-0}" 2>/dev/null || echo "?"
+load() {
+  local k v
+  f_state=""; f_dev=""; f_disk=""; f_label=""; f_threats=0; f_unscannable=0
+  f_found=""; f_msg=""
+  [ -r "$1" ] || return 1
+  while IFS='=' read -r k v; do
+    case $k in
+      state) f_state=$v ;; dev) f_dev=$v ;; disk) f_disk=$v ;;
+      label) f_label=$v ;; threats) f_threats=$v ;;
+      unscannable) f_unscannable=$v ;;
+      found) f_found=$v ;; msg) f_msg=$v ;;
+    esac
+  done <"$1"
+  [ -n "$f_dev" ] || return 1
+  [ -n "$f_disk" ] || f_disk=$f_dev
+  return 0
 }
 
 toast() {
-  local dev=$1 hold=$2 summary=$3 body=$4
-  if [ -n "${nid[$dev]:-}" ]; then
-    notify-send -a NixlyOS -t "$hold" --replace-id="${nid[$dev]}" \
-      "$summary" "$body"
+  local d=$1 urgency=$2 hold=$3 summary=$4 body=$5
+  if [ -n "${nid[$d]:-}" ]; then
+    notify-send -a NixlyOS -u "$urgency" -t "$hold" \
+      --replace-id="${nid[$d]}" "$summary" "$body"
   else
-    nid[$dev]=$(notify-send -a NixlyOS -t "$hold" -p "$summary" "$body")
+    nid[$d]=$(notify-send -a NixlyOS -u "$urgency" -t "$hold" -p "$summary" "$body")
   fi
+}
+
+# How many filesystems udev will hand to the scanner for this device.
+expected() {
+  local d=$1 n=0 name fs
+  while read -r name fs; do
+    [ "$name" != "$d" ] || continue
+    case $fs in ""|crypto_LUKS|LVM2_member) continue ;; esac
+    n=$(( n + 1 ))
+  done < <(lsblk -rno NAME,FSTYPE "/dev/$d" 2>/dev/null)
+  [ "$n" -gt 0 ] || n=1
+  echo "$n"
+}
+
+name_of() {
+  local d=$1 model
+  model=$(lsblk -dno MODEL "/dev/$d" 2>/dev/null | sed 's/ *$//')
+  [ -n "$model" ] || model="USB device"
+  echo "$model"
 }
 
 # Hand the device to nixly-diskd, which mounts it nosuid,nodev,noexec.
@@ -41,66 +68,118 @@ do_mount() {
     | socat -t2 - UNIX-CONNECT:/run/nixly-diskd.sock >/dev/null 2>&1
   mountpoint -q "$target" || return 1
   mounted[$dev]=$target
-  nautilus --new-window "$target" >/dev/null 2>&1 &
   return 0
 }
 
 render() {
-  local f=$1 state="" dev="" label="" size=0 files=0 done_n=0 threats=0
-  local scripts=0 found="" msg="" k v pct=0
+  local d=$1 f i seen=0 pending=0 threats=0 unscannable=0
+  local findings="" blocked="" extra=""
+  local clean=() labels=() name target
 
-  [ -r "$f" ] || return 0
-  while IFS='=' read -r k v; do
-    case $k in
-      state) state=$v ;; dev) dev=$v ;; label) label=$v ;;
-      size) size=$v ;; files) files=$v ;; done) done_n=$v ;;
-      threats) threats=$v ;; scripts) scripts=$v ;; found) found=$v ;;
-      msg) msg=$v ;;
+  for f in "$dir"/*.state; do
+    load "$f" || continue
+    [ "$f_disk" = "$d" ] || continue
+    seen=$(( seen + 1 ))
+    case $f_state in
+      detected|updating|starting|counting|scanning)
+        pending=1 ;;
+      infected)
+        threats=$(( threats + f_threats ))
+        findings="${findings:+$findings|}$f_found" ;;
+      unverified)
+        unscannable=$(( unscannable + f_unscannable ))
+        findings="${findings:+$findings|}$f_found" ;;
+      clean)
+        clean+=("$f_dev"); labels+=("$f_label") ;;
+      *)
+        blocked=${f_msg:-could not be read} ;;
     esac
-  done <"$f"
-  [ -n "$dev" ] || return 0
-  [ "$files" -gt 0 ] && pct=$(( done_n * 100 / files ))
+  done
 
-  case $state in
-    detected|updating|starting)
-      toast "$dev" 30000 "USB oppdaget · $label" \
-        "$(human "$size") — gjør klar skanning" ;;
-    counting)
-      toast "$dev" 30000 "Skanner $label" "Teller filer…" ;;
-    scanning)
-      toast "$dev" 60000 "Skanner $label" \
-        "$(bar "$pct")
-$done_n av $files filer" ;;
-    clean)
-      local note="$files filer skannet, ingen trusler"
-      [ "$scripts" -gt 0 ] && note="$note
-$scripts script/snarvei funnet (kan ikke kjøres herfra)"
-      if do_mount "$dev" "$label"; then
-        toast "$dev" 6000 "USB klar · $label" "$note"
-      else
-        toast "$dev" 8000 "USB ren · $label" \
-          "Skanning OK, men montering feilet"
-      fi ;;
-    infected)
-      toast "$dev" 60000 "⚠ Trusler på $label" \
-        "$threats funn — ikke montert
-${found:-ukjent signatur}" ;;
-    unreadable|unavailable)
-      toast "$dev" 10000 "USB ikke skannet · $label" "${msg:-ukjent feil}" ;;
-  esac
+  [ "$seen" -gt 0 ] || return 0
+  name=$(name_of "$d")
+
+  # Scanning is silent: the device is simply not there yet.
+  if [ "$pending" = 1 ] || [ "$seen" -lt "$(expected "$d")" ]; then
+    card[$d]=scanning
+    return 0
+  fi
+
+  if [ "$threats" -gt 0 ]; then
+    card[$d]=blocked
+    # Only the first five findings are carried in the state file.
+    [ "$threats" -gt 5 ] && extra=$(( threats - 5 ))
+    toast "$d" critical 0 "USB device blocked" \
+      "$name was not mounted — $threats threat(s) found
+
+$(tr '|' '\n' <<<"$findings")${extra:+
++$extra more}"
+    return 0
+  fi
+
+  if [ "$unscannable" -gt 0 ]; then
+    card[$d]=blocked
+    toast "$d" critical 0 "USB device blocked" \
+      "$name was not mounted — $unscannable file(s) could not be scanned
+
+$(tr '|' '\n' <<<"$findings")"
+    return 0
+  fi
+
+  if [ -n "$blocked" ]; then
+    card[$d]=blocked
+    toast "$d" critical 0 "USB device blocked" \
+      "$name could not be verified — $blocked"
+    return 0
+  fi
+
+  [ "${card[$d]:-}" = verified ] && return 0
+  target=""
+  for i in "${!clean[@]}"; do
+    if do_mount "${clean[$i]}" "${labels[$i]}"; then
+      target=${target:-${mounted[${clean[$i]}]}}
+    fi
+  done
+  card[$d]=verified
+  # A clean device just opens, without announcing itself.
+  if [ -n "$target" ]; then
+    if [ -z "${opened[$d]:-}" ]; then
+      opened[$d]=1
+      nautilus --new-window "$target" >/dev/null 2>&1 &
+    fi
+  else
+    toast "$d" critical 0 "USB device blocked" \
+      "$name passed the scan but could not be mounted"
+  fi
 }
 
-for f in "$dir"/*.state; do
-  [ -e "$f" ] && render "$f"
-done
+disks() {
+  local f
+  for f in "$dir"/*.state; do
+    load "$f" && echo "$f_disk"
+  done | sort -u
+  return 0
+}
 
-inotifywait -q -m -e close_write,moved_to,delete --format '%e %f' "$dir" \
-| while read -r ev file; do
+# A card dies with the last state file of its device.
+forget() {
+  local live d
+  live=$(disks)
+  for d in "${!card[@]}"; do
+    grep -qx "$d" <<<"$live" && continue
+    unset 'card[$d]' 'nid[$d]' 'opened[$d]'
+  done
+}
+
+sweep() {
+  local d
+  for d in $(disks); do render "$d"; done
+}
+
+sweep
+
+while read -r ev file; do
   case $file in *.state) ;; *) continue ;; esac
-  case $ev in
-    DELETE)
-      dev=${file%.state}
-      unset 'nid[$dev]' 'mounted[$dev]' ;;
-    *) render "$dir/$file" ;;
-  esac
-done
+  case $ev in *DELETE*) forget; continue ;; esac
+  sweep
+done < <(inotifywait -q -m -e close_write,moved_to,delete --format '%e %f' "$dir")
