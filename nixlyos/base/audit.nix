@@ -1,9 +1,10 @@
-{ nixlyUser, ... }:
+{ lib, config, nixlyUser, ... }:
 
 let
   home = "/home/${nixlyUser}";
 in
-{
+# Off on HTPC: the audit hooks tax the syscall path for no couch-box gain.
+lib.mkIf (config.nixlyos.mode != "htpc") {
   # Path watches only, plus the three module syscalls: they cost nothing
   # until something actually touches a persistence point, unlike a
   # syscall-wide execve rule that taxes every process start.

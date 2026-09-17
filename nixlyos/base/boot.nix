@@ -1,9 +1,10 @@
-{ lib, pkgs, hwData, ... }:
+{ lib, pkgs, config, hwData, ... }:
 
 let
   platform = hwData.platform;
   isArm = platform.arch == "aarch64";
   bootMode = platform.bootMode or "efi";
+  isHtpc = config.nixlyos.mode == "htpc";
 in
 {
   boot = {
@@ -90,32 +91,30 @@ in
     ]
     ++ lib.optionals (!isArm) [
       "nmi_watchdog=0"
-      # All CPU mitigations on (kernel default). SMT stays enabled: nosmt
-      # costs far more than the cross-thread leaks are worth here.
-      "mitigations=auto"
-      # IOMMU strict unmap: a hot-plugged PCIe/Thunderbolt device never sees
-      # stale DMA mappings. Costs a TLB flush per unmap.
-      "iommu.strict=1"
+      # Mitigations off on HTPC (couch box, no untrusted users); SMT always on.
+      (if isHtpc then "mitigations=off" else "mitigations=auto")
+      # Strict unmap blocks stale DMA but costs a TLB flush per unmap.
+      (if isHtpc then "iommu.strict=0" else "iommu.strict=1")
       "split_lock_detect=off"
-      # Battery target (95 Wh / 10 h ≈ 9.5 W) needs these idle savings:
-      # NVMe Autonomous Power State Transition (deep drive sleep after ~100 ms
-      # idle) and PCIe Active State Power Management (link L1). Tradeoff: a
-      # multi-ms wake stall is possible mid asset-streaming; accepted for the
-      # battery budget. Was 0 / performance (gaming-latency biased).
-      "nvme_core.default_ps_max_latency_us=100000"
-      "pcie_aspm=powersave"
+      # NVMe deep sleep and PCIe L1 are battery knobs; the mains HTPC keeps
+      # both links awake so nothing stalls mid asset-stream.
+      (if isHtpc
+       then "nvme_core.default_ps_max_latency_us=0"
+       else "nvme_core.default_ps_max_latency_us=100000")
+      (if isHtpc then "pcie_aspm=performance" else "pcie_aspm=powersave")
     ]
     ++ [
-      # audit.nix watches the persistence points; the rules are path-based,
-      # so the syscall path stays untaxed until one of them is touched.
-      "audit=1"
+      # audit.nix watches the persistence points; off on HTPC, it taxes syscalls.
+      (if isHtpc then "audit=0" else "audit=1")
     ];
 
     blacklistedKernelModules = lib.optionals (!isArm) [ "8250_pci" ];
 
-    # Idle power: HD-audio codec autosuspend (steady idle draw otherwise), and
-    # i915 panel self-refresh + framebuffer compression (panel/iGPU savings).
-    extraModprobeConfig = ''
+    # Idle power on the laptop; the HTPC keeps the codec awake (eARC pops) and
+    # leaves i915 panel knobs alone since it drives no internal panel.
+    extraModprobeConfig = if isHtpc then ''
+      options snd_hda_intel power_save=0 power_save_controller=N
+    '' else ''
       options snd_hda_intel power_save=1 power_save_controller=Y
       options i915 enable_fbc=1 enable_psr=1
     '';

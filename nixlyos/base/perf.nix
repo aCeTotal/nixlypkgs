@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, config, ... }:
 
 {
   # Performance tunings on top of linuxPackages_cachyos.
@@ -54,9 +54,11 @@
     # These ship root-only; grant the users group write.
     ACTION=="add|change", SUBSYSTEM=="cpu", RUN+="${pkgs.bash}/bin/sh -c 'chgrp users /sys/devices/system/cpu/cpufreq/policy*/scaling_governor /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference 2>/dev/null; chmod 0664 /sys/devices/system/cpu/cpufreq/policy*/scaling_governor /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference 2>/dev/null || true'"
 
+  '' + lib.optionalString (config.nixlyos.mode != "htpc") ''
     # Idle power: runtime-autosuspend PCI + USB devices (idle → D3/suspend).
     # Wireless-class (e0) devices are exempt: autosuspending the Bluetooth
     # adapter drops headsets mid-stream (bluetooth.nix owns BT power policy).
+    # Skipped on the mains HTPC: a D3 wake mid-frame is a stutter.
     ACTION=="add", SUBSYSTEM=="pci", TEST=="power/control", ATTR{power/control}="auto"
     ACTION=="add", SUBSYSTEM=="usb", ATTR{bDeviceClass}!="e0", TEST=="power/control", ATTR{power/control}="auto"
   '';
