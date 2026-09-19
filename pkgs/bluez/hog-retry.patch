@@ -1,0 +1,107 @@
+--- a/profiles/input/hog-lib.c
++++ b/profiles/input/hog-lib.c
+@@ -67,6 +67,9 @@
+ #define HID_INFO_SIZE			4
+ #define ATT_NOTIFICATION_HEADER_SIZE	3
+ 
++#define HOG_GATT_RETRY_MAX		3
++#define HOG_GATT_RETRY_DELAY_MS		200
++
+ struct bt_hog {
+ 	int			ref_count;
+ 	char			*name;
+@@ -118,6 +121,10 @@
+ 	unsigned int id;
+ 	struct bt_hog *hog;
+ 	void *user_data;
++	uint16_t handle;
++	GAttribResultFunc func;
++	uint8_t retry_count;
++	guint retry_timer;
+ };
+ 
+ static struct gatt_request *create_request(struct bt_hog *hog,
+@@ -147,11 +154,17 @@
+ {
+ 	struct gatt_request *req = data;
+ 
++	if (req->retry_timer) {
++		g_source_remove(req->retry_timer);
++		req->retry_timer = 0;
++	}
++
+ 	bt_hog_unref(req->hog);
+ 	free(req);
+ }
+ 
+ static void read_report_map(struct bt_hog *hog);
++static gboolean retry_gatt_read(gpointer user_data);
+ 
+ static void remove_gatt_req(struct gatt_request *req, uint8_t status)
+ {
+@@ -159,6 +172,19 @@
+ 
+ 	queue_remove(hog->gatt_op, req);
+ 
++	/* A peripheral just out of deep sleep answers reads with ATT
++	 * Unlikely Error until its GATT server is up; retry instead of
++	 * leaving the HID half-initialized.
++	 */
++	if (status == ATT_ECODE_UNLIKELY &&
++			req->retry_count < HOG_GATT_RETRY_MAX &&
++			req->func && hog->attrib) {
++		req->retry_count++;
++		req->retry_timer = g_timeout_add(HOG_GATT_RETRY_DELAY_MS,
++						retry_gatt_read, req);
++		return;
++	}
++
+ 	if (!status && queue_isempty(hog->gatt_op)) {
+ 		/* Report Map must be read last since that can result
+ 		 * in uhid being created and the driver may start to
+@@ -171,6 +197,35 @@
+ 	destroy_gatt_req(req);
+ }
+ 
++static gboolean retry_gatt_read(gpointer user_data)
++{
++	struct gatt_request *req = user_data;
++	struct bt_hog *hog = req->hog;
++	unsigned int id;
++
++	req->retry_timer = 0;
++
++	if (!hog->attrib) {
++		destroy_gatt_req(req);
++		return FALSE;
++	}
++
++	id = gatt_read_char(hog->attrib, req->handle, req->func, req);
++	if (!id) {
++		error("hog: GATT retry failed to queue read");
++		destroy_gatt_req(req);
++		return FALSE;
++	}
++
++	if (!set_and_store_gatt_req(hog, req, id)) {
++		error("hog: Failed to queue GATT retry");
++		g_attrib_cancel(hog->attrib, id);
++		destroy_gatt_req(req);
++	}
++
++	return FALSE;
++}
++
+ static void write_char(struct bt_hog *hog, GAttrib *attrib, uint16_t handle,
+ 					const uint8_t *value, size_t vlen,
+ 					GAttribResultFunc func,
+@@ -207,6 +262,9 @@
+ 	if (!req)
+ 		return 0;
+ 
++	req->handle = handle;
++	req->func = func;
++
+ 	id = gatt_read_char(attrib, handle, func, req);
+ 	if (!id) {
+ 		error("hog: Could not read char");

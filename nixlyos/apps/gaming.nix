@@ -73,6 +73,7 @@
   hardware.bluetooth = {
     enable = true;
     powerOnBoot = true;
+    package = pkgs.bluez-nixly;
     settings = {
       General = {
         Experimental = true;
@@ -80,9 +81,8 @@
         ControllerMode = "dual";
         FastConnectable = true;
 
-        # Controller pairing. JustWorksRepairing stays at the secure default
-        # ("never"): a spoofed device cannot silently re-bond; existing pads
-        # keep their stored bond.
+        # Pads that dropped their key re-bond without manual removal.
+        JustWorksRepairing = "always";
         Privacy = "device";
         Class = "0x000100";
       };

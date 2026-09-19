@@ -27,6 +27,11 @@ in {
   linuxPackages_nixlyos = import ./nvidia-latest.nix inputs final final.linux-nixlyos;
   linuxPackages_nixlyos_v3 = import ./nvidia-latest.nix inputs final final.linux-nixlyos-v3;
 
+  # bluez 5.86 drops BLE HID setup on ATT 0x0E; patch retries the read.
+  bluez-nixly = prev.bluez.overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [ ../pkgs/bluez/hog-retry.patch ];
+  });
+
   flycast = prev.flycast.overrideAttrs (old: {
     postPatch = (old.postPatch or "") + ''
       sed -i '/#include "spvIR.h"/a #include <cstdint>' core/deps/glslang/SPIRV/SpvBuilder.h
