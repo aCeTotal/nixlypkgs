@@ -1,4 +1,4 @@
-{ ... }:
+{ pkgs, ... }:
 
 # A browser tab is the one place untrusted code runs every day. Firejail's
 # stock profiles keep it out of the rest of $HOME, so a drive-by exploit
@@ -9,6 +9,21 @@
 # helpers are already disabled here ("dumpable process"), so the jail would
 # break gaming for filesystem confinement alone.
 let
+  # Stock profiles leave the session bus wide open (dbus-user none is
+  # commented out), so a jailed process reaches org.freedesktop.systemd1 and
+  # StartTransientUnit spawns a service outside the jail. Filter mode allows
+  # only the buses a browser needs and drops systemd1, closing that escape.
+  dbusFilter = [
+    "--dbus-user=filter"
+    "--dbus-user.talk=org.freedesktop.Notifications"
+    "--dbus-user.talk=org.freedesktop.secrets"
+    "--dbus-user.talk='org.freedesktop.portal.*'"
+    "--dbus-user.talk=org.freedesktop.ScreenSaver"
+    "--dbus-user.talk=ca.desrt.dconf"
+    "--dbus-user.own='org.mpris.MediaPlayer2.*'"
+  ];
+  dbusArgs = builtins.concatStringsSep " \\\n          " dbusFilter;
+
   jail = final: { pkg, bin, profile }:
     final.symlinkJoin {
       name = "${bin}-jailed";
@@ -20,6 +35,7 @@ let
         #!${final.runtimeShell} -e
         exec /run/wrappers/bin/firejail \
           --profile=${final.firejail}/etc/firejail/${profile}.profile \
+          ${dbusArgs} \
           -- ${pkg}/bin/${bin} "\$@"
         EOF
         chmod 0755 $out/bin/${bin}
@@ -35,6 +51,9 @@ let
     };
 in
 {
+  # firejail's dbus filter spawns xdg-dbus-proxy from PATH.
+  environment.systemPackages = [ pkgs.xdg-dbus-proxy ];
+
   nixpkgs.overlays = [
     (final: prev: {
       google-chrome = jail final {

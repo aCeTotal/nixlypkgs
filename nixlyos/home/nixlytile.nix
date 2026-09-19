@@ -135,6 +135,13 @@ in
         fullscreen false
     }
 
+    // GeForce NOW: klientvinduet aapner 1246x798, under 3/4 av skjermen, saa
+    // spillklassifiseringen tok det for en splash og sentrerte det flytende.
+    window-rule {
+        app-id "GeForceNOW"
+        game   false
+    }
+
     modkey      "Super"
     monitorkey  "Ctrl"
 

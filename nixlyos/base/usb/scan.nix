@@ -6,6 +6,7 @@ let
   scan = pkgs.writeShellApplication {
     name = "nixly-usbscan";
     runtimeInputs = with pkgs; [
+      b3sum
       clamav
       coreutils
       expand
@@ -61,9 +62,9 @@ in
     };
   };
 
-  # clamd holds the whole signature set in RAM (~1 GB). It is started the
-  # moment a USB device appears and stopped again ten minutes after the last
-  # scan, so the desktop never carries it for nothing.
+  # clamd holds the whole signature set in RAM (~1 GB). Nothing keeps it
+  # resident: a scan starts it, and the scan stops it again the instant the
+  # last partition finishes, so an idle desktop never carries it.
   systemd.services.clamav-daemon.wantedBy = lib.mkForce [ ];
 
   # Database downloads must never compete with the foreground desktop.
@@ -85,18 +86,18 @@ in
       ExecStart = "${scan}/bin/nixly-usbscan %i";
       RuntimeDirectory = "nixly-usbscan";
       RuntimeDirectoryPreserve = true;
+      # Persistent clean-hash cache; survives reboots.
+      StateDirectory = "nixly-usbscan";
+      StateDirectoryMode = "0700";
       # A big stick takes as long as it takes; progress is on screen.
       TimeoutStartSec = "infinity";
     };
   };
 
   services.udev.extraRules = ''
-    # Load the signature set while the partition table is still being read:
-    # by the time the scan starts, clamd is usually already warm.
-    ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", TAG+="systemd", ENV{SYSTEMD_WANTS}+="clamav-daemon.service"
-
     # USB partitions carrying a filesystem. Whole disks, empty partitions and
-    # everything internal never reach the scanner.
+    # everything internal never reach the scanner. The scan unit pulls clamd
+    # up itself, so nothing keeps it resident just because a stick is plugged.
     ACTION=="add", SUBSYSTEM=="block", ENV{ID_BUS}=="usb", ENV{DEVTYPE}=="partition", ENV{ID_FS_USAGE}=="filesystem", TAG+="systemd", ENV{SYSTEMD_WANTS}+="nixly-usbscan@$kernel.service"
     ACTION=="remove", SUBSYSTEM=="block", ENV{ID_BUS}=="usb", ENV{DEVTYPE}=="partition", RUN+="${pkgs.coreutils}/bin/rm -f /run/nixly-usbscan/$kernel.state"
   '';

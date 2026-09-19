@@ -151,6 +151,12 @@ in
     # Anti-exploit hardening
     "kernel.yama.ptrace_scope" = 1;                    # restrict ptrace
     "fs.suid_dumpable" = 0;                            # no core dumps from SUID
+    "kernel.kexec_load_disabled" = 1;                  # no kexec persistence path
+    "kernel.perf_event_paranoid" = 2;                  # deny perf to non-root
+    "net.core.bpf_jit_harden" = 2;                     # harden JIT vs spraying
+    "dev.tty.ldisc_autoload" = 0;                      # block ldisc privesc autoload
+    "vm.unprivileged_userfaultfd" = 0;                 # remove an exploit primitive
+    "net.ipv4.tcp_syncookies" = 1;                     # SYN-flood resistance
 
     "vm.max_map_count" = 2147483642; # Steam Deck default
   };

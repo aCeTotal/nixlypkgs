@@ -2,6 +2,8 @@
 # Session side of the USB scanner: one card per device, never per partition.
 # Isolated while it is being verified, then mounted or blocked.
 set -uo pipefail
+# writeShellApplication forces errexit; this script guards its own exits.
+set +o errexit
 
 dir=/run/nixly-usbscan
 declare -A nid card mounted opened
@@ -176,10 +178,15 @@ sweep() {
   for d in $(disks); do render "$d"; done
 }
 
-sweep
-
-while read -r ev file; do
-  case $file in *.state) ;; *) continue ;; esac
-  case $ev in *DELETE*) forget; continue ;; esac
+# The runtime dir only exists once the first scan runs; wait for it and
+# re-arm if the watch ever drops, so login before any insert never kills us.
+while true; do
+  [ -d "$dir" ] || { sleep 2; continue; }
   sweep
-done < <(inotifywait -q -m -e close_write,moved_to,delete --format '%e %f' "$dir")
+  while read -r ev file; do
+    case $file in *.state) ;; *) continue ;; esac
+    case $ev in *DELETE*) forget; continue ;; esac
+    sweep
+  done < <(inotifywait -q -m -e close_write,moved_to,delete --format '%e %f' "$dir")
+  sleep 2
+done

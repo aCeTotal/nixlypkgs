@@ -4,14 +4,14 @@
   networking.firewall.enable = true;
   # nftables loads rules in one transaction, faster at boot than iptables-restore.
   networking.nftables.enable = true;
+  # Don't answer pings from off-box: no free host discovery on the LAN.
+  networking.firewall.allowPing = false;
 
-  # Connection-flood cap for the window where ssh_gate has port 22 open to the
-  # LAN. Sits ahead of the gate's runtime accept rule, so excess new
-  # connections are dropped before sshd ever forks.
-  networking.firewall.extraInputRules = ''
-    tcp dport 22 ct state new limit rate over 10/minute burst 5 packets drop
-  '';
+  # No core dumps land on disk; a crash never spills process memory.
+  systemd.coredump.enable = false;
 
+  # SSH is reachable only over the trusted tailscale0 interface (ssh.nix sets
+  # openFirewall = false); port 22 is never opened to the LAN or internet.
 
   security.apparmor.enable = false;
 

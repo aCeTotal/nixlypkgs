@@ -3,6 +3,8 @@
 # $1 = kernel device name (sdb1).  Progress goes to
 # /run/nixly-usbscan/<dev>.state, which nixlytile watches with inotify.
 set -uo pipefail
+# writeShellApplication forces errexit; this script guards its own exits.
+set +o errexit
 
 dev=$1
 node=/dev/$dev
@@ -10,7 +12,6 @@ dir=/run/nixly-usbscan
 state=$dir/$dev.state
 mnt=$dir/mnt/$dev
 batch_size=200
-clamd_linger=600
 
 label=$(blkid -o value -s LABEL "$node" 2>/dev/null || true)
 [ -n "$label" ] || label=$dev
@@ -24,6 +25,7 @@ done_n=0
 threats=0
 unscannable=0
 scripts=0
+cached=0
 hits=0
 found=""
 
@@ -41,6 +43,7 @@ put() {
     echo "threats=$threats"
     echo "unscannable=$unscannable"
     echo "scripts=$scripts"
+    echo "cached=$cached"
     echo "found=$found"
     echo "msg=${2:-}"
   } >"$tmp"
@@ -74,8 +77,7 @@ if [ ! -s /var/lib/clamav/daily.cvd ] && [ ! -s /var/lib/clamav/daily.cld ]; the
   exit 0
 fi
 
-# udev started clamd the moment the device appeared; this only waits for the
-# database load to finish.
+# Start clamd for this scan and wait for the database load to finish.
 put starting
 systemctl start --no-block clamav-daemon.service 2>/dev/null
 if ! clamdscan --ping 120 >/dev/null 2>&1; then
@@ -89,22 +91,50 @@ if ! mount -o ro,nosuid,nodev,noexec "$node" "$mnt" 2>/dev/null; then
   exit 0
 fi
 
+# A file that scanned clean is remembered by its BLAKE3 content hash, keyed
+# by the loaded signature set: a later insert re-hashes and skips anything
+# unchanged, while an edited file gets a new hash and is scanned again. The
+# key resets whenever the clamav database changes, so fresh signatures are
+# always applied at least once to every file.
+cacheroot=/var/lib/nixly-usbscan/hashes
+epoch=$(stat -c '%s:%Y' /var/lib/clamav/*.c?d 2>/dev/null | b3sum --no-names 2>/dev/null | cut -c1-16)
+[ -n "$epoch" ] || epoch=noepoch
+cachedir=$cacheroot/$epoch
+mkdir -p "$cachedir" 2>/dev/null
+# A new signature set makes old verdicts stale; drop every other epoch.
+find "$cacheroot" -mindepth 1 -maxdepth 1 -type d ! -name "$epoch" \
+  -exec rm -rf {} + 2>/dev/null || true
+
+remember() {
+  local h=$1 sh
+  [ -n "$h" ] || return 0
+  sh=$cachedir/${h:0:2}
+  mkdir -p "$sh" 2>/dev/null
+  : >"$sh/$h" 2>/dev/null || true
+}
+
 put counting
 files=$(find "$mnt" -xdev -type f -printf . 2>/dev/null | wc -c)
 put scanning
 
+declare -A fhash
 batch=()
 flush() {
   [ ${#batch[@]} -gt 0 ] || return 0
-  local out line hit sig inner rc
+  local out line hit sig inner rc f
+  local -A bad=() skip=()
   # --multiscan spreads the batch over clamd's threads; --fdpass hands it
   # open descriptors so it never re-opens a path under our feet.
   # A detection makes clamdscan exit nonzero; that is the normal case here.
   out=$(clamdscan --fdpass --multiscan --no-summary --infected "${batch[@]}" 2>/dev/null) || true
   if [ -n "$out" ]; then
-    # A file the engine had to give up on counts separately from a detection.
     while IFS= read -r line; do
       hit=${line%%: *}
+      # A file the engine could not read is never remembered as clean.
+      if [ "${line%ERROR}" != "$line" ]; then
+        skip["$hit"]=1
+        continue
+      fi
       sig=${line##*: }
       sig=${sig% FOUND}
       if [ "${sig#*Limits.Exceeded}" != "$sig" ]; then
@@ -117,19 +147,24 @@ flush() {
         case $rc in
           0) continue ;;
           1) sig="contains $(head -1 <<<"$inner")"
-             threats=$(( threats + 1 )) ;;
+             threats=$(( threats + 1 )); bad["$hit"]=1 ;;
           *) sig="too large to scan, could not be unpacked"
-             unscannable=$(( unscannable + 1 )) ;;
+             unscannable=$(( unscannable + 1 )); skip["$hit"]=1 ;;
         esac
       else
-        threats=$(( threats + 1 ))
+        threats=$(( threats + 1 )); bad["$hit"]=1
       fi
       if [ "$hits" -lt 5 ]; then
         found="${found:+$found|}$(basename "$hit") — $sig"
         hits=$(( hits + 1 ))
       fi
-    done < <(grep 'FOUND$' <<<"$out")
+    done < <(grep -E 'FOUND$|ERROR$' <<<"$out")
   fi
+  # Everything in the batch that was neither infected nor unreadable is clean.
+  for f in "${batch[@]}"; do
+    [ -n "${bad[$f]:-}${skip[$f]:-}" ] || remember "${fhash[$f]:-}"
+    unset 'fhash[$f]'
+  done
   done_n=$(( done_n + ${#batch[@]} ))
   batch=()
   put scanning
@@ -140,7 +175,16 @@ while IFS= read -r -d '' f; do
     *autorun.inf|*.lnk|*.desktop|*.bat|*.cmd|*.vbs|*.vbe|*.ps1|*.scr|*.jse|*.hta)
       scripts=$(( scripts + 1 )) ;;
   esac
+  h=$(b3sum --no-names -- "$f" 2>/dev/null)
+  # Known-clean and unchanged: skip the scan, still count it as done.
+  if [ -n "$h" ] && [ -e "$cachedir/${h:0:2}/$h" ]; then
+    done_n=$(( done_n + 1 ))
+    cached=$(( cached + 1 ))
+    (( done_n % batch_size == 0 )) && put scanning
+    continue
+  fi
   batch+=("$f")
+  fhash["$f"]=$h
   [ ${#batch[@]} -ge $batch_size ] && flush
 done < <(find "$mnt" -xdev -type f -print0 2>/dev/null)
 flush
@@ -156,9 +200,10 @@ else
   put clean
 fi
 
-# Keep the loaded signature set around: plugging in a second stick within the
-# next few minutes then scans instantly instead of reloading ~1 GB.
-systemctl stop nixly-clamd-stop.timer 2>/dev/null || true
-systemd-run --quiet --unit=nixly-clamd-stop --on-active=$clamd_linger \
-  systemctl stop clamav-daemon.service 2>/dev/null || true
+# Kill clamd the instant the last partition finishes — no idle 1 GB resident.
+# A sibling scan still running keeps it up; that scan stops it when it ends.
+siblings=$(systemctl list-units --plain --no-legend --state=active,activating \
+  'nixly-usbscan@*.service' 2>/dev/null \
+  | awk -v me="nixly-usbscan@$dev.service" '$1 ~ /nixly-usbscan@/ && $1 != me')
+[ -n "$siblings" ] || systemctl stop --no-block clamav-daemon.service 2>/dev/null || true
 true

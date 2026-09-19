@@ -80,9 +80,10 @@
         ControllerMode = "dual";
         FastConnectable = true;
 
-        # Controller pairing.
+        # Controller pairing. JustWorksRepairing stays at the secure default
+        # ("never"): a spoofed device cannot silently re-bond; existing pads
+        # keep their stored bond.
         Privacy = "device";
-        JustWorksRepairing = "always";
         Class = "0x000100";
       };
       Policy = {

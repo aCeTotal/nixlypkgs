@@ -19,9 +19,7 @@
     '';
   };
 
-  # Conntrack covers replies from the same 5-tuple; an edge that answers
-  # from another source port does not get in without this.
-  networking.firewall.allowedUDPPortRanges = [
-    { from = 49000; to = 49200; }
-  ];
+  # No inbound port opening: GeForce NOW initiates the UDP flows outbound, so
+  # conntrack accepts the replies. Leaving 200 UDP ports open to the LAN and
+  # the public IPv6 internet was needless attack surface.
 }
