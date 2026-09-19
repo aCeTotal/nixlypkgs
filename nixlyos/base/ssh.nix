@@ -1,9 +1,14 @@
 { lib, nixlyUser, ... }:
 
 {
+  # Key-only sshd from private ranges; WAN still never sees port 22.
+  networking.firewall.extraInputRules = ''
+    ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } tcp dport 22 accept
+  '';
+
   services.openssh = {
     enable = true;
-    # SSH over tailscale only; port 22 is not opened to the LAN or internet.
+    # Not opened globally; the LAN rule above is the only way in.
     openFirewall = false;
     settings = {
       PermitRootLogin = "no";

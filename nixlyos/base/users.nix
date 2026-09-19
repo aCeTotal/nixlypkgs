@@ -28,7 +28,9 @@
       # userControlled.group option is gone).
       "wpa_supplicant"
     ];
-    openssh.authorizedKeys.keys = [];
+    openssh.authorizedKeys.keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICTkd7+i+h7SK83+dxPNpAknDr17sUt6cIR99SuKj6pf lars.oksendal@gmail.com"
+    ];
   };
 
   users.groups.uinput = {};

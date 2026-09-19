@@ -34,7 +34,8 @@
   };
 
   boot = {
-    # Stage 2: loads before display-manager.
+    # Initrd: nvidia-drm takes the console before efifb drops it.
+    initrd.kernelModules = [ "nvidia" "nvidia_uvm" "nvidia_modeset" "nvidia_drm" ];
     kernelModules = [ "nvidia" "nvidia_uvm" "nvidia_modeset" "nvidia_drm" ];
     kernelParams = [
       "nvidia_drm.modeset=1"
