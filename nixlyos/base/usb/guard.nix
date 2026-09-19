@@ -41,6 +41,11 @@ in
       # keyboard does not match this rule and stays blocked.
       allow with-interface equals { 08:06:50 }
 
+      # Phone USB tethering: CDC network interfaces only, no HID.
+      allow with-interface equals { 02:0d:00 0a:00:01 0a:00:01 }
+      allow with-interface equals { 02:06:00 0a:00:00 }
+      allow with-interface equals { e0:01:03 0a:00:00 }
+
       # Game controllers.
       allow id 045e:* with-interface one-of { ff:*:* 03:*:* }
       allow id 054c:* with-interface one-of { 03:*:* ff:*:* }

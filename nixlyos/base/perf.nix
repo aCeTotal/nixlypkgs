@@ -61,6 +61,9 @@
     # Skipped on the mains HTPC: a D3 wake mid-frame is a stutter.
     ACTION=="add", SUBSYSTEM=="pci", TEST=="power/control", ATTR{power/control}="auto"
     ACTION=="add", SUBSYSTEM=="usb", ATTR{bDeviceClass}!="e0", TEST=="power/control", ATTR{power/control}="auto"
+    # HID exempt: a suspended keyboard kills its own backlight, and the
+    # class lives on the interface, so the parent is set from here.
+    ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_interface", ATTR{bInterfaceClass}=="03", RUN+="${pkgs.bash}/bin/sh -c 'echo on > /sys$env{DEVPATH}/../power/control'"
   '';
 
   # systemd-oomd and the vm.dirty_* knobs live in zram.nix.
