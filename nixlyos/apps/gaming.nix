@@ -83,7 +83,8 @@
 
         # Pads that dropped their key re-bond without manual removal.
         JustWorksRepairing = "always";
-        Privacy = "device";
+        # Pads reconnect against fixed identity address.
+        Privacy = "off";
         Class = "0x000100";
       };
       Policy = {

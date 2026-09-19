@@ -47,6 +47,7 @@ in
     ./wayland.nix
     ./sound.nix
     ./bluetooth.nix
+    ./btpair
     ./zram.nix
     ./hibernate.nix
     ./security.nix
