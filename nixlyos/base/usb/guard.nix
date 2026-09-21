@@ -46,6 +46,12 @@ in
       allow with-interface equals { 02:06:00 0a:00:00 }
       allow with-interface equals { e0:01:03 0a:00:00 }
 
+      # Built-in radios. A Bluetooth controller re-enumerates after every
+      # controller reset (SCO errors do this), and blocking it there kills
+      # Bluetooth until someone approves it by hand. Hardwired only, so a
+      # plugged-in BadUSB can never match.
+      allow with-interface one-of { e0:01:01 } with-connect-type "hardwired"
+
       # Game controllers.
       allow id 045e:* with-interface one-of { ff:*:* 03:*:* }
       allow id 054c:* with-interface one-of { 03:*:* ff:*:* }

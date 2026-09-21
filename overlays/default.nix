@@ -20,6 +20,7 @@ in {
   kmymoney = callPackage ../pkgs/kmymoney { };
   low-latency-layer = callPackage ../pkgs/low-latency-layer { };
   discord-keybridge = callPackage ../pkgs/discord-keybridge { };
+  nixly-mic = callPackage ../pkgs/nixly-mic { };
   proton-nixlyos = callPackage ../pkgs/proton-nixlyos { };
   proton-nixlyos-generic = callPackage ../pkgs/proton-nixlyos { variant = "generic"; };
 

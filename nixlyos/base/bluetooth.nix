@@ -15,6 +15,33 @@
     options btusb enable_autosuspend=0
   '';
 
+  # A connected headset is the one the user is wearing: it outranks every
+  # built-in output. Its mic already ranks above the built-in one on its own
+  # (2010), which is what nixly-mic picks up behind NixlyMic.
+  services.pipewire.wireplumber.extraConfig."55-bluez-priority" = {
+    "monitor.bluez.rules" = [
+      {
+        matches = [ { "node.name" = "~bluez_output\\..*"; } ];
+        actions = {
+          update-props = {
+            "priority.session" = 4000;
+            "priority.driver" = 4000;
+          };
+        };
+      }
+    ];
+
+    # A profile switch removes the A2DP sink; players must follow the new
+    # node instead of being paused, or the audio just stops.
+    "wireplumber.settings" = {
+      "linking.pause-playback" = false;
+      "linking.follow-default-target" = true;
+      "linking.allow-moving-streams" = true;
+      # Off until nixlytile sees LE Audio duplex; it flips this at runtime.
+      "bluetooth.autoswitch-to-headset-profile" = false;
+    };
+  };
+
   services.pipewire.wireplumber.extraConfig."54-bluez-keepalive" = {
     "monitor.bluez.rules" = [
       {

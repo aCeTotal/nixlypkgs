@@ -73,7 +73,7 @@
                 inherit (kp) xpadneo xone xpad-noone msi-ec;
               };
         in {
-          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly discord-keybridge;
+          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly discord-keybridge nixly-mic;
 
           totalvim = import ./nixlyos/lib/totalvim.nix {
             pkgs = stable;

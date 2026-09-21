@@ -46,6 +46,7 @@ in
     ./overhead.nix
     ./wayland.nix
     ./sound.nix
+    ./mic.nix
     ./bluetooth.nix
     ./btpair
     ./zram.nix
