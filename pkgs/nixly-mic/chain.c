@@ -31,6 +31,5 @@ void push_props(struct app *a)
 	pw_node_set_param((struct pw_node *)a->fc_proxy, SPA_PARAM_Props, 0, pod);
 	a->pushed_g1 = g1;
 	a->pushed_g2 = g2;
-	info(a, "gain: capture volume %.4f, chain %.1f dB", a->ctl.vol,
-	     a->ctl.sens_db);
+	info(a, "gain: card %.1f dB, chain %.1f dB", a->ctl.hw_db, a->ctl.sens_db);
 }

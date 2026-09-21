@@ -8,6 +8,7 @@
 
 #define MAX_MICS 32
 #define KEY_LEN 160
+#define FORMAT "nixly-mic 2"   /* hw gain in dB; older files held a fraction */
 
 struct entry {
 	char key[KEY_LEN];
@@ -48,6 +49,11 @@ struct state *state_load(void)
 	state_path(s->path, sizeof(s->path));
 	if ((f = fopen(s->path, "r")) == NULL)
 		return s;
+	if (fgets(line, sizeof(line), f) == NULL ||
+	    strncmp(line, FORMAT, strlen(FORMAT)) != 0) {
+		fclose(f);
+		return s;
+	}
 
 	while (fgets(line, sizeof(line), f)) {
 		char key[KEY_LEN];
@@ -145,6 +151,7 @@ void state_save(struct state *s)
 	snprintf(tmp, sizeof(tmp), "%s.new", s->path);
 	if ((f = fopen(tmp, "w")) == NULL)
 		return;
+	fprintf(f, "%s\n", FORMAT);
 	if (s->preferred[0])
 		fprintf(f, "preferred\t%s\n", s->preferred);
 	for (i = 0; i < s->n; i++)

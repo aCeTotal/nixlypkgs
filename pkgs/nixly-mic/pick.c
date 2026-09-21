@@ -17,22 +17,43 @@ static struct node_info *find_node(struct app *a, const char *name)
 void store_gains(struct app *a)
 {
 	if (a->selected[0])
-		state_set(a->state, a->selected, a->ctl.vol, a->ctl.sens_db,
+		state_set(a->state, a->selected, a->ctl.hw_db, a->ctl.sens_db,
 			  a->ctl.learned);
+}
+
+/* The card's gain range decides where the control law may go; a stored gain
+ * from a session with the same mic is the starting point. */
+static void open_mixer(struct app *a, int card)
+{
+	if (a->mixer.elem != NULL && a->card == card)
+		return;
+	mixer_close(&a->mixer);
+	a->card = card;
+	if (!mixer_open(&a->mixer, card)) {
+		info(a, "card %d has no capture element", card);
+		return;
+	}
+	control_range(&a->ctl, a->mixer.min_db, a->mixer.max_db);
+	if (!a->hw_known)
+		a->ctl.hw_db = a->ctl.hw_start;
+	info(a, "card %d gain range %.1f..%.1f dB, starting at %.1f dB", card,
+	     a->mixer.min_db, a->mixer.max_db, a->ctl.hw_db);
+	push_hw(a);
 }
 
 /* device.id and the profile device index only show up in the full node info. */
 static void on_sel_info(void *data, const struct pw_node_info *i)
 {
 	struct app *a = data;
-	const char *dev, *pd;
+	const char *dev, *card;
 
 	if (!(i->change_mask & PW_NODE_CHANGE_MASK_PROPS) || i->props == NULL)
 		return;
 	if ((dev = spa_dict_lookup(i->props, PW_KEY_DEVICE_ID)) == NULL)
 		return;
-	pd = spa_dict_lookup(i->props, "card.profile.device");
-	route_bind(a, (uint32_t)atoi(dev), pd ? atoi(pd) : 0);
+	if ((card = spa_dict_lookup(i->props, "alsa.card")) != NULL)
+		open_mixer(a, atoi(card));
+	route_bind(a, (uint32_t)atoi(dev));
 }
 
 static const struct pw_node_events sel_events = {
@@ -42,7 +63,7 @@ static const struct pw_node_events sel_events = {
 
 static void select_node(struct app *a, struct node_info *n)
 {
-	float vol = 0.35f, sens = 0.0f;
+	float hw = 0.0f, sens = 0.0f;
 	bool learned = false;
 
 	if (strcmp(a->selected, n->name) == 0)
@@ -62,12 +83,11 @@ static void select_node(struct app *a, struct node_info *n)
 			     &sel_events, a);
 
 	meter_init(&a->meter, RATE);
-	a->vol_known = state_get(a->state, n->name, &vol, &sens, &learned);
-	control_reset(&a->ctl, vol, sens, learned);
+	a->hw_known = state_get(a->state, n->name, &hw, &sens, &learned);
+	control_reset(&a->ctl, hw, sens, learned);
 	a->pushed_g1 = a->pushed_g2 = 0.0f;
-	a->pushed_vol = -1.0f;
 
-	info(a, "mic: %s (%s)", n->name, a->vol_known ? "remembered" : "learning");
+	info(a, "mic: %s (%s)", n->name, a->hw_known ? "remembered" : "learning");
 	update_metering(a);
 	push_props(a);
 }

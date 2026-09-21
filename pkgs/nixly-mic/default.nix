@@ -1,4 +1,4 @@
-{ lib, stdenv, pkg-config, pipewire }:
+{ lib, stdenv, pkg-config, pipewire, alsa-lib }:
 
 stdenv.mkDerivation {
   pname = "nixly-mic";
@@ -8,12 +8,12 @@ stdenv.mkDerivation {
 
   strictDeps = true;
   nativeBuildInputs = [ pkg-config ];
-  buildInputs = [ pipewire ];
+  buildInputs = [ pipewire alsa-lib ];
 
   buildPhase = ''
     runHook preBuild
-    $CC -O2 -Wall -Wextra -o nixly-mic main.c pick.c route.c chain.c meterio.c meter.c control.c state.c \
-      $(pkg-config --cflags --libs libpipewire-0.3) -lm
+    $CC -O2 -Wall -Wextra -o nixly-mic main.c pick.c route.c chain.c meterio.c meter.c refgate.c vadgate.c mixer.c control.c state.c \
+      $(pkg-config --cflags --libs libpipewire-0.3 alsa) -lm
     runHook postBuild
   '';
 

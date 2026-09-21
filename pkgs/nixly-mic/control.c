@@ -3,13 +3,15 @@
 #include <math.h>
 
 #define TARGET_IN_DB -24.0f  /* quiet speech RMS handed to the compressor */
-#define LOUD_AIM_DB -12.0f   /* where the decayed speech peak should sit */
-#define LOUD_HI_DB -6.0f     /* above this the ADC is running out of room */
-#define LOUD_LO_DB -18.0f    /* below this it has room to spare */
-#define CLIP_LOCK 300.0      /* no volume increase for 5 min after clipping */
-#define FAST_WINDOW 30.0     /* re-converge quickly after a volume change */
-#define VOL_MIN 0.0005f
-#define VOL_MAX 1.0f
+#define LOUD_AIM_DB -12.0f   /* where the loud seconds should peak */
+#define LOUD_HI_DB -9.0f     /* above this the converter is running out of room */
+#define LOUD_LO_DB -15.0f    /* below this it has room to spare */
+#define PEAK_SECS 10         /* seconds of peak history before trusting it */
+#define CLIP_LOCK 300.0      /* no gain increase for 5 min after clipping */
+#define CLIP_STEP 10.0       /* min seconds between clip cuts */
+#define QUIET_RESCUE 60.0f   /* silence that means the gain is too low */
+#define RESCUE_STEP 6.0f
+#define FAST_WINDOW 30.0     /* re-converge quickly after a gain change */
 #define GAIN_LIMIT 20.0f     /* per linear node, two of them in the chain */
 
 static float clampf(float v, float lo, float hi)
@@ -17,44 +19,62 @@ static float clampf(float v, float lo, float hi)
 	return v < lo ? lo : (v > hi ? hi : v);
 }
 
-void control_reset(struct control *c, float vol, float sens_db, bool learned)
+void control_range(struct control *c, float min_db, float max_db)
 {
-	c->vol = clampf(vol, VOL_MIN, VOL_MAX);
+	c->hw_min = min_db;
+	c->hw_max = max_db;
+	c->hw_start = max_db - HW_START_BELOW_MAX;
+	c->hw_db = clampf(c->hw_db, min_db, max_db);
+}
+
+void control_reset(struct control *c, float hw_db, float sens_db, bool learned)
+{
+	c->hw_db = hw_db;
 	c->sens_db = sens_db;
 	c->learned = learned;
 	c->clip_lock = 0.0;
+	c->last_clip = 0.0;
 	c->last_up = 0.0;
 	c->last_sens = 0.0;
 	c->fast_until = 0.0;
 }
 
-/* The volume curve is the card's, not ours, so aim for the measured error and
- * under-relax instead of assuming a dB per step. */
-static bool tick_volume(struct control *c, struct meter *m, double now)
+/* Lowering the card's gain is allowed on any sound, since clipping ruins the
+ * signal whoever made it; raising it waits for speech. */
+static bool tick_hw(struct control *c, struct meter *m, double now)
 {
-	float want = 0.0f, vol;
+	bool clipped = m->clips > 0;
+	float loud, want = 0.0f, db;
 
-	if (m->clips > 0) {
-		want = -8.0f;
-		c->clip_lock = now + CLIP_LOCK;
-	} else if (m->speech_secs > 3.0f && m->loud_db > LOUD_HI_DB) {
-		want = LOUD_AIM_DB - m->loud_db;
-	} else if (m->speech_secs > 3.0f && m->loud_db < LOUD_LO_DB &&
-		   now > c->clip_lock &&
-		   now - c->last_up >= (c->learned ? 10.0 : 3.0)) {
-		want = LOUD_AIM_DB - m->loud_db;
-		c->last_up = now;
-	}
 	m->clips = 0;
+	if (clipped && now - c->last_clip >= CLIP_STEP) {
+		want = -6.0f;
+		c->last_clip = now;
+		c->clip_lock = now + CLIP_LOCK;
+	} else if (m->quiet_secs > QUIET_RESCUE && m->peaks_len == 0 &&
+		   now > c->clip_lock && c->hw_db < c->hw_max) {
+		/* Not one word heard since this gain was set. Feel upwards: a
+		 * voice too faint to detect is the only thing that looks like
+		 * this, and the card's maximum bounds the search. */
+		want = fminf(RESCUE_STEP, c->hw_max - c->hw_db);
+	} else if (meter_peak_level(m, PEAK_SECS, 0.9f, &loud)) {
+		if (loud > LOUD_HI_DB)
+			want = LOUD_AIM_DB - loud;
+		else if (loud < LOUD_LO_DB && m->speech_secs > 3.0f &&
+			 now > c->clip_lock &&
+			 now - c->last_up >= (c->learned ? 10.0 : 3.0)) {
+			want = LOUD_AIM_DB - loud;
+			c->last_up = now;
+		}
+	}
 	if (want == 0.0f)
 		return false;
 
-	vol = clampf(c->vol * powf(10.0f, clampf(0.7f * want, -12.0f, 12.0f) / 20.0f),
-		     VOL_MIN, VOL_MAX);
-	if (vol == c->vol)
+	db = clampf(c->hw_db + clampf(want, -12.0f, 24.0f), c->hw_min, c->hw_max);
+	if (db == c->hw_db)
 		return false;
-	c->vol = vol;
-	/* Every level we measured was taken at the old volume. */
+	c->hw_db = db;
+	/* Every level we measured was taken at the old gain. */
 	meter_init(m, m->rate);
 	c->fast_until = now + FAST_WINDOW;
 	return true;
@@ -93,8 +113,8 @@ int control_tick(struct control *c, struct meter *m, double now)
 {
 	int changed = 0;
 
-	if (tick_volume(c, m, now))
-		changed |= CONTROL_VOLUME | CONTROL_GAIN;
+	if (tick_hw(c, m, now))
+		changed |= CONTROL_HW | CONTROL_GAIN;
 	if (tick_sens(c, m, now))
 		changed |= CONTROL_GAIN;
 	return changed;

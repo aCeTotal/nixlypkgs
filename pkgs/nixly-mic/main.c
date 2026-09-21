@@ -35,15 +35,14 @@ static void on_timer(void *data, uint64_t expirations)
 	struct app *a = data;
 	double now = mono_now();
 
-	if (a->stream) {
+	if (a->stream && now >= a->ref_hot_until) {
 		int changed = control_tick(&a->ctl, &a->meter, now);
 
-		info(a, "level: floor %.1f loud %.1f speech %.1fs hist %d",
-		     a->meter.floor_db, a->meter.loud_db, a->meter.speech_secs,
+		info(a, "level: floor %.1f card %.1f speech %.1fs hist %d",
+		     a->meter.floor_db, a->ctl.hw_db, a->meter.speech_secs,
 		     a->meter.hist_len);
-		if (changed & CONTROL_VOLUME)
-			push_volume(a);
-		if (changed & CONTROL_GAIN)
+		/* Gain steps are audible, so they wait for a pause in speech. */
+		if ((changed & CONTROL_GAIN) && now >= a->speech_until)
 			push_props(a);
 		if (changed) {
 			store_gains(a);
@@ -51,6 +50,9 @@ static void on_timer(void *data, uint64_t expirations)
 				a->save_at = now + SAVE_DELAY;
 		}
 	}
+	/* Anything else that writes the card's gain is undone here, in a pause. */
+	if (now >= a->speech_until)
+		push_hw(a);
 	if (a->save_at != 0.0 && now >= a->save_at) {
 		state_save(a->state);
 		a->save_at = 0.0;
@@ -77,7 +79,6 @@ int main(int argc, char *argv[])
 	if (a.state == NULL)
 		return 1;
 	meter_init(&a.meter, RATE);
-	control_reset(&a.ctl, 0.35f, 0.0f, false);
 
 	a.loop = pw_main_loop_new(NULL);
 	loop = pw_main_loop_get_loop(a.loop);
@@ -100,6 +101,8 @@ int main(int argc, char *argv[])
 	store_gains(&a);
 	state_save(a.state);
 	meter_stop(&a);
+	refgate_stop(&a);
+	mixer_close(&a.mixer);
 	state_free(a.state);
 	pw_proxy_destroy((struct pw_proxy *)a.registry);
 	pw_core_disconnect(a.core);

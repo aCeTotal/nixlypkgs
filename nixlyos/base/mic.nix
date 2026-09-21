@@ -3,7 +3,7 @@
 # app that records. Both stages are WirePlumber smart filters, so they are
 # invisible — the real device stays the default source everywhere, and apps
 # are linked through the chain instead of to the device. nixly-mic (the
-# daemon) owns the capture volume and the chain's gain stages; see
+# daemon) owns the card's capture gain and the chain's gain stages; see
 # pkgs/nixly-mic for the control law.
 { pkgs, ... }:
 
@@ -15,33 +15,39 @@ in
   services.pipewire.extraConfig.pipewire."99-nixly-mic" = {
     "context.modules" = [
       {
-        # Reference is the monitor of whatever sink is playing, so apps keep
-        # using the real sink and nothing has to be routed by hand.
-        name = "libpipewire-module-echo-cancel";
+        # Carries no processing: it exists so nixly-mic can meter the signal
+        # before the gain stages it controls.
+        name = "libpipewire-module-filter-chain";
         args = {
-          "library.name" = "aec/libspa-aec-webrtc";
-          "monitor.mode" = true;
-          # webrtc's own AGC is the drift we must not have; rnnoise does
-          # better noise suppression than webrtc's.
-          "aec.args" = "webrtc.gain_control=false webrtc.noise_suppression=false webrtc.high_pass_filter=true webrtc.mobile_mode=false";
-          "audio.rate" = 48000;
-          "audio.channels" = 1;
-          "node.link-group" = "nixly-mic-ec";
-          "capture.props" = {
-            "node.name" = "nixly-mic-capture";
-            "node.description" = "NixlyMic capture";
+          "node.description" = "NixlyMic tap";
+          "media.name" = "NixlyMic tap";
+          "filter.graph" = {
+            nodes = [ { type = "builtin"; name = "thru"; label = "copy"; } ];
+            inputs = [ "thru:In" ];
+            outputs = [ "thru:Out" ];
           };
-          "source.props" = {
-            "node.name" = "nixly-mic-ec";
-            "node.description" = "Echo cancelled microphone";
+          "node.link-group" = "nixly-mic-tap";
+          "capture.props" = {
+            "node.name" = "nixly-mic-tap-input";
+            "node.description" = "NixlyMic tap input";
+            "node.passive" = true;
+            "audio.rate" = 48000;
+            "audio.channels" = 1;
+            "audio.position" = [ "MONO" ];
+            "node.latency" = "480/48000";
+          };
+          "playback.props" = {
+            "node.name" = "nixly-mic-tap";
+            "node.description" = "NixlyMic tap";
+            "media.class" = "Audio/Source";
+            "audio.rate" = 48000;
+            "audio.channels" = 1;
+            "audio.position" = [ "MONO" ];
             "filter.smart" = true;
-            "filter.smart.name" = "nixly-mic-ec";
-            # Closest to the device, so it cancels echo before anything else
-            # touches the signal. Stated from both sides because the sort only
-            # reorders on the entry that is already in the list.
+            "filter.smart.name" = "nixly-mic-tap";
+            # Closest to the device. Stated from both sides because the sort
+            # only reorders on the entry that is already in the list.
             "filter.smart.after" = [ "nixly-mic" ];
-            # nixly-mic's level meter taps the signal here, before the gain
-            # stages it controls.
             "filter.smart.targetable" = true;
           };
         };
@@ -72,23 +78,14 @@ in
               { type = "builtin"; name = "g1"; label = "linear"; control = { "Mult" = 1.0; }; }
               { type = "builtin"; name = "g2"; label = "linear"; control = { "Mult" = 1.0; }; }
               {
+                # Threshold 0 suppresses noise without ever gating: a voice the
+                # detector is unsure about is quieter, never missing.
                 type = "ladspa"; name = "nr"; plugin = rnnoise;
                 label = "noise_suppressor_mono";
                 control = {
-                  "VAD Threshold (%)" = 55.0;
+                  "VAD Threshold (%)" = 0.0;
                   "VAD Grace Period (ms)" = 200.0;
                   "Retroactive VAD Grace (ms)" = 60.0;
-                };
-              }
-              {
-                # Only removes what rnnoise leaves behind between words.
-                type = "builtin"; name = "gate"; label = "noisegate";
-                control = {
-                  "Open Threshold" = 0.012;
-                  "Close Threshold" = 0.008;
-                  "Attack (s)" = 0.005;
-                  "Hold (s)" = 0.25;
-                  "Release (s)" = 0.12;
                 };
               }
               {
@@ -122,8 +119,7 @@ in
               { output = "hum2:Out"; input = "g1:In"; }
               { output = "g1:Out"; input = "g2:In"; }
               { output = "g2:Out"; input = "nr:Input"; }
-              { output = "nr:Output"; input = "gate:In"; }
-              { output = "gate:Out"; input = "comp:Input"; }
+              { output = "nr:Output"; input = "comp:Input"; }
               { output = "comp:Output"; input = "lim:Input 1"; }
             ];
             inputs = [ "dc:In 1" ];
@@ -137,6 +133,8 @@ in
             "audio.rate" = 48000;
             "audio.channels" = 1;
             "audio.position" = [ "MONO" ];
+            # rnnoise works on 10 ms frames; anything else tears the audio.
+            "node.latency" = "480/48000";
           };
           "playback.props" = {
             "node.name" = "nixly-mic";
@@ -147,8 +145,8 @@ in
             "audio.position" = [ "MONO" ];
             "filter.smart" = true;
             "filter.smart.name" = "nixly-mic";
-            # Closest to the app, so the echo canceller sees the raw device.
-            "filter.smart.before" = [ "nixly-mic-ec" ];
+            # Closest to the app, so the tap sees the raw device.
+            "filter.smart.before" = [ "nixly-mic-tap" ];
           };
         };
       }

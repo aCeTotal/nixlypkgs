@@ -7,10 +7,11 @@
 
 #include "control.h"
 #include "meter.h"
+#include "mixer.h"
 #include "state.h"
 
 #define FC_NODE "nixly-mic"
-#define EC_SOURCE "nixly-mic-ec"
+#define TAP_SOURCE "nixly-mic-tap"
 #define METER_NODE "nixly-mic-meter"
 #define RATE 48000
 #define NAME_LEN 160
@@ -43,8 +44,10 @@ struct app {
 	int route_device;
 	int route_index;
 	uint32_t route_nch;
-	bool vol_known;
-	float pushed_vol;
+	bool hw_known;
+
+	struct mixer mixer;
+	int card;
 
 	struct node_info nodes[MAX_NODES];
 	int n_nodes;
@@ -58,6 +61,13 @@ struct app {
 
 	struct pw_stream *stream;
 	struct spa_hook stream_listener;
+	struct pw_stream *ref_stream;
+	struct spa_hook ref_listener;
+	double ref_hot_until;
+	struct pw_stream *vad_stream;
+	struct spa_hook vad_listener;
+	double speech_until;
+	float ec_rms;
 	bool fc_running;
 
 	float pushed_g1;
@@ -71,13 +81,19 @@ void info(struct app *a, const char *fmt, ...);
 
 void push_props(struct app *a);
 
-void route_bind(struct app *a, uint32_t device_id, int profile_device);
+void route_bind(struct app *a, uint32_t device_id);
 void route_unbind(struct app *a);
-void push_volume(struct app *a);
+void push_hw(struct app *a);
 
 void meter_start(struct app *a);
 void meter_stop(struct app *a);
 void update_metering(struct app *a);
+
+void refgate_start(struct app *a);
+void refgate_stop(struct app *a);
+
+void vadgate_start(struct app *a);
+void vadgate_stop(struct app *a);
 
 void pick_setup(struct app *a);
 void store_gains(struct app *a);
