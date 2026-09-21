@@ -6,9 +6,10 @@
 
 #define CONTROL_HW 1
 #define CONTROL_GAIN 2
+#define CONTROL_LEARNED 4
 
 /* Headroom below the card's maximum when nothing has been learned yet. */
-#define HW_START_BELOW_MAX 12.0f
+#define HW_START_BELOW_MAX 20.0f
 
 /* The card's capture gain rides the converter headroom; sens_db sets the level
  * the chain works at. Loud talking never moves either: both react to long
@@ -20,6 +21,8 @@ struct control {
 	float hw_start;
 	float sens_db;
 	bool learned;
+	float learn_secs;
+	float seen_speech;
 
 	double clip_lock;
 	double last_clip;

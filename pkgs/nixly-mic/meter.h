@@ -4,9 +4,8 @@
 
 #define METER_HIST 600
 
-/* Speech level statistics measured on the echo cancelled microphone. Which
- * frames hold speech is decided by the chain's noise suppressor, not by level,
- * so a noisy room cannot pass for a voice. */
+/* Speech level statistics from the microphone. A frame is speech when it
+ * stands clear of the tracked noise floor. */
 struct meter {
 	int rate;
 	int frame_len;
@@ -35,6 +34,6 @@ struct meter {
 };
 
 void meter_init(struct meter *m, int rate);
-void meter_push(struct meter *m, const float *s, int n, bool speech);
+bool meter_push(struct meter *m, const float *s, int n);
 bool meter_level(const struct meter *m, int min_len, float pct, float *out_db);
 bool meter_peak_level(const struct meter *m, int min_len, float pct, float *out_db);

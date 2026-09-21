@@ -8,7 +8,7 @@
 
 #define MAX_MICS 32
 #define KEY_LEN 160
-#define FORMAT "nixly-mic 2"   /* hw gain in dB; older files held a fraction */
+#define FORMAT "nixly-mic 3"   /* new control law voids older gains */
 
 struct entry {
 	char key[KEY_LEN];

@@ -64,10 +64,7 @@ struct app {
 	struct pw_stream *ref_stream;
 	struct spa_hook ref_listener;
 	double ref_hot_until;
-	struct pw_stream *vad_stream;
-	struct spa_hook vad_listener;
 	double speech_until;
-	float ec_rms;
 	bool fc_running;
 
 	float pushed_g1;
@@ -91,9 +88,6 @@ void update_metering(struct app *a);
 
 void refgate_start(struct app *a);
 void refgate_stop(struct app *a);
-
-void vadgate_start(struct app *a);
-void vadgate_stop(struct app *a);
 
 void pick_setup(struct app *a);
 void store_gains(struct app *a);

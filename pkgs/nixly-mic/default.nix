@@ -12,7 +12,7 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    $CC -O2 -Wall -Wextra -o nixly-mic main.c pick.c route.c chain.c meterio.c meter.c refgate.c vadgate.c mixer.c control.c state.c \
+    $CC -O2 -Wall -Wextra -o nixly-mic main.c pick.c route.c chain.c meterio.c meter.c refgate.c mixer.c control.c state.c \
       $(pkg-config --cflags --libs libpipewire-0.3 alsa) -lm
     runHook postBuild
   '';

@@ -8,6 +8,7 @@
 #define FLOOR_RISE (0.04f * FRAME_SEC)   /* noise floor climbs 0.04 dB/s */
 #define FLOOR_FALL 0.25f
 #define SPEECH_FRAMES 10                 /* per second, before it counts */
+#define SPEECH_OVER 12.0f                /* dB above the floor to be a voice */
 #define CLIP_LEVEL 0.985f
 
 void meter_init(struct meter *m, int rate)
@@ -15,7 +16,8 @@ void meter_init(struct meter *m, int rate)
 	memset(m, 0, sizeof(*m));
 	m->rate = rate;
 	m->frame_len = (int)(rate * FRAME_SEC);
-	m->floor_db = -60.0f;
+	/* High, so the first quiet gap pulls it down to the real floor. */
+	m->floor_db = -20.0f;
 }
 
 static void push_hist(float *hist, int *len, int *pos, float v)
@@ -42,15 +44,17 @@ static void second_done(struct meter *m)
 	m->sec_peak = 0.0f;
 }
 
-static void frame_done(struct meter *m, bool speech)
+static bool frame_done(struct meter *m)
 {
 	float rms_db = 10.0f * log10f((float)(m->sumsq / m->n) + 1e-12f);
+	bool speech;
 
 	if (rms_db < m->floor_db)
 		m->floor_db += (rms_db - m->floor_db) * FLOOR_FALL;
 	else
 		m->floor_db += FLOOR_RISE;
 
+	speech = rms_db > m->floor_db + SPEECH_OVER;
 	if (speech) {
 		m->speech_secs += FRAME_SEC;
 		m->quiet_secs = 0.0f;
@@ -69,10 +73,12 @@ static void frame_done(struct meter *m, bool speech)
 	m->n = 0;
 	m->peak = 0.0f;
 	m->sumsq = 0.0;
+	return speech;
 }
 
-void meter_push(struct meter *m, const float *s, int n, bool speech)
+bool meter_push(struct meter *m, const float *s, int n)
 {
+	bool speech = false;
 	int i;
 
 	for (i = 0; i < n; i++) {
@@ -81,8 +87,9 @@ void meter_push(struct meter *m, const float *s, int n, bool speech)
 			m->peak = v;
 		m->sumsq += (double)s[i] * s[i];
 		if (++m->n >= m->frame_len)
-			frame_done(m, speech);
+			speech |= frame_done(m);
 	}
+	return speech;
 }
 
 static int cmp_float(const void *a, const void *b)

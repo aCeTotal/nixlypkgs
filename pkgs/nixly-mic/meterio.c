@@ -3,21 +3,10 @@
  * the microphone open. */
 #include "app.h"
 
-#include <math.h>
-
 #include <spa/param/audio/format-utils.h>
 #include <spa/pod/builder.h>
 
-/* What the speech gate compares the chain's output against. */
-static float buffer_rms(const float *s, uint32_t n)
-{
-	double sumsq = 0.0;
-	uint32_t i;
-
-	for (i = 0; i < n; i++)
-		sumsq += (double)s[i] * s[i];
-	return n ? sqrtf((float)(sumsq / n)) : 0.0f;
-}
+#define SPEECH_HOLD 0.6   /* speech is assumed to continue this long */
 
 static void on_process(void *data)
 {
@@ -31,13 +20,11 @@ static void on_process(void *data)
 	if (d->data && d->chunk->size) {
 		double now = mono_now();
 
-		a->ec_rms = buffer_rms((float *)((uint8_t *)d->data + d->chunk->offset),
-				       d->chunk->size / sizeof(float));
-		if (now >= a->ref_hot_until)
-			meter_push(&a->meter,
-				   (float *)((uint8_t *)d->data + d->chunk->offset),
-				   d->chunk->size / sizeof(float),
-				   now < a->speech_until);
+		if (now >= a->ref_hot_until &&
+		    meter_push(&a->meter,
+			       (float *)((uint8_t *)d->data + d->chunk->offset),
+			       d->chunk->size / sizeof(float)))
+			a->speech_until = now + SPEECH_HOLD;
 	}
 	pw_stream_queue_buffer(a->stream, b);
 }
@@ -92,10 +79,8 @@ void update_metering(struct app *a)
 	if (a->fc_running && a->selected[0]) {
 		meter_start(a);
 		refgate_start(a);
-		vadgate_start(a);
 		return;
 	}
 	meter_stop(a);
 	refgate_stop(a);
-	vadgate_stop(a);
 }

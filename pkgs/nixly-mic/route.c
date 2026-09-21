@@ -19,6 +19,7 @@ void push_hw(struct app *a)
 
 	if (a->mixer.elem == NULL)
 		return;
+	mixer_pin_boost(&a->mixer);
 	if (mixer_get_db(&a->mixer, &cur) && fabsf(cur - a->ctl.hw_db) < DRIFT_DB)
 		return;
 	if (mixer_set_db(&a->mixer, a->ctl.hw_db))

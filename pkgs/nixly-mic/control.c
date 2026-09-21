@@ -8,7 +8,8 @@
 #define LOUD_LO_DB -15.0f    /* below this it has room to spare */
 #define PEAK_SECS 10         /* seconds of peak history before trusting it */
 #define CLIP_LOCK 300.0      /* no gain increase for 5 min after clipping */
-#define CLIP_STEP 10.0       /* min seconds between clip cuts */
+#define CLIP_STEP 3.0        /* min seconds between clip cuts */
+#define LEARN_SECS 60.0f     /* speech heard before the mic counts as known */
 #define QUIET_RESCUE 60.0f   /* silence that means the gain is too low */
 #define RESCUE_STEP 6.0f
 #define FAST_WINDOW 30.0     /* re-converge quickly after a gain change */
@@ -32,6 +33,8 @@ void control_reset(struct control *c, float hw_db, float sens_db, bool learned)
 	c->hw_db = hw_db;
 	c->sens_db = sens_db;
 	c->learned = learned;
+	c->learn_secs = 0.0f;
+	c->seen_speech = 0.0f;
 	c->clip_lock = 0.0;
 	c->last_clip = 0.0;
 	c->last_up = 0.0;
@@ -80,14 +83,30 @@ static bool tick_hw(struct control *c, struct meter *m, double now)
 	return true;
 }
 
+/* The mic counts as known once a minute of speech has passed through it,
+ * counted across the meter restarts a card gain change forces. */
+static bool tick_learn(struct control *c, struct meter *m)
+{
+	if (m->speech_secs >= c->seen_speech)
+		c->learn_secs += m->speech_secs - c->seen_speech;
+	c->seen_speech = m->speech_secs;
+
+	if (c->learned || c->learn_secs < LEARN_SECS)
+		return false;
+	c->learned = true;
+	return true;
+}
+
 static bool tick_sens(struct control *c, struct meter *m, double now)
 {
-	bool fast = !c->learned || now < c->fast_until;
+	bool fresh = !c->learned;
+	bool fast = fresh || now < c->fast_until;
 	double period = fast ? 5.0 : 60.0;
 	int min_len = fast ? 5 : 120;
-	float dead = fast ? 1.0f : 4.0f;
-	float up = fast ? 6.0f : 1.0f;
-	float down = fast ? 6.0f : 0.5f;
+	float dead = fast ? 2.0f : 4.0f;
+	/* Only an unknown mic may jump: every later step has to be inaudible. */
+	float up = fresh ? 6.0f : (fast ? 2.0f : 1.0f);
+	float down = fresh ? 6.0f : (fast ? 2.0f : 0.5f);
 	float quiet, want, d;
 
 	if (now - c->last_sens < period)
@@ -97,8 +116,6 @@ static bool tick_sens(struct control *c, struct meter *m, double now)
 	 * so it can never drag the gain down. */
 	if (!meter_level(m, min_len, 0.25f, &quiet))
 		return false;
-	if (!c->learned && m->hist_len >= 60)
-		c->learned = true;
 
 	want = TARGET_IN_DB - quiet;
 	d = want - c->sens_db;
@@ -113,6 +130,8 @@ int control_tick(struct control *c, struct meter *m, double now)
 {
 	int changed = 0;
 
+	if (tick_learn(c, m))
+		changed |= CONTROL_LEARNED;
 	if (tick_hw(c, m, now))
 		changed |= CONTROL_HW | CONTROL_GAIN;
 	if (tick_sens(c, m, now))

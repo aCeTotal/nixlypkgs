@@ -9,6 +9,7 @@
 #include <time.h>
 
 #define SAVE_DELAY 15.0
+#define GAIN_PAUSE 1.0   /* silence before a gain step passes unheard */
 
 double mono_now(void)
 {
@@ -38,21 +39,21 @@ static void on_timer(void *data, uint64_t expirations)
 	if (a->stream && now >= a->ref_hot_until) {
 		int changed = control_tick(&a->ctl, &a->meter, now);
 
-		info(a, "level: floor %.1f card %.1f speech %.1fs hist %d",
-		     a->meter.floor_db, a->ctl.hw_db, a->meter.speech_secs,
-		     a->meter.hist_len);
-		/* Gain steps are audible, so they wait for a pause in speech. */
-		if ((changed & CONTROL_GAIN) && now >= a->speech_until)
-			push_props(a);
+		info(a, "level: floor %.1f card %.1f chain %.1f speech %.1fs hist %d",
+		     a->meter.floor_db, a->ctl.hw_db, a->ctl.sens_db,
+		     a->meter.speech_secs, a->meter.hist_len);
 		if (changed) {
 			store_gains(a);
 			if (a->save_at == 0.0)
 				a->save_at = now + SAVE_DELAY;
 		}
 	}
-	/* Anything else that writes the card's gain is undone here, in a pause. */
-	if (now >= a->speech_until)
+	/* Gain steps are audible, so they wait for a pause in speech; both calls
+	 * do nothing when the level they would write is already there. */
+	if (now >= a->speech_until + GAIN_PAUSE) {
+		push_props(a);
 		push_hw(a);
+	}
 	if (a->save_at != 0.0 && now >= a->save_at) {
 		state_save(a->state);
 		a->save_at = 0.0;
