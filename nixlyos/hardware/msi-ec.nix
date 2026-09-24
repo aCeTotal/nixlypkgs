@@ -95,7 +95,7 @@ in
       MemoryDenyWriteExecute = true;
       SystemCallArchitectures = "native";
       SystemCallFilter = [ "@system-service" "@raw-io" ];
-      CapabilityBoundingSet = [ "CAP_SYS_RAWIO" "CAP_DAC_OVERRIDE" ];
+      CapabilityBoundingSet = [ "CAP_SYS_RAWIO" "CAP_DAC_OVERRIDE" "CAP_CHOWN" ];
       # /sys and /dev stay writable under strict; only /run needs listing
       # (the control socket). NVML lives behind /run/opengl-driver.
       ReadWritePaths = [ "/run" ];

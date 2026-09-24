@@ -113,6 +113,14 @@ tune_cpu() {
 		esac
 	fi
 
+	# MSI laptops: turbo raises the power limits.
+	case "$(cat "${ROOT}/sys/devices/platform/msi-ec/available_shift_modes" 2>/dev/null)" in
+	*turbo*)
+		save_and_set msi-shift-mode \
+			"${ROOT}/sys/devices/platform/msi-ec/shift_mode" turbo
+		;;
+	esac
+
 	# AMD X3D dual-CCD: bias the scheduler's core ranking toward the
 	# V-Cache CCD (amd_3d_vcache driver; the glob matches nothing on every
 	# other machine). nixlytile additionally hard pins the game there —
