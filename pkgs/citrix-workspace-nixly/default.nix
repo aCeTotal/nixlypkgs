@@ -410,8 +410,11 @@ stdenv.mkDerivation {
 
       for wfc in "$ICAInstDir/config/wfclient.ini" "$ICAInstDir/config/wfclient.template"; do
         [ -f "$wfc" ] || continue
+        # Citrix ships its own CDMAllowed; a second one makes wfica reject the file.
+        sed -i '/^\[WFClient\]/,/^\[[^]]*\]/ { /^CDMAllowed[[:space:]]*=/d }' "$wfc"
+        sed -i '/^\[WFClient\]/a\CDMAllowed=True' "$wfc"
         if ! grep -q "DriveEnabledA" "$wfc"; then
-          sed -i '/^\[WFClient\]/a\CDMAllowed=True\nDriveEnabledA=True\nDrivePathA=/\nDriveReadAccessA=3\nDriveWriteAccessA=3' "$wfc"
+          sed -i '/^\[WFClient\]/a\DriveEnabledA=True\nDrivePathA=/\nDriveReadAccessA=3\nDriveWriteAccessA=3' "$wfc"
         fi
         if ! grep -q "^H264Enabled" "$wfc"; then
           sed -i '/^\[WFClient\]/a\H264Enabled=True\nH265Enabled=True\nGraphicsAcceleration=True\nEnableHardwareDecoding=True\nMaximumCompression=True' "$wfc"

@@ -24,6 +24,7 @@ in
     ./nic-latency.nix
     ./dns-ecs.nix
     ./tailscale.nix
+    ./netbird.nix
     ./nix.nix
     ./lockscreen.nix
     ./nfs.nix
