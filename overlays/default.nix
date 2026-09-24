@@ -19,7 +19,6 @@ in {
   gaea = callPackage ../pkgs/gaea { };
   kmymoney = callPackage ../pkgs/kmymoney { };
   low-latency-layer = callPackage ../pkgs/low-latency-layer { };
-  discord-keybridge = callPackage ../pkgs/discord-keybridge { };
   nixly-mic = callPackage ../pkgs/nixly-mic { };
   proton-nixlyos = callPackage ../pkgs/proton-nixlyos { };
   proton-nixlyos-generic = callPackage ../pkgs/proton-nixlyos { variant = "generic"; };
@@ -33,24 +32,6 @@ in {
   bluez-nixly = prev.bluez.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [ ../pkgs/bluez/hog-retry.patch ];
   });
-
-  # Discord's keybinds are X11-only; every launcher starts the bridge that
-  # feeds them.  Wrapping the store paths keeps the upstream layout (plain
-  # or FHS) untouched.
-  discord = final.runCommand prev.discord.name {
-    nativeBuildInputs = [ final.makeWrapper ];
-    inherit (prev.discord) meta;
-  } ''
-    mkdir -p $out
-    cp -as ${prev.discord}/. $out/
-    chmod -R u+w $out
-    for bin in $out/bin/*; do
-      target=$(readlink -f $bin)
-      rm $bin
-      makeWrapper $target $bin \
-        --run '${final.discord-keybridge}/bin/discord-keybridge >/dev/null 2>&1 &'
-    done
-  '';
 
   flycast = prev.flycast.overrideAttrs (old: {
     postPatch = (old.postPatch or "") + ''

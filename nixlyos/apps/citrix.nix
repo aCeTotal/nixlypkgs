@@ -42,22 +42,20 @@
     home.activation.citrixWfclientIni = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       INI="$HOME/.ICAClient/wfclient.ini"
       if [ -f "$INI" ]; then
-        # Citrix's UseFullScreen default spans every monitor as one X window.
+        # Default fullscreen spans every monitor.
         ${pkgs.gnused}/bin/sed -i \
           's/^UseFullScreen[[:space:]]*=.*/UseFullScreen=False/' "$INI"
 
-        # Map drive A: to the home directory; wfica expands $HOME itself.
-        ${pkgs.gnused}/bin/sed -i \
-          's|^DrivePathA[[:space:]]*=.*|DrivePathA=$HOME|' "$INI"
-
-        # Otherwise the local Super key opens the Windows start menu in-session.
-        if ${pkgs.gnugrep}/bin/grep -q '^SuperMetaToWinKeys' "$INI"; then
-          ${pkgs.gnused}/bin/sed -i \
-            's/^SuperMetaToWinKeys[[:space:]]*=.*/SuperMetaToWinKeys=False/' "$INI"
-        else
-          ${pkgs.gnused}/bin/sed -i \
-            '/^\[WFClient\]/a SuperMetaToWinKeys=False' "$INI"
-        fi
+        # Read-write home drive, local Super.
+        for kv in CDMAllowed=True DriveEnabledA=True 'DrivePathA=$HOME' \
+            DriveReadAccessA=0 DriveWriteAccessA=0 SuperMetaToWinKeys=False; do
+          key=''${kv%%=*}
+          if ${pkgs.gnugrep}/bin/grep -q "^$key[[:space:]]*=" "$INI"; then
+            ${pkgs.gnused}/bin/sed -i "s|^$key[[:space:]]*=.*|$kv|" "$INI"
+          else
+            ${pkgs.gnused}/bin/sed -i "/^\[WFClient\]/a $kv" "$INI"
+          fi
+        done
       fi
     '';
   };

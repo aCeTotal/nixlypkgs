@@ -18,6 +18,10 @@ final: prev: {
       sed -i 's/^CDMHideHiddenFile\([[:space:]]*\)=.*/CDMHideHiddenFile\1= 1/' \
         $out/opt/citrix-icaclient/config/module.ini
 
+      # Follow symlinks out of home.
+      sed -i '/^\[ClientDrive\]/a AllowSymlinkTraversalOutsideMap=True' \
+        $out/opt/citrix-icaclient/config/module.ini
+
       # Also disabled here, since module.ini beats the wfclient.ini setting that
       # wfica rewrites on every GUI change.
       sed -i 's/^SuperMetaToWinKeys[[:space:]]*=.*/SuperMetaToWinKeys=False/' \
