@@ -1,7 +1,7 @@
 { lib, nixlyUser, ... }:
 
 {
-  # Key-only sshd from private ranges; WAN still never sees port 22.
+  # sshd from private ranges only.
   networking.firewall.extraInputRules = ''
     ip saddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } tcp dport 22 accept
   '';
@@ -12,14 +12,11 @@
     openFirewall = false;
     settings = {
       PermitRootLogin = "no";
-      # Keys only: brute force has nothing to guess. Tailscale SSH does its
-      # own tailnet auth and never reaches sshd, so the usual login is
-      # unaffected; a LAN login needs a key in authorizedKeys.
-      PasswordAuthentication = false;
+      # Key or password, LAN only.
+      PasswordAuthentication = true;
       PermitEmptyPasswords = false;
       KbdInteractiveAuthentication = false;
       PubkeyAuthentication = true;
-      AuthenticationMethods = "publickey";
       AllowUsers = [ nixlyUser ];
       X11Forwarding = false;
       AllowTcpForwarding = "yes";
