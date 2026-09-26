@@ -14,12 +14,10 @@
 { pkgs, lib, config, ... }:
 
 lib.mkIf (config.nixlyos.mode == "htpc") {
-  # No silent-stream keepalive: with it on, the codec feeds the TV a
-  # permanent silent stream + audio infoframe, so the sink's idle
-  # suspend never pulls the infoframe and the TV/eARC receiver never
-  # mutes when nothing is playing.
+  # Idle mute; 5.1 despite ELD.
   boot.extraModprobeConfig = ''
     options snd_hda_codec_intelhdmi enable_silent_stream=N
+    options snd_hda_codec_hdmi static_hdmi_pcm=1
   '';
 
   systemd.services.htpc-hdmi-audio = {

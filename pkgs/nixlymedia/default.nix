@@ -35,14 +35,14 @@ let
 in
 rustPlatform.buildRustPackage rec {
   pname = "nixlymedia";
-  version = "2026.09.13";
+  version = "2026.09.26";
 
   src = fetchFromGitHub {
     name = "nixlymedia-src-8c19e08";
     owner = "aCeTotal";
     repo = "nixlymedia";
-    rev = "8c19e08c1d83c5942a2382303bf9be374fa35011";
-    hash = "sha256-yYbBx0gCT22bFdEHpjgmZyYueuHhQhT22HTF/V5gPEo=";
+    rev = "db6d520497c1853c9ec26069382708548c145d66";
+    hash = "sha256-L9Buim9nAtC6bnvSt4pQoGCOBE5azuXPQwso7Oov+FQ=";
   };
 
   cargoHash = "sha256-1ao6Nd/yc8Z6aaqCtrTlyZYwmGRLey5vEuP+hQJlt2s=";

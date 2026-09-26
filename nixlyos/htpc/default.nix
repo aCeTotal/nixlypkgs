@@ -20,6 +20,7 @@
     ./controllers.nix
     ./geforce-now.nix
     ./qos.nix
+    ./rx-buffers.nix
     ./trim.nix
   ];
 }

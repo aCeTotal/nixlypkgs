@@ -1,15 +1,31 @@
-# HTPC audio routing: display audio out is always the default sink, profiles
-# stay on auto (base/sound.nix) so ACP picks a profile the TV actually
-# advertises via EDID. HDMI and DisplayPort share the same ALSA hdmi:x,y
-# devices, so the "hdmi" node match covers both connectors; auto-port follows
-# whichever one has a display plugged in (ELD/jack detection). The desktop's
-# forced hdmi-surround71 profile (home/audio_priority.nix, now desktop-only)
-# played as static on the TV.
+# HTPC: display audio, always 5.1.
 { config, lib, pkgs, ... }:
 
+let
+  # Stereo gets LFE: 2.1.
+  upmix = {
+    "channelmix.upmix" = true;
+    "channelmix.lfe-cutoff" = 120;
+  };
+in
 lib.mkIf (config.nixlyos.mode == "htpc") {
 
+  services.pipewire.extraConfig.client."60-htpc-upmix"."stream.properties" = upmix;
+  services.pipewire.extraConfig.pipewire-pulse."60-htpc-upmix"."stream.properties" = upmix;
+
   services.pipewire.wireplumber.extraConfig."55-htpc-hdmi-priority" = {
+    "device.profile.priority.rules" = [
+      {
+        matches = [
+          { "device.name" = "~alsa_card.*"; }
+        ];
+        actions = {
+          update-props = {
+            priorities = [ "output:hdmi-surround" "output:hdmi-stereo" ];
+          };
+        };
+      }
+    ];
     "monitor.alsa.rules" = [
       {
         matches = [
