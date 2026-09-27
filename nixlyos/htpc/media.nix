@@ -138,6 +138,8 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
       savestate_auto_save = "true"
       savestate_auto_load = "true"
       savestate_thumbnail_enable = "true"
+      # SIGKILL on switch skips exit flush.
+      autosave_interval = "10"
 
       # Misc
       pause_nonactive = "false"

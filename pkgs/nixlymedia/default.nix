@@ -35,17 +35,17 @@ let
 in
 rustPlatform.buildRustPackage rec {
   pname = "nixlymedia";
-  version = "2026.09.26";
+  version = "2026.09.27";
 
   src = fetchFromGitHub {
     name = "nixlymedia-src-8c19e08";
     owner = "aCeTotal";
     repo = "nixlymedia";
-    rev = "db6d520497c1853c9ec26069382708548c145d66";
-    hash = "sha256-L9Buim9nAtC6bnvSt4pQoGCOBE5azuXPQwso7Oov+FQ=";
+    rev = "9b39317148abc956ca36baa99ecdd0a9274d6edb";
+    hash = "sha256-if+FNKCcWY0hdd/CaWWrHpZk6t/IuJc+dIXPKM1VU88=";
   };
 
-  cargoHash = "sha256-1ao6Nd/yc8Z6aaqCtrTlyZYwmGRLey5vEuP+hQJlt2s=";
+  cargoHash = "sha256-kFugkS8x1TOVTwJ4gC1cVj3g3/6uDcE3vwh/2iSAcMI=";
 
   nativeBuildInputs = [
     pkg-config
