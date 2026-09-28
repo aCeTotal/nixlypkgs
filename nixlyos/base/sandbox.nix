@@ -1,18 +1,8 @@
 { pkgs, ... }:
 
-# A browser tab is the one place untrusted code runs every day. Firejail's
-# stock profiles keep it out of the rest of $HOME, so a drive-by exploit
-# cannot walk the home directory or encrypt it.
-#
-# Steam and wine stay unjailed on purpose: Proton runs games inside its own
-# bwrap namespace, which firejail refuses to nest, and firejail's seccomp
-# helpers are already disabled here ("dumpable process"), so the jail would
-# break gaming for filesystem confinement alone.
+# Steam stays unjailed: Proton needs bwrap.
 let
-  # Stock profiles leave the session bus wide open (dbus-user none is
-  # commented out), so a jailed process reaches org.freedesktop.systemd1 and
-  # StartTransientUnit spawns a service outside the jail. Filter mode allows
-  # only the buses a browser needs and drops systemd1, closing that escape.
+  # Blocks systemd1 jail escape.
   dbusFilter = [
     "--dbus-user=filter"
     "--dbus-user.talk=org.freedesktop.Notifications"
@@ -24,7 +14,7 @@ let
   ];
   dbusArgs = builtins.concatStringsSep " \\\n          " dbusFilter;
 
-  jail = final: { pkg, bin, profile }:
+  jail = final: { pkg, bin, profile, extraArgs ? [ ] }:
     final.symlinkJoin {
       name = "${bin}-jailed";
       paths = [ pkg ];
@@ -36,6 +26,7 @@ let
         exec /run/wrappers/bin/firejail \
           --profile=${final.firejail}/etc/firejail/${profile}.profile \
           ${dbusArgs} \
+          ${builtins.concatStringsSep " " extraArgs} \
           -- ${pkg}/bin/${bin} "\$@"
         EOF
         chmod 0755 $out/bin/${bin}
@@ -60,6 +51,8 @@ in
         pkg = prev.google-chrome;
         bin = "google-chrome-stable";
         profile = "google-chrome";
+        # Citrix sessions inherit this home.
+        extraArgs = [ "--whitelist=~" ];
       };
       brave = jail final {
         pkg = prev.brave;
