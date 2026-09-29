@@ -15,8 +15,8 @@
           claude
           discord
           google-chrome
+          libreoffice-fresh
           nixlymedia
-          onlyoffice-desktopeditors
           pavucontrol
           spotify
           teams-for-linux
