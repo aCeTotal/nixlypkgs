@@ -7,6 +7,10 @@
       url = "github:aCeTotal/nixly_launcher";
       flake = false;
     };
+    nixly_voice_src = {
+      url = "github:aCeTotal/nixly_voice";
+      flake = false;
+    };
 
     # NixlyOS system inputs. This flake.lock is THE system pin: machines only
     # ever run `nix flake update nixlypkgs`, so every rev below ships exactly
@@ -73,7 +77,7 @@
                 inherit (kp) xpadneo xone xpad-noone msi-ec;
               };
         in {
-          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly nixly-mic nixly_kalk nixly_pdf;
+          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly nixly-mic nixly_kalk nixly_pdf nixly_voice;
 
           totalvim = import ./nixlyos/lib/totalvim.nix {
             pkgs = stable;

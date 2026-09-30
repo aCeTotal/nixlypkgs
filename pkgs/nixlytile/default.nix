@@ -69,14 +69,15 @@
 , slurp
 , wl-clipboard
 , nixlycc
+, nixly_voice
 }:
 
 let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "05277db931efc2add08677b1dab77b45ac7f05a9";
-    hash = "sha256-g5h3LkadTOBmJ+PiDP3wRmxHm+tyiJB6hgtBomzkPbY=";
+    rev = "ebb69472ba821e192664b802274477522cd90a7d";
+    hash = "sha256-fkoC6xJmt/Fz7QkQkpjvDjR8aiClr+ZJzDmTpjfaWfs=";
   };
 
   wlrootsLocal = stdenv.mkDerivation {
@@ -140,12 +141,13 @@ let
     wl-clipboard
 
     nixlycc
+    nixly_voice
   ];
 in
 
 stdenv.mkDerivation {
   pname = "nixlytile";
-  version = "2026.09.29";
+  version = "2026.09.30";
 
   passthru.providedSessions = [ "nixlytile" ];
 

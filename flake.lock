@@ -151,6 +151,22 @@
         "type": "github"
       }
     },
+    "nixly_voice_src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790800904,
+        "narHash": "sha256-ZoLzkwUudO0tzY3ReXL9q00wcW+jju2ftIeuYJglmaY=",
+        "owner": "aCeTotal",
+        "repo": "nixly_voice",
+        "rev": "e0b0526db5ab0bfd9ae0bf8c1aec2f200fa3882c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "aCeTotal",
+        "repo": "nixly_voice",
+        "type": "github"
+      }
+    },
     "nixlyos-kernel": {
       "inputs": {
         "cachy-config": "cachy-config",
@@ -312,6 +328,7 @@
         "lanzaboote": "lanzaboote",
         "mnw": "mnw",
         "nixly_launcher_src": "nixly_launcher_src",
+        "nixly_voice_src": "nixly_voice_src",
         "nixlyos-kernel": "nixlyos-kernel",
         "nixos-hardware": "nixos-hardware",
         "nixos-stable": "nixos-stable",
