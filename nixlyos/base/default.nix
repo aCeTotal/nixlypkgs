@@ -71,6 +71,8 @@ in
     ../apps/newsboat.nix
     ../apps/w3m.nix
     ../apps/viewers.nix
+    ../apps/pdf.nix
+    ../apps/calculator.nix
     ../apps/mpv.nix
     ../apps/retroarch.nix
     ../services/drawingtablet.nix

@@ -157,7 +157,7 @@
         image/*;             swayimg %s
         video/*;             mpv %s
         audio/*;             mpv %s
-        application/pdf;     zathura %s
+        application/pdf;     nixly-pdf %s
       '';
     })
   ];

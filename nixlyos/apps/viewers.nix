@@ -1,20 +1,16 @@
-# PDF-leser (zathura) og bildeviser (swayimg) med xdg-mime-defaults,
-# så xdg-open og filbehandlere åpner dem automatisk.
+# Swayimg som bilde-default.
 { ... }:
 
 {
   config.home-manager.sharedModules = [
     ({ pkgs, ... }: {
       home.packages = with pkgs; [
-        zathura
         swayimg
       ];
 
       xdg.mimeApps = {
         enable = true;
         defaultApplications = {
-          "application/pdf" = [ "org.pwmt.zathura-pdf-mupdf.desktop" ];
-
           # Alle formatene swayimg selv oppgir i sin .desktop-fil.
           "image/avif" = [ "swayimg.desktop" ];
           "image/bmp" = [ "swayimg.desktop" ];

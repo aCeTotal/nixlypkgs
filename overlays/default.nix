@@ -20,6 +20,8 @@ in {
   kmymoney = callPackage ../pkgs/kmymoney { };
   low-latency-layer = callPackage ../pkgs/low-latency-layer { };
   nixly-mic = callPackage ../pkgs/nixly-mic { };
+  nixly_kalk = callPackage ../pkgs/nixly_kalk { };
+  nixly_pdf = callPackage ../pkgs/nixly_pdf { };
   proton-nixlyos = callPackage ../pkgs/proton-nixlyos { };
   proton-nixlyos-generic = callPackage ../pkgs/proton-nixlyos { variant = "generic"; };
 
