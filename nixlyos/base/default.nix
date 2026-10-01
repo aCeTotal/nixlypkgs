@@ -75,6 +75,7 @@ in
     ../apps/calculator.nix
     ../apps/mpv.nix
     ../apps/retroarch.nix
+    ../apps/rom-playlists
     ../services/drawingtablet.nix
   ]
   ++ lib.optional isX86 ../apps/citrix.nix

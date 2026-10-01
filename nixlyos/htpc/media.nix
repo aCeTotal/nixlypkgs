@@ -149,8 +149,7 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
       assets_directory = "${pkgs.retroarch-assets}/share/retroarch/assets"
       joypad_autoconfig_dir = "${joypadAutoconfigNoGuide}/share/libretro/autoconfig"
 
-      # Playlists: auto-generated from the NFS ROM share (playlists.nix),
-      # one per system, every entry pinned to its core.
+      # Written by apps/rom-playlists.
       playlist_directory = "~/.config/retroarch/playlists"
       content_show_playlists = "true"
     '';

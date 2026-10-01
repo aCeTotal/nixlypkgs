@@ -9,7 +9,6 @@
     ./media.nix
     ./audio.nix
     ./hdmi-audio.nix
-    ./playlists.nix
     ./bios-sync.nix
     ./retroarch-4k.nix
     ./gpu-perf.nix

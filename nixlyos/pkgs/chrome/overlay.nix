@@ -1,7 +1,6 @@
 final: prev: {
-  # Chrome is hard-killed when the Wayland session ends, so it always thinks it
-  # crashed; these flags suppress the "Restore pages?" bubble for good.
+  # Session kill fakes crashes; NVIDIA GMB video frames crash renderer.
   google-chrome = prev.google-chrome.override {
-    commandLineArgs = "--hide-crash-restore-bubble --disable-session-crashed-bubble --no-default-browser-check";
+    commandLineArgs = "--hide-crash-restore-bubble --disable-session-crashed-bubble --no-default-browser-check --disable-gpu-memory-buffer-video-frames";
   };
 }

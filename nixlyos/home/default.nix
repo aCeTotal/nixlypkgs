@@ -21,7 +21,6 @@
       ./qt.nix
       ./emulator_config.nix
       ./audio_priority.nix
-      ./emulator_playlists.nix
       ./caveman.nix
       ./claude.nix
       ./discord_rpc.nix
