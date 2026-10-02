@@ -154,11 +154,11 @@
     "nixly_voice_src": {
       "flake": false,
       "locked": {
-        "lastModified": 1790800904,
-        "narHash": "sha256-ZoLzkwUudO0tzY3ReXL9q00wcW+jju2ftIeuYJglmaY=",
+        "lastModified": 1790949558,
+        "narHash": "sha256-sq+zco1ocr6o4c/PjqL1PsVvU6dj+BWX5Q5Kzr8rwoo=",
         "owner": "aCeTotal",
         "repo": "nixly_voice",
-        "rev": "e0b0526db5ab0bfd9ae0bf8c1aec2f200fa3882c",
+        "rev": "9b3262094edaf9fe8648afe20625618ea90bb82a",
         "type": "github"
       },
       "original": {
