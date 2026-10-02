@@ -55,7 +55,7 @@ in
     nixly_launcher
   ];
 
-  home.file."Pictures/wallpapers/beach.jpg".source = ../wallpapers/beach.jpg;
+  home.file."Pictures/wallpapers/mountains.jpg".source = ../wallpapers/mountains.jpg;
 
   xdg.configFile."nixlytile/config.kdl".text = ''
     // nixlytile config (managed by home-manager: home/nixlytile.nix).
@@ -165,7 +165,7 @@ in
     // hel refresh aa signalere paa i stedet.
     game-late-latch false
     ''}
-    wallpaper "~/Pictures/wallpapers/beach.jpg"
+    wallpaper "~/Pictures/wallpapers/mountains.jpg"
 
     // "info" i produksjon — debug betyr per-event formatering + logg-IO
     // i frame-pathen.  Sett "debug" midlertidig ved feilsøking.
@@ -178,7 +178,7 @@ in
     // HTPC autostart: htpc-app-supervisoren starter RetroArch ved boot
     // og holder den valgte appen i live — krasjer den startes samme app
     // umiddelbart paa nytt.
-    autostart "swaybg -i \"$HOME/Pictures/wallpapers/beach.jpg\" -m fill"
+    autostart "swaybg -i \"$HOME/Pictures/wallpapers/mountains.jpg\" -m fill"
     // Steam er en X11-klient — xwayland-satellite maa opp foerst.
     autostart "xwayland-satellite"
     autostart "${setRandrPrimary}"
@@ -189,7 +189,7 @@ in
     // thunar-daemonen dro med seg 5 residente gvfs-volume-monitors
     // (goa/gphoto2/afc/mtp/udisks) ved hver innlogging. Thunar starter
     // fortsatt on-demand om noe kaller den.
-    autostart "swaybg -i \"$HOME/Pictures/wallpapers/beach.jpg\" -m fill"
+    autostart "swaybg -i \"$HOME/Pictures/wallpapers/mountains.jpg\" -m fill"
     // nm-applet/blueman-applet fjernet: nettverk + bluetooth er innebygd
     // i nixlytile (egne tray-ikoner med popup, direkte mot kernel/bluez).
     autostart "xwayland-satellite"
