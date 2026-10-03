@@ -14,7 +14,6 @@
           citrix-workspace-nixly
           claude
           discord
-          google-chrome
           libreoffice-fresh
           nixlymedia
           pavucontrol

@@ -8,12 +8,12 @@
 
   xdg.portal = {
     enable = true;
-    # nixlytile ships its own GlobalShortcuts backend (Discord/OBS
-    # global keybinds) — the .portal file lives in the package.
+    # Shortcuts and FileChooser from nixlytile.
     extraPortals = with pkgs; [ xdg-desktop-portal-gtk xdg-desktop-portal-wlr nixlytile ];
     config.nixlytile = {
       default = lib.mkForce [ "wlr" "gtk" ];
       "org.freedesktop.impl.portal.GlobalShortcuts" = [ "nixlytile" ];
+      "org.freedesktop.impl.portal.FileChooser" = [ "nixlytile" ];
     };
   };
 

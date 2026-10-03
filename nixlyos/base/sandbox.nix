@@ -47,17 +47,12 @@ in
 
   nixpkgs.overlays = [
     (final: prev: {
-      google-chrome = jail final {
-        pkg = prev.google-chrome;
-        bin = "google-chrome-stable";
-        profile = "google-chrome";
-        # Citrix sessions inherit this home.
-        extraArgs = [ "--whitelist=~" ];
-      };
       brave = jail final {
         pkg = prev.brave;
         bin = "brave";
         profile = "brave-browser";
+        # Citrix sessions inherit this home.
+        extraArgs = [ "--whitelist=~" ];
       };
     })
   ];

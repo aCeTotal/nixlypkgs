@@ -5,7 +5,7 @@
   home.sessionVariables = {
     EDITOR = "nvim";
     VISUAL = "nvim";
-    BROWSER = "google-chrome-stable"; # brave er ikke installert
+    BROWSER = "brave";
     TERMINAL = "alacritty";
   };
 }

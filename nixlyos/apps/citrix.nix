@@ -60,7 +60,7 @@
     '';
   };
 
-  # An enterprise policy, since Chrome's own "always open" setting is lost on profile reset.
-  environment.etc."opt/chrome/policies/managed/citrix-ica.json".text =
+  # Policy survives profile resets.
+  environment.etc."brave/policies/managed/citrix-ica.json".text =
     builtins.toJSON { AutoOpenFileTypes = [ "ica" ]; };
 }

@@ -1,0 +1,80 @@
+--- a/src/polkitgnomeauthenticationdialog.c
++++ b/src/polkitgnomeauthenticationdialog.c
+@@ -568,33 +568,6 @@
+   gtk_label_set_line_wrap (GTK_LABEL (label), TRUE);
+   gtk_box_pack_start (GTK_BOX (main_vbox), label, FALSE, FALSE, 0);
+ 
+-  /* secondary message */
+-  label = gtk_label_new (NULL);
+-  if (g_strv_length (dialog->priv->users) > 1)
+-    {
+-          gtk_label_set_markup (GTK_LABEL (label),
+-                                _("An application is attempting to perform an action that requires privileges. "
+-                                  "Authentication as one of the users below is required to perform this action."));
+-    }
+-  else
+-    {
+-      if (strcmp (g_get_user_name (), dialog->priv->users[0]) == 0)
+-        {
+-          gtk_label_set_markup (GTK_LABEL (label),
+-                                _("An application is attempting to perform an action that requires privileges. "
+-                                  "Authentication is required to perform this action."));
+-        }
+-      else
+-        {
+-          gtk_label_set_markup (GTK_LABEL (label),
+-                                _("An application is attempting to perform an action that requires privileges. "
+-                                  "Authentication as the super user is required to perform this action."));
+-        }
+-    }
+-  gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
+-  gtk_label_set_line_wrap (GTK_LABEL (label), TRUE);
+-  gtk_box_pack_start (GTK_BOX (main_vbox), label, FALSE, FALSE, 0);
+-
+   /* user combobox */
+   if (g_strv_length (dialog->priv->users) > 1)
+     {
+--- a/src/polkitgnomeauthenticator.c
++++ b/src/polkitgnomeauthenticator.c
+@@ -379,7 +379,6 @@
+ {
+   PolkitGnomeAuthenticator *authenticator = POLKIT_GNOME_AUTHENTICATOR (user_data);
+   PolkitIdentity *identity;
+-  gint num_tries;
+ 
+   gtk_widget_show_all (GTK_WIDGET (authenticator->dialog));
+   gtk_window_present (GTK_WINDOW (authenticator->dialog));
+@@ -393,8 +392,6 @@
+ 
+   authenticator->loop = g_main_loop_new (NULL, TRUE);
+ 
+-  num_tries = 0;
+-
+  try_again:
+ 
+   g_free (authenticator->selected_user);
+@@ -445,8 +442,6 @@
+       goto try_again;
+     }
+ 
+-  num_tries++;
+-
+   if (!authenticator->gained_authorization && !authenticator->was_cancelled)
+     {
+       if (authenticator->dialog != NULL)
+@@ -463,12 +458,9 @@
+           /* shake the dialog to indicate error */
+           polkit_gnome_authentication_dialog_indicate_error (POLKIT_GNOME_AUTHENTICATION_DIALOG (authenticator->dialog));
+ 
+-          if (num_tries < 3)
+-            {
+-              g_object_unref (authenticator->session);
+-              authenticator->session = NULL;
+-              goto try_again;
+-            }
++          g_object_unref (authenticator->session);
++          authenticator->session = NULL;
++          goto try_again;
+         }
+     }
+ 

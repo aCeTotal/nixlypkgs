@@ -35,6 +35,7 @@ in
   ++ [
     ../apps/gametune.nix
     ./packages.nix
+    ../apps/brave.nix
     ../apps/totalvim.nix
     ./users.nix
     ./timezone_locale.nix
@@ -64,6 +65,7 @@ in
     ./keyring.nix
     ./power.nix
     ./diskd.nix
+    ./jaild.nix
     ./disks-auto.nix
     ./nixlyos-tools.nix
     ./update-stage.nix

@@ -102,9 +102,9 @@
     enableNotifications = true;
     freeMemThreshold = 5;       # Kill when <5% RAM free
     freeSwapThreshold = 10;     # Kill when <10% swap free
-    # earlyoom matches on comm (15 chars), so "chrome" not "google-chrome-stable".
+    # earlyoom matches on comm (15 chars).
     extraArgs = [
-      "--prefer" "^(Web Content|firefox|chrome|chromium|electron)$"
+      "--prefer" "^(Web Content|firefox|brave|electron)$"
       # Games outside ultra mode get no oom_score_adj protection, so keep
       # earlyoom away from them (and the compositor) by comm pattern. comm
       # is 15 chars: .exe names longer than that truncate past the suffix

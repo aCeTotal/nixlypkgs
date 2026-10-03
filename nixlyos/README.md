@@ -44,7 +44,7 @@ hardware/          cpu/, gpu/, machine profile - selected by nixlyos-detect-hw
 services/          detect-activated extras (drawing tablets, on-demand, ...)
 apps/              programs that ship preconfigured (steam, citrix, mpv, ...)
 home/              home-manager entrypoint + per-app user config
-pkgs/              chrome + citrix overlays local to NixlyOS
+pkgs/              brave, citrix, polkit-gnome overlays local to NixlyOS
 scripts/           detect-hw, update, stage, (packaged as nixlyos-*
                    tools by base/nixlyos-tools.nix), bump-inputs (maintainer)
 install.sh         installer: partitioning, LUKS2, ~/.local/nixlyos, nixos-install

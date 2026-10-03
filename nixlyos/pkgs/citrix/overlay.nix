@@ -2,7 +2,7 @@ final: prev: {
   # wfica is X11-only, but detects Wayland and then passes an Xlib pointer to the
   # Wayland EGL platform, which segfaults; pretending the session is X11 avoids it.
   # EGL_PLATFORM must be set explicitly too, since .ica files open as children of
-  # Chrome and would inherit its EGL_PLATFORM=wayland.
+  # Brave and would inherit its EGL_PLATFORM=wayland.
   citrix-workspace-nixly = prev.citrix-workspace-nixly.overrideAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ final.makeWrapper ];
     postFixup = (old.postFixup or "") + ''

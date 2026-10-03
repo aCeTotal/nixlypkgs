@@ -49,7 +49,8 @@ let
     config = pkgsConfig;
     overlays = [
       self.overlays.default
-      (import ../pkgs/chrome/overlay.nix)
+      (import ../pkgs/brave/overlay.nix)
+      (import ../pkgs/polkit-gnome/overlay.nix)
     ];
   };
 

@@ -62,7 +62,7 @@
             config = import ./nixlyos/lib/pkgs-config.nix;
             overlays = [
               self.overlays.default
-              (import ./nixlyos/pkgs/chrome/overlay.nix)
+              (import ./nixlyos/pkgs/brave/overlay.nix)
             ];
           };
           # Every out-of-tree module machines compile against a nixlyos

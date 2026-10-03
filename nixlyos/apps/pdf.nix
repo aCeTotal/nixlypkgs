@@ -11,8 +11,6 @@ lib.mkIf (config.nixlyos.mode == "desktop") {
         defaultApplications."application/pdf" = [ "nixly-pdf.desktop" ];
         associations.removed."application/pdf" = [
           "draw.desktop"
-          "google-chrome.desktop"
-          "com.google.Chrome.desktop"
           "brave-browser.desktop"
           "com.brave.Browser.desktop"
         ];
