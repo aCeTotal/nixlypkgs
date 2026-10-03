@@ -1,5 +1,21 @@
 { lib, pkgs, nixlyUser, ... }:
 
+let
+  icaOpen = pkgs.writeShellApplication {
+    name = "nixly-icaopen";
+    runtimeInputs = with pkgs; [
+      coreutils
+      systemd
+    ];
+    text = ''
+      tail -F -n0 /run/nixly-dlgate/events 2>/dev/null | while IFS='|' read -r kind _ _ file; do
+        case $kind:$file in
+          clean:*.ica) systemd-run --user --quiet -- ${pkgs.citrix-workspace-nixly}/bin/wfica "$file" ;;
+        esac
+      done
+    '';
+  };
+in
 {
   # mkAfter, or the nixlypkgs overlay replaces the wfica wrapper below with the
   # unwrapped package.
@@ -60,7 +76,16 @@
     '';
   };
 
-  # Policy survives profile resets.
-  environment.etc."brave/policies/managed/citrix-ica.json".text =
-    builtins.toJSON { AutoOpenFileTypes = [ "ica" ]; };
+  # Scanned .ica opens outside jail.
+  systemd.user.services.nixly-icaopen = {
+    description = "Open scanned Citrix launch files";
+    partOf = [ "graphical-session.target" ];
+    after = [ "graphical-session.target" ];
+    wantedBy = [ "graphical-session.target" ];
+    serviceConfig = {
+      ExecStart = "${icaOpen}/bin/nixly-icaopen";
+      Restart = "on-failure";
+      RestartSec = 3;
+    };
+  };
 }

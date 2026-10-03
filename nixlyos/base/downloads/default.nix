@@ -9,5 +9,6 @@
     ./noexec.nix
     ./notify.nix
     ./open.nix
+    ./inbox.nix
   ];
 }

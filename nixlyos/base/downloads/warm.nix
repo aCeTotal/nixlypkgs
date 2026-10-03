@@ -2,6 +2,7 @@
 
 let
   home = "/home/${nixlyUser}";
+  inbox = "${home}/${import ./inbox-dir.nix}";
 
   warm = pkgs.writeShellApplication {
     name = "nixly-dlwarm";
@@ -19,7 +20,7 @@ in
     after = [ "systemd-tmpfiles-setup.service" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
-      ExecStart = "${warm}/bin/nixly-dlwarm ${home}/Downloads ${home}/Desktop /tmp /var/tmp";
+      ExecStart = "${warm}/bin/nixly-dlwarm ${inbox} ${home}/Downloads ${home}/Desktop /tmp /var/tmp";
       Restart = "always";
       RestartSec = 3;
     };

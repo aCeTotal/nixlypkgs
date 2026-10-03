@@ -21,13 +21,13 @@ let
       inherit (pkg) meta;
       postBuild = ''
         rm -f $out/bin/${bin}
-        cat > $out/bin/${bin} <<EOF
+        cat > $out/bin/${bin} <<'EOF'
         #!${final.runtimeShell} -e
         exec /run/wrappers/bin/firejail \
+          ${builtins.concatStringsSep " " extraArgs} \
           --profile=${final.firejail}/etc/firejail/${profile}.profile \
           ${dbusArgs} \
-          ${builtins.concatStringsSep " " extraArgs} \
-          -- ${pkg}/bin/${bin} "\$@"
+          -- ${pkg}/bin/${bin} "$@"
         EOF
         chmod 0755 $out/bin/${bin}
 
@@ -51,8 +51,13 @@ in
         pkg = prev.brave;
         bin = "brave";
         profile = "brave-browser";
-        # Citrix sessions inherit this home.
-        extraArgs = [ "--whitelist=~" ];
+        # Files arrive only through jaild.
+        extraArgs = [
+          "'--ignore=whitelist \${DOWNLOADS}'"
+          "'--ignore=whitelist \${HOME}/.gnupg'"
+          "--whitelist=~/${import ./downloads/inbox-dir.nix}"
+          "--private-tmp"
+        ];
       };
     })
   ];
