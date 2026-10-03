@@ -1,6 +1,20 @@
 final: prev: {
-  # Session kill fakes crashes; NVIDIA GMB video frames crash renderer.
+  # Replaces wrapper's feature list.
   brave = prev.brave.override {
-    commandLineArgs = "--hide-crash-restore-bubble --no-default-browser-check --disable-gpu-memory-buffer-video-frames";
+    commandLineArgs = builtins.concatStringsSep " " [
+      # Session kill fakes crashes.
+      "--hide-crash-restore-bubble"
+      "--no-default-browser-check"
+      # NVIDIA GMB frames crash renderer.
+      "--disable-gpu-memory-buffer-video-frames"
+      "--enable-features=${builtins.concatStringsSep "," [
+        "AcceleratedVideoDecodeLinuxGL"
+        "AcceleratedVideoDecodeLinuxZeroCopyGL"
+        "AcceleratedVideoEncoder"
+        "VaapiOnNvidiaGPUs"
+        "VaapiIgnoreDriverChecks"
+        "WaylandWindowDecorations"
+      ]}"
+    ];
   };
 }

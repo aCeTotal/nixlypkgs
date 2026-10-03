@@ -1,0 +1,91 @@
+# Kernel Self Protection Project set.
+{ yes, no, unset, freeform, ... }:
+
+{
+  # Corruption halts, never exploits.
+  BUG_ON_DATA_CORRUPTION = yes;
+  LIST_HARDENED = yes;
+  SCHED_STACK_END_CHECK = yes;
+  DEBUG_SG = yes;
+  DEBUG_NOTIFIERS = yes;
+  DEBUG_VIRTUAL = yes;
+  DEBUG_WX = yes;
+  PAGE_TABLE_CHECK = yes;
+  PAGE_TABLE_CHECK_ENFORCED = yes;
+  UBSAN = yes;
+  UBSAN_BOUNDS = yes;
+  UBSAN_TRAP = yes;
+  KFENCE = yes;
+
+  HARDENED_USERCOPY = yes;
+  FORTIFY_SOURCE = yes;
+  STACKPROTECTOR_STRONG = yes;
+  VMAP_STACK = yes;
+  STRICT_KERNEL_RWX = yes;
+  STRICT_MODULE_RWX = yes;
+  KSTACK_ERASE = yes;
+  ZERO_CALL_USED_REGS = yes;
+  INIT_STACK_ALL_ZERO = yes;
+  INIT_ON_ALLOC_DEFAULT_ON = yes;
+  INIT_ON_FREE_DEFAULT_ON = yes;
+
+  SLAB_FREELIST_RANDOM = yes;
+  SLAB_FREELIST_HARDENED = yes;
+  SLAB_BUCKETS = yes;
+  RANDOM_KMALLOC_CACHES = yes;
+  SHUFFLE_PAGE_ALLOCATOR = yes;
+  RANDOMIZE_BASE = yes;
+  RANDOMIZE_MEMORY = yes;
+  RANDOMIZE_KSTACK_OFFSET_DEFAULT = yes;
+
+  X86_UMIP = yes;
+  X86_KERNEL_IBT = yes;
+  X86_USER_SHADOW_STACK = yes;
+  IOMMU_DEFAULT_DMA_STRICT = yes;
+  INTEL_IOMMU_DEFAULT_ON = yes;
+  EFI_DISABLE_PCI_DMA = yes;
+  RESET_ATTACK_MITIGATION = yes;
+
+  # Root cannot touch kernel.
+  SECURITY_LOCKDOWN_LSM = yes;
+  SECURITY_LOCKDOWN_LSM_EARLY = yes;
+  LOCK_DOWN_KERNEL_FORCE_CONFIDENTIALITY = yes;
+  SECURITY_DMESG_RESTRICT = yes;
+  SECURITY_YAMA = yes;
+  SECURITY_LANDLOCK = yes;
+
+  # Ephemeral build key signs modules.
+  MODULE_SIG = yes;
+  MODULE_SIG_FORCE = yes;
+  MODULE_SIG_ALL = yes;
+  MODULE_SIG_SHA512 = yes;
+  MODULE_SIG_HASH = freeform "sha512";
+
+  LEGACY_VSYSCALL_NONE = yes;
+  X86_VSYSCALL_EMULATION = no;
+  IA32_EMULATION = no;
+  X86_X32_ABI = no;
+  COMPAT_BRK = no;
+  MODIFY_LDT_SYSCALL = no;
+  X86_IOPL_IOPERM = no;
+
+  KEXEC = no;
+  KEXEC_FILE = no;
+  KEXEC_HANDOVER = no;
+  CRASH_DUMP = unset;
+  PROC_VMCORE = unset;
+  HIBERNATION = no;
+  PROC_KCORE = no;
+  DEVMEM = no;
+  STRICT_DEVMEM = unset;
+  IO_STRICT_DEVMEM = unset;
+  DEVPORT = no;
+  LEGACY_TIOCSTI = no;
+  LDISC_AUTOLOAD = no;
+  BINFMT_MISC = no;
+  IO_URING = no;
+  BLK_DEV_UBLK = no;
+  USERFAULTFD = no;
+  MAGIC_SYSRQ = no;
+  KPROBES = no;
+}

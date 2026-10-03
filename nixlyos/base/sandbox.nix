@@ -23,7 +23,12 @@ let
         rm -f $out/bin/${bin}
         cat > $out/bin/${bin} <<'EOF'
         #!${final.runtimeShell} -e
-        exec /run/wrappers/bin/firejail \
+        fj=/run/wrappers/bin/firejail
+        # Reach running instance's singleton socket.
+        if $fj --list | grep -qE '^[0-9]+:[^:]*:${bin}:'; then
+          exec $fj --quiet --join=${bin} ${pkg}/bin/${bin} "$@"
+        fi
+        exec $fj --name=${bin} \
           ${builtins.concatStringsSep " " extraArgs} \
           --profile=${final.firejail}/etc/firejail/${profile}.profile \
           ${dbusArgs} \

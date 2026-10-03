@@ -33,6 +33,8 @@ in {
   linux-nixlyos-v3 = (import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; }).v3;
   linuxPackages_nixlyos = import ./nvidia-latest.nix inputs final final.linux-nixlyos;
   linuxPackages_nixlyos_v3 = import ./nvidia-latest.nix inputs final final.linux-nixlyos-v3;
+  linux-nixlyserver = import ../pkgs/linux-nixlyserver { inherit (final) lib linux; };
+  linuxPackages_nixlyserver = final.linuxPackagesFor final.linux-nixlyserver;
 
   # bluez 5.86 drops BLE HID setup on ATT 0x0E; patch retries the read.
   bluez-nixly = prev.bluez.overrideAttrs (old: {

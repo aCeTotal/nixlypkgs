@@ -21,6 +21,15 @@
     BraveWaybackMachineEnabled = false;
     BraveWebDiscoveryEnabled = false;
     TorDisabled = true;
+    TranslateEnabled = false;
+    HardwareAccelerationModeEnabled = true;
+    # Start on blank tab.
+    RestoreOnStartup = 5;
+    DefaultSearchProviderEnabled = true;
+    DefaultSearchProviderName = "Google";
+    DefaultSearchProviderKeyword = "google.com";
+    DefaultSearchProviderSearchURL = "https://www.google.com/search?q={searchTerms}";
+    DefaultSearchProviderSuggestURL = "https://www.google.com/complete/search?client=chrome&q={searchTerms}";
   };
 
   home-manager.sharedModules = [

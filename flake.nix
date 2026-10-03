@@ -41,6 +41,7 @@
     in {
       lib = nixpkgs.lib // {
         mkNixlySystem = import ./nixlyos/lib/mk-system.nix { inherit self inputs; };
+        mkNixlyServer = import ./nixlyserver/mk-server.nix { inherit self inputs; };
       };
 
       overlays.default = import ./overlays/default.nix inputs;
@@ -92,6 +93,9 @@
           linux-nixlyos-dev = stable.linux-nixlyos.dev;
           linux-nixlyos-v3-modules = stable.linux-nixlyos-v3.modules;
           linux-nixlyos-v3-dev = stable.linux-nixlyos-v3.dev;
+          inherit (stable) linux-nixlyserver;
+          linux-nixlyserver-modules = stable.linux-nixlyserver.modules;
+          linux-nixlyserver-dev = stable.linux-nixlyserver.dev;
 
           # Kernel-independent nvidia userspace parts (unfree, so never on
           # cache.nixos.org): the driver itself and persistenced.

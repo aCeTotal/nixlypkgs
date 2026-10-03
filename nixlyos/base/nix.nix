@@ -3,6 +3,7 @@
 let
   # Cores, RAM and build parallelism for this machine, from scripts/detect-hw.sh.
   hw = hwData.resources;
+  caches = import ../lib/caches.nix;
 
   # Daily idle maintenance: only when the mouse has been idle 60 min
   # and no game runs, at most once per 24 h.  Replaces the weekly GC
@@ -100,21 +101,9 @@ in
       max-free = 6442450944;
       trusted-users = [ "root" "@wheel" ];
 
-      substituters = [
-        # NixlyOS binary cache: prebuilt nixlypkgs packages for every main commit.
-        "https://cache.aceclan.no"
-        "https://cache.nixos.org"
-      ];
-
-      trusted-substituters = [
-        "https://cache.aceclan.no"
-        "https://cache.nixos.org"
-      ];
-
-      trusted-public-keys = [
-        "cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak="
-        "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
-      ];
+      substituters = caches.urls;
+      trusted-substituters = caches.urls;
+      trusted-public-keys = caches.keys;
     };
 
     gc = {
