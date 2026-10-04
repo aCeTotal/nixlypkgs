@@ -69,7 +69,6 @@
 , slurp
 , wl-clipboard
 , nixlycc
-, nixly_voice
 }:
 
 let
@@ -141,7 +140,6 @@ let
     wl-clipboard
 
     nixlycc
-    nixly_voice
   ];
 in
 
