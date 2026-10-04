@@ -1,0 +1,20 @@
+--- a/kernel/nvidia/nv-acpi.c
++++ b/kernel/nvidia/nv-acpi.c
+@@ -146,16 +146,7 @@
+ 
+ static void nv_acpi_nvpcf_event(acpi_handle handle, u32 event_type, void *data)
+ {
+-    nv_acpi_t *pNvAcpiObject = data;
+-
+-    if (event_type == ACPI_NVPCF_EVENT_CHANGE)
+-    {
+-        rm_acpi_nvpcf_notify(pNvAcpiObject->sp);
+-    }
+-    else
+-    {
+-        nv_printf(NV_DBG_INFO,"NVRM: %s: NVPCF event 0x%x is not supported\n", __FUNCTION__, event_type);
+-    }
++    nv_printf(NV_DBG_INFO, "NVRM: %s: NVPCF event 0x%x ignored\n", __FUNCTION__, event_type);
+ }
+ 
+ /*

@@ -45,9 +45,8 @@ in
             "audio.position" = [ "MONO" ];
             "filter.smart" = true;
             "filter.smart.name" = "nixly-mic-tap";
-            # Closest to the device. Stated from both sides because the sort
-            # only reorders on the entry that is already in the list.
-            "filter.smart.after" = [ "nixly-mic" ];
+            # Closest to the device; the sort is not transitive.
+            "filter.smart.after" = [ "nixly-mic" "nixly-ptt" ];
             "filter.smart.targetable" = true;
           };
         };
@@ -145,8 +144,11 @@ in
             "audio.position" = [ "MONO" ];
             "filter.smart" = true;
             "filter.smart.name" = "nixly-mic";
-            # Closest to the app, so the tap sees the raw device.
+            # Tap sees the raw device.
             "filter.smart.before" = [ "nixly-mic-tap" ];
+            "filter.smart.after" = [ "nixly-ptt" ];
+            # Meeting apps link here, skipping push-to-talk.
+            "filter.smart.targetable" = true;
           };
         };
       }

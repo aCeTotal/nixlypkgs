@@ -49,6 +49,8 @@ in
     ./wayland.nix
     ./sound.nix
     ./mic.nix
+    ./ptt.nix
+    ./voip.nix
     ./bluetooth.nix
     ./btpair
     ./zram.nix

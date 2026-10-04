@@ -20,6 +20,7 @@ in {
   kmymoney = callPackage ../pkgs/kmymoney { };
   low-latency-layer = callPackage ../pkgs/low-latency-layer { };
   nixly-mic = callPackage ../pkgs/nixly-mic { };
+  nixly-gate = callPackage ../pkgs/nixly-gate { };
   # Streaming VAD needs whisper 1.9.
   nixly_voice = inputs.nixpkgs.legacyPackages.${final.stdenv.hostPlatform.system}.callPackage ../pkgs/nixly_voice {
     src = inputs.nixly_voice_src;

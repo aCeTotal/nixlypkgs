@@ -146,6 +146,7 @@ writeScript "nixly-game-wrap" ''
               "__NV_PRIME_RENDER_OFFLOAD_PROVIDER", "NVIDIA-G0")
           os.environ.setdefault("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
           os.environ.setdefault("__VK_LAYER_NV_optimus", "NVIDIA_only")
+          os.environ.pop("VK_DRIVER_FILES", None)
           dgpu = next((g for g in gpus if g["vid"] == "0x10de"), None)
       else:
           # dGPU = not the boot display, preferring non-Intel when mixed.

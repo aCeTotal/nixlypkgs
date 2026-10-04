@@ -7,6 +7,25 @@ in
 {
   services.xserver.videoDrivers = [ "nvidia" ];
 
+  nixpkgs.overlays = [
+    (final: prev: {
+      # Blender opts back into dGPU.
+      Blender_bin_lts = final.symlinkJoin {
+        inherit (prev.Blender_bin_lts) name meta;
+        paths = [ prev.Blender_bin_lts ];
+        nativeBuildInputs = [ final.makeWrapper ];
+        postBuild = ''
+          wrapProgram $out/bin/blender \
+            --unset VK_DRIVER_FILES \
+            --set __NV_PRIME_RENDER_OFFLOAD 1 \
+            --set __NV_PRIME_RENDER_OFFLOAD_PROVIDER NVIDIA-G0 \
+            --set __GLX_VENDOR_LIBRARY_NAME nvidia \
+            --set __VK_LAYER_NV_optimus NVIDIA_only
+        '';
+      };
+    })
+  ];
+
   hardware.graphics = {
     enable = true;
     enable32Bit = true;
@@ -85,6 +104,13 @@ in
   # primary output, and games get the Nvidia env per-process from set_dgpu_env().
 
   environment.sessionVariables = {
+    # Vulkan probes wake the dGPU.
+    VK_DRIVER_FILES = lib.concatStringsSep ":" [
+      "/run/opengl-driver/share/vulkan/icd.d/intel_icd.x86_64.json"
+      "/run/opengl-driver/share/vulkan/icd.d/intel_hasvk_icd.x86_64.json"
+      "/run/opengl-driver-32/share/vulkan/icd.d/intel_icd.i686.json"
+      "/run/opengl-driver-32/share/vulkan/icd.d/intel_hasvk_icd.i686.json"
+    ];
     __GL_VRR_ALLOWED = "1";
     __GL_GSYNC_ALLOWED = "1";
     __GL_THREADED_OPTIMIZATIONS = "1";
