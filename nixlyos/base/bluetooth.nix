@@ -1,4 +1,4 @@
-{ ... }:
+{ nixlyUser, ... }:
 
 # Keep Bluetooth audio devices alive. Two sleep paths cause mid-use dropouts:
 #  1. The adapter side: btusb runtime-autosuspends the USB dongle/chip, which
@@ -59,4 +59,16 @@
       }
     ];
   };
+
+  # nixlytile stops idle bluetoothd.
+  security.polkit.extraConfig = ''
+    polkit.addRule(function(action, subject) {
+      if (action.id == "org.freedesktop.systemd1.manage-units" &&
+          action.lookup("unit") == "bluetooth.service" &&
+          action.lookup("verb") == "stop" &&
+          subject.user == "${nixlyUser}") {
+        return polkit.Result.YES;
+      }
+    });
+  '';
 }

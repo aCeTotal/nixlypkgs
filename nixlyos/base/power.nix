@@ -1,6 +1,9 @@
-{ pkgs, nixlyUser, ... }:
+{ pkgs, lib, nixlyUser, ... }:
 
 {
+  # logind owns lid and power keys.
+  services.acpid.enable = lib.mkForce false;
+
   # nixlytile reads and writes power knobs directly via sysfs
   # (power-profiles-daemon is intentionally disabled — perf.nix owns the
   # governor): the battery popup's platform profile (ACPI platform_profile,

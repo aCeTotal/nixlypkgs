@@ -50,6 +50,8 @@
     # RestartSec=1 permanent failed unit hver boot -> ingen
     # polkit-dialoger. Ubegrenset retry til display finnes.
     unitConfig.StartLimitIntervalSec = 0;
+    # GTK would pull gvfsd in.
+    environment.GIO_USE_VFS = "local";
     serviceConfig = {
       Type = "simple";
       ExecStart = "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1";
@@ -58,4 +60,7 @@
       TimeoutStopSec = 10;
     };
   };
+
+  # File dialogs browse local files.
+  systemd.user.services.xdg-desktop-portal-gtk.environment.GIO_USE_VFS = "local";
 }

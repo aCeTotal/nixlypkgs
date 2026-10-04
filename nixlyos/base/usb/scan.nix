@@ -1,4 +1,4 @@
-{ pkgs, lib, hwData, ... }:
+{ pkgs, hwData, ... }:
 
 let
   expand = pkgs.callPackage ../scanbox/expand.nix { };
@@ -61,11 +61,6 @@ in
       ConcurrentDatabaseReload = false;
     };
   };
-
-  # clamd holds the whole signature set in RAM (~1 GB). Nothing keeps it
-  # resident: a scan starts it, and the scan stops it again the instant the
-  # last partition finishes, so an idle desktop never carries it.
-  systemd.services.clamav-daemon.wantedBy = lib.mkForce [ ];
 
   # Database downloads must never compete with the foreground desktop.
   systemd.services.clamav-freshclam.serviceConfig = {

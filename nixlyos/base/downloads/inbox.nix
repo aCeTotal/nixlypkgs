@@ -15,7 +15,6 @@ let
       coreutils
       expand
       inotify-tools
-      systemd
     ];
     text = builtins.readFile ./inbox.sh;
   };

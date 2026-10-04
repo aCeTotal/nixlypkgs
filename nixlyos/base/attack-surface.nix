@@ -1,7 +1,16 @@
-{ lib, hwData, ... }:
+{ pkgs, lib, hwData, ... }:
 
 let
   isArm = hwData.platform.arch == "aarch64";
+
+  # Last peer gone: boltd exits.
+  boltIdle = pkgs.writeShellScript "bolt-idle" ''
+    for d in /sys/bus/thunderbolt/devices/*-*; do
+      case ''${d##*/} in *-0|*:*) continue ;; esac
+      [ -e "$d" ] && exit 0
+    done
+    exec ${pkgs.systemd}/bin/systemctl stop --no-block bolt.service
+  '';
 in
 {
   # Kernel code that nothing here uses but a hostile device can reach by
@@ -56,4 +65,11 @@ in
   # since "none" gives any plugged-in device PCIe/DMA access before boltd
   # ever sees it.
   services.hardware.bolt.enable = true;
+
+  # Only a plugged-in peer wakes boltd.
+  services.udev.extraRules = ''
+    SUBSYSTEM=="thunderbolt", ENV{DEVTYPE}!="thunderbolt_device", ENV{SYSTEMD_WANTS}=""
+    SUBSYSTEM=="thunderbolt", KERNEL=="*-0", ENV{SYSTEMD_WANTS}=""
+    ACTION=="remove", SUBSYSTEM=="thunderbolt", ENV{DEVTYPE}=="thunderbolt_device", RUN+="${boltIdle}"
+  '';
 }

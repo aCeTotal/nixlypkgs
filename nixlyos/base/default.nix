@@ -61,6 +61,7 @@ in
     ./secureboot.nix
     ./snapshots.nix
     ./audit.nix
+    ./clamd
     ./scanbox
     ./usb
     ./downloads

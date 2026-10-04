@@ -20,7 +20,7 @@ in
     description = "Purge Bluetooth bonds the peer no longer holds";
     after = [ "bluetooth.service" ];
     partOf = [ "bluetooth.service" ];
-    wantedBy = [ "bluetooth.target" ];
+    wantedBy = [ "bluetooth.service" ];
 
     serviceConfig = {
       Type = "simple";

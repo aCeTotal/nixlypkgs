@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 
 {
   # Run `tailscale-init` once: it logs in, waits for the connection and confirms
@@ -6,6 +6,7 @@
   environment.systemPackages = [
     (pkgs.writeShellScriptBin "tailscale-init" ''
       set -e
+      sudo systemctl start tailscaled
       sudo tailscale up --ssh
       until [ "$(tailscale status --json 2>/dev/null | ${pkgs.jq}/bin/jq -r .BackendState)" = "Running" ]; do
         sleep 1
@@ -30,5 +31,7 @@
     # extraUpFlags only applies to auto-up, so pass --ssh on the first manual login.
     extraUpFlags = [ "--ssh" ];
   };
+  # Started by hand, never at boot.
+  systemd.services.tailscaled.wantedBy = lib.mkForce [ ];
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 }

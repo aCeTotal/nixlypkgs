@@ -196,7 +196,8 @@
       Type = "oneshot";
       ExecStartPre = "${pkgs.coreutils}/bin/sleep 3";
       ExecStart = pkgs.writeShellScript "bt-resume" ''
-        # Restart Bluetooth to clear stale connections.
+        # Dormant bluetoothd stays asleep.
+        ${pkgs.systemd}/bin/systemctl is-active -q bluetooth.service || exit 0
         ${pkgs.systemd}/bin/systemctl restart bluetooth.service
         sleep 2
 

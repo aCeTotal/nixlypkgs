@@ -75,7 +75,6 @@ process() {
     return 0
   fi
 
-  systemctl start --no-block clamav-daemon.service 2>/dev/null || true
   if reason=$(scan "$s"); then rc=0; else rc=$?; fi
   case $rc in
     0) release "$s" "$name" ;;

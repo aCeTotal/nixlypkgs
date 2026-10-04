@@ -25,12 +25,16 @@ in
     MaxScanSize = lib.mkForce "4G";
     # Hitting a limit is a verdict of its own, never a silent pass.
     AlertExceedsMax = true;
+    # Covers clamd's cold signature load.
+    OnAccessCurlTimeout = 120000;
+    OnAccessRetryAttempts = 1;
+    OnAccessDenyOnError = true;
   };
 
   systemd.services.clamav-clamonacc.serviceConfig = {
     # Quarantine, never delete: the verdict is triaged afterwards.
     ExecStart = lib.mkForce
-      "${config.services.clamav.package}/bin/clamonacc -F --fdpass --move=/var/lib/nixly-quarantine --wait --ping 120:1";
+      "${config.services.clamav.package}/bin/clamonacc -F --fdpass --move=/var/lib/nixly-quarantine";
     # Dead clamonacc means no gate.
     Restart = "always";
     RestartSec = 2;

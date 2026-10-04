@@ -22,7 +22,6 @@ inotifywait -q -m -e close_write,moved_to --format '%w%f' "$@" 2>/dev/null \
   [ ! -e "$dst" ] || dst=$q/$name.$RANDOM
   mv -f -- "$f" "$dst" 2>/dev/null || continue
 
-  systemctl start --no-block clamav-daemon.service 2>/dev/null || true
   if found=$(nixly-scan-expand "$dst"); then
     rc=0
   else

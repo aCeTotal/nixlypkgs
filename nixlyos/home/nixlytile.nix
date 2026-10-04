@@ -14,10 +14,10 @@ let
   setRandrPrimary = pkgs.writeShellScript "nixly-xrandr-primary" ''
     export DISPLAY=:0
     for _ in $(seq 10); do
-      out=$(${pkgs.xorg.xrandr}/bin/xrandr 2>/dev/null \
+      out=$(${pkgs.xrandr}/bin/xrandr 2>/dev/null \
         | sed -n 's/^\([^ ]*\) connected.* \([0-9]\+\)x[0-9]\++.*/\2 \1/p' \
         | sort -rn | head -1 | cut -d' ' -f2)
-      if [ -n "$out" ] && ${pkgs.xorg.xrandr}/bin/xrandr --output "$out" --primary 2>/dev/null; then
+      if [ -n "$out" ] && ${pkgs.xrandr}/bin/xrandr --output "$out" --primary 2>/dev/null; then
         exit 0
       fi
       sleep 1

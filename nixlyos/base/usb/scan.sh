@@ -199,11 +199,3 @@ elif [ "$unscannable" -gt 0 ]; then
 else
   put clean
 fi
-
-# Kill clamd the instant the last partition finishes — no idle 1 GB resident.
-# A sibling scan still running keeps it up; that scan stops it when it ends.
-siblings=$(systemctl list-units --plain --no-legend --state=active,activating \
-  'nixly-usbscan@*.service' 2>/dev/null \
-  | awk -v me="nixly-usbscan@$dev.service" '$1 ~ /nixly-usbscan@/ && $1 != me')
-[ -n "$siblings" ] || systemctl stop --no-block clamav-daemon.service 2>/dev/null || true
-true
