@@ -58,6 +58,11 @@
     # on any GPU. Opt-in per game — gamewrap sets LOW_LATENCY_LAYER=1.
     # From nixlypkgs; the guard keeps eval green until that rev is pushed.
     pkgs.low-latency-layer
+  # nixlytile dynamic rendering layer.
+  ++ lib.optionals (pkgs ? nixly-vrs) [
+    pkgs.nixly-vrs
+    pkgs.pkgsi686Linux.nixly-vrs
+  ]
   ++ (with pkgs; [
 
     libnotify           # gamemode notifications

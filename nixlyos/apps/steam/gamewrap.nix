@@ -41,11 +41,10 @@ writeScript "nixly-game-wrap" ''
           os.environ.setdefault("PROTON_VKD3D_LOWLATENCY", "1")
           if vendor == "nvidia":
               os.environ.setdefault("DXVK_NVAPI_VKREFLEX", "1")
-      # The implicit low-latency layer (VK_AMD_anti_lag et al.) is safe as a
-      # default (dedups against driver extensions, leaves native Reflex
-      # alone), but tier 3 runs with no extra layers at all.
-      os.environ.setdefault(
-          "LOW_LATENCY_LAYER", "0" if tier >= MAX_TIER else "1")
+      # Tier 3 runs without extra layers.
+      layers = "0" if tier >= MAX_TIER else "1"
+      os.environ.setdefault("LOW_LATENCY_LAYER", layers)
+      os.environ.setdefault("NIXLY_VRS", layers)
 
   def default_tier(vendor):
       # Hardware preset: every recognized GPU (NVIDIA/AMD/Intel) starts on

@@ -19,6 +19,7 @@ in {
   gaea = callPackage ../pkgs/gaea { };
   kmymoney = callPackage ../pkgs/kmymoney { };
   low-latency-layer = callPackage ../pkgs/low-latency-layer { };
+  nixly-vrs = callPackage ../pkgs/nixly-vrs { };
   nixly-mic = callPackage ../pkgs/nixly-mic { };
   nixly-gate = callPackage ../pkgs/nixly-gate { };
   # Streaming VAD needs whisper 1.9.

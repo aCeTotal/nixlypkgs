@@ -78,7 +78,10 @@
                 inherit (kp) xpadneo xone xpad-noone msi-ec;
               };
         in {
-          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly nixly-mic nixly-gate nixly_kalk nixly_pdf nixly_voice;
+          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer nixly-vrs proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly nixly-mic nixly-gate nixly_kalk nixly_pdf nixly_voice;
+
+          # Layer for 32-bit games.
+          nixly-vrs-i686 = stable.pkgsi686Linux.nixly-vrs;
 
           totalvim = import ./nixlyos/lib/totalvim.nix {
             pkgs = stable;
