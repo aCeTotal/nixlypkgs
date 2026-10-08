@@ -5,7 +5,7 @@
 <policyconfig>
   <action id="org.nixlyos.download-save">
     <description>Download a file</description>
-    <message>Authentication is required to download $(file). It will be scanned for malware before it is saved to Downloads.</message>
+    <message>Enter your password to download $(file).</message>
     <defaults>
       <allow_any>no</allow_any>
       <allow_inactive>no</allow_inactive>

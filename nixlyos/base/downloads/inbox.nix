@@ -7,6 +7,7 @@ let
   stage = "/home/.nixly-dlscan";
 
   expand = pkgs.callPackage ../scanbox/expand.nix { };
+  stream = pkgs.callPackage ../scanbox/stream.nix { };
 
   mover = pkgs.writeShellApplication {
     name = "nixly-dlinbox";
@@ -17,6 +18,7 @@ let
       inotify-tools
       polkit
       procps
+      stream
     ];
     text = builtins.readFile ./inbox.sh;
   };

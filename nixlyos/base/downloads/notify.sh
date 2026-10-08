@@ -6,6 +6,14 @@ events=/run/nixly-dlgate/events
 app=NixlyOS
 saved_ms=15000
 
+declare -A title=(
+  [live]="Scanning during download"
+  [verify]="Verifying download"
+  [match]="Checking archive index"
+  [unpack]="Unpacking for scan"
+  [scan]="Scanning for malware"
+)
+
 saved() {
   local act
   act=$(notify-send ${1:+-r "$1"} -a "$app" -t "$saved_ms" \
@@ -15,15 +23,38 @@ No threats found. The file is ready in Downloads.")
   [ "$act" != open ] || nautilus --select "$3" >/dev/null 2>&1
 }
 
+bytes() {
+  LC_ALL=C numfmt --to=iec-i --suffix=B --format=%.1f "$1"
+}
+
+# Updates the card, prints id.
+progress() {
+  local pct got total body=$2
+  local -a bar=()
+  read -r pct got total <<<"$4"
+  case $3 in
+    live) body+=$'\n'"$(bytes "$got") scanned" ;;
+    verify) ;;
+    *)
+      bar=(-h "int:value:$pct")
+      body+=$'\n'"$(bytes "$got") of $(bytes "$total")" ;;
+  esac
+  notify-send -p ${1:+-r "$1"} -a "$app" -t 0 "${bar[@]}" "${title[$3]}" "$body"
+}
+
 declare -A card
 
 tail -F -n0 "$events" 2>/dev/null | while IFS='|' read -r kind name sig file; do
-  if [ "$kind" = scanning ]; then
-    card[$name]=$(notify-send -p -a "$app" -t 0 "Scanning for malware" \
-      "$name
+  case $kind in
+    scanning)
+      card[$name]=$(notify-send -p ${card[$name]:+-r "${card[$name]}"} -a "$app" -t 0 "Scanning for malware" \
+        "$name
 The file will be available in Downloads once the scan is done.")
-    continue
-  fi
+      continue ;;
+    progress)
+      card[$name]=$(progress "${card[$name]:-}" "$name" "$sig" "$file")
+      continue ;;
+  esac
   id=${card[$name]:-}
   unset 'card[$name]'
   case $kind in

@@ -38,7 +38,9 @@ in
     daemon.settings = {
       # Depth over speed on the content itself: archives, installers, office
       # macros and PUA all count as "everything", and clamd is threaded.
-      MaxThreads = hwData.resources.buildCores;
+      MaxThreads = hwData.resources.cores;
+      # Unpacked members stay off tmpfs.
+      TemporaryDirectory = "/var/tmp";
       ScanArchive = true;
       ScanPE = true;
       ScanELF = true;

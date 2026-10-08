@@ -1,9 +1,11 @@
 --- a/src/polkitgnomeauthenticationdialog.c
 +++ b/src/polkitgnomeauthenticationdialog.c
-@@ -568,33 +568,6 @@
+@@ -566,33 +566,8 @@
+   g_free (s);
+   gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
    gtk_label_set_line_wrap (GTK_LABEL (label), TRUE);
-   gtk_box_pack_start (GTK_BOX (main_vbox), label, FALSE, FALSE, 0);
- 
+-  gtk_box_pack_start (GTK_BOX (main_vbox), label, FALSE, FALSE, 0);
+-
 -  /* secondary message */
 -  label = gtk_label_new (NULL);
 -  if (g_strv_length (dialog->priv->users) > 1)
@@ -29,11 +31,11 @@
 -    }
 -  gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
 -  gtk_label_set_line_wrap (GTK_LABEL (label), TRUE);
--  gtk_box_pack_start (GTK_BOX (main_vbox), label, FALSE, FALSE, 0);
--
++  gtk_label_set_line_wrap_mode (GTK_LABEL (label), PANGO_WRAP_WORD_CHAR);
++  gtk_label_set_max_width_chars (GTK_LABEL (label), 40);
+   gtk_box_pack_start (GTK_BOX (main_vbox), label, FALSE, FALSE, 0);
+ 
    /* user combobox */
-   if (g_strv_length (dialog->priv->users) > 1)
-     {
 --- a/src/polkitgnomeauthenticator.c
 +++ b/src/polkitgnomeauthenticator.c
 @@ -379,7 +379,6 @@

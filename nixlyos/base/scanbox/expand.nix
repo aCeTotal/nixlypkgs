@@ -1,7 +1,8 @@
 { writeShellApplication
+, callPackage
 , _7zz
+, b3sum
 , cabextract
-, clamav
 , coreutils
 , cpio
 , dmg2img
@@ -20,8 +21,9 @@ writeShellApplication {
   name = "nixly-scan-expand";
   runtimeInputs = [
     _7zz
+    b3sum
+    (callPackage ./batches.nix { })
     cabextract
-    clamav
     coreutils
     cpio
     dmg2img

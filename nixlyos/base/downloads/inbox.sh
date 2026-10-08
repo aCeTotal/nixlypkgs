@@ -81,11 +81,20 @@ verdict() {
   return "$rc"
 }
 
+relay() {
+  local phase rest
+  while read -r phase rest; do
+    event progress "$1" "$phase" "$rest"
+  done
+}
+
 # 0 clean, 1 threat, 2 unverifiable.
 scan() {
   local s=$1 out rc
   if [ "$(stat -c %s -- "$s")" -gt "$limit" ]; then
-    if out=$(nixly-scan-expand "$s"); then rc=0; else rc=$?; fi
+    if nixly-scan-expand "$s" 3>&1 >"$s.report" | relay "$2"; then rc=0; else rc=$?; fi
+    out=$(cat -- "$s.report")
+    rm -f -- "$s.report"
     printf '%s' "${out:-too large to scan and could not be unpacked}" | head -1
     return "$rc"
   fi
@@ -106,6 +115,14 @@ scan() {
   return "$rc"
 }
 
+# Scan big archives while downloading.
+live() {
+  local res=$verdicts/$2.live rc
+  : >"$res.run"
+  if nixly-scan-stream "$1" "$res.done" 3>&1 >"$res.report" | relay "$3"; then rc=0; else rc=$?; fi
+  echo "$rc" >"$res.rc"
+}
+
 hold() {
   local s=$1 name=$2 reason=$3 dst=$q/$2
   [ ! -e "$dst" ] || dst=$q/$name.$RANDOM
@@ -118,6 +135,26 @@ release() {
   out=$dest/$(unique "$name")
   mv -- "$s" "$out"
   event clean "$name" "" "$out"
+}
+
+# Live verdict for this file.
+streamed() {
+  local res=$verdicts/$1.live rc reason
+  [ -e "$res.run" ] || return 1
+  printf '%s' "$2" >"$res.path"
+  mv -- "$res.path" "$res.done"
+  until [ -s "$res.rc" ]; do
+    inotifywait -qq -t 1 -e close_write -- "$verdicts" 2>/dev/null || true
+  done
+  rc=$(<"$res.rc")
+  reason=$(head -1 -- "$res.report")
+  rm -f -- "$res".*
+  case $rc in
+    0) release "$2" "$3" ;;
+    1) rm -f -- "$2"; event threat "$3" "$reason" ;;
+    2) hold "$2" "$3" "$reason" ;;
+    *) return 1 ;;
+  esac
 }
 
 process() {
@@ -141,8 +178,9 @@ process() {
     *) rm -f -- "$s"; return 0 ;;
   esac
 
+  if streamed "$id" "$s" "$name"; then return 0; fi
   event scanning "$name" ""
-  if reason=$(scan "$s"); then rc=0; else rc=$?; fi
+  if reason=$(scan "$s" "$name"); then rc=0; else rc=$?; fi
   case $rc in
     0) release "$s" "$name" ;;
     1) rm -f -- "$s"; event threat "$name" "$reason" ;;
@@ -152,9 +190,13 @@ process() {
 
 # A refusal aborts the download in Brave.
 start() {
-  local rc=0
-  ask "$2" "$(basename -- "${1%.crdownload}")" || rc=$?
-  case $rc in 1|3) rm -f -- "$1" ;; esac
+  local rc=0 name
+  name=$(basename -- "${1%.crdownload}")
+  ask "$2" "$name" || rc=$?
+  case $rc in
+    0) live "$1" "$2" "$name" ;;
+    1|3) rm -f -- "$1" ;;
+  esac
 }
 
 # Prompts as soon as Brave starts writing.

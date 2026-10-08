@@ -3,11 +3,15 @@
 # Filesystem and VM images are mounted, everything else is unpacked; the
 # unpacked copy is deleted the moment the scan is over, in every exit path.
 # stdout: one "name — reason" line per finding.
+# fd 3, when open: "phase percent done total" lines.
 # 0 = clean, 1 = something found, 2 = nothing could be opened.
 set -uo pipefail
 
 f=$1
+src=$(readlink -f -- "$f")
 depth=${2:-0}
+# Hashes already scanned, optional.
+seen=${3:-}
 box=/var/lib/nixly-scanbox
 max_depth=2
 limit=$(( 2 * 1024 * 1024 * 1024 ))
@@ -17,6 +21,9 @@ nfound=0
 unverified=0
 opened=0
 loop=""
+shown=""
+report=0
+[ ! -w /dev/fd/3 ] || report=1
 
 [ -r "$f" ] || exit 2
 [ "$depth" -le "$max_depth" ] || exit 2
@@ -31,6 +38,39 @@ cleanup() {
   rm -rf "$work"
 }
 trap cleanup EXIT INT TERM HUP
+
+progress() {
+  local pct=$(( $2 * 100 / ($3 > 0 ? $3 : 1) ))
+  [ "$report" = 1 ] && [ "$1 $pct" != "$shown" ] || return 0
+  shown="$1 $pct"
+  printf '%s %s %s %s\n' "$1" "$pct" "$2" "$3" >&3
+}
+
+# Unpacker read offset in source.
+read_pos() {
+  local fd pos
+  for fd in /proc/"$1"/fd/*; do
+    [ "$(readlink -- "$fd" 2>/dev/null)" = "$src" ] || continue
+    read -r _ pos <"/proc/$1/fdinfo/${fd##*/}" || return 1
+    printf '%s' "$pos"
+    return 0
+  done
+  return 1
+}
+
+unpack() {
+  local pid pos size
+  size=$(stat -c %s -- "$f")
+  "$@" >/dev/null 2>&1 &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    if pos=$(read_pos "$pid"); then
+      progress unpack "$pos" "$size"
+    fi
+    sleep 0.25
+  done
+  wait "$pid"
+}
 
 record() {
   printf '%s — %s\n' "$(basename -- "$1")" "$2"
@@ -49,34 +89,83 @@ room_for() {
   [ -n "$avail" ] && [ "$avail" -gt "$(( need + headroom ))" ]
 }
 
-scan_tree() {
-  local dir=$1 out line p s sub rc
-  # clamdscan exits nonzero on a detection, which is not an error here.
-  out=$(clamdscan --fdpass --multiscan --no-summary --infected "$dir" 2>/dev/null) || true
-  while IFS= read -r line; do
-    case $line in *" FOUND") ;; *) continue ;; esac
-    p=${line%%: *}
-    s=${line##*: }
-    s=${s% FOUND}
-    case $s in
-      *Limits.Exceeded*) ;;
-      *) record "$p" "$s" ;;
-    esac
-  done <<<"$out"
+big=()
+total=0
+scanned=0
 
-  # Anything still too big for the engine gets the same treatment again.
-  while IFS= read -r -d '' big; do
-    if sub=$("$0" "$big" "$(( depth + 1 ))"); then
-      rc=0
-    else
-      rc=$?
+index_tree() {
+  local size p
+  big=()
+  total=0
+  scanned=0
+  while IFS=$'\t' read -r -d '' size p; do
+    total=$(( total + size ))
+    if [ "$size" -gt "$limit" ]; then
+      big+=("$p")
+      continue
     fi
-    case $rc in
-      0) ;;
-      1) printf '%s' "$sub"; nfound=$(( nfound + 1 )) ;;
-      *) note "$big" "could not be opened" ;;
-    esac
-  done < <(find "$dir" -xdev -type f -size +"$limit"c -print0 2>/dev/null)
+    printf '%s\t%s\0' "$size" "$p"
+  done < <(find "$1" -xdev -type f -printf '%s\t%p\0' 2>/dev/null) >"$work/small"
+}
+
+# Every batch must report back.
+verdict_line() {
+  local s bytes rc
+  case $1 in
+    "batch "*)
+      read -r _ bytes rc _ <<<"$1"
+      [ "$rc" != 2 ] || note "$2" "some files could not be scanned"
+      scanned=$(( scanned + bytes ))
+      progress scan "$scanned" "$total" ;;
+    *" FOUND")
+      s=${1##*: }
+      s=${s% FOUND}
+      case $s in *Limits.Exceeded*) ;; *) record "${1%: *}" "$s" ;; esac ;;
+  esac
+}
+
+# Recurse into oversized members.
+scan_big() {
+  local sub rc=0
+  sub=$("$0" "$1" "$(( depth + 1 ))" 3>&-) || rc=$?
+  case $rc in
+    0) ;;
+    1) printf '%s' "$sub"; nfound=$(( nfound + 1 )) ;;
+    *) note "$1" "could not be opened" ;;
+  esac
+  scanned=$(( scanned + $(stat -c %s -- "$1") ))
+  progress scan "$scanned" "$total"
+}
+
+scan_tree() {
+  local line p
+  index_tree "$1"
+  mkdir -p "$work/lists"
+  progress scan 0 "$total"
+  while IFS= read -r line; do
+    verdict_line "$line" "$1"
+  done < <(nixly-scan-batches "$work/lists" <"$work/small")
+  for p in "${big[@]}"; do
+    scan_big "$p"
+  done
+}
+
+# Skip members scanned while downloading.
+drop_seen() {
+  local h p size got=0 all=0
+  local -A known bytes
+  while read -r h; do
+    known[$h]=1
+  done <"$seen"
+  while IFS=$'\t' read -r -d '' size p; do
+    bytes[$p]=$size
+    all=$(( all + size ))
+  done < <(find "$1" -type f -printf '%s\t%p\0')
+  while read -r h p; do
+    [ -z "${known[$h]:-}" ] || rm -f -- "$p"
+    got=$(( got + ${bytes[$p]:-0} ))
+    progress match "$got" "$all"
+  done < <(find "$1" -type f -print0 | xargs -0 -r -P "$(nproc)" -n 256 b3sum --)
 }
 
 mount_and_scan() {
@@ -134,12 +223,12 @@ fi
 #    every compression, zip, 7z, cab, cpio, ar, xar, lha and rar; the rest
 #    have their own openers.
 if [ "$opened" = 0 ] && room_for "$(stat -c %s -- "$f" 2>/dev/null || echo 0)"; then
-  if bsdtar -xf "$f" -C "$work/x" 2>/dev/null ||
-      7zz x -y -bso0 -bsp0 -o"$work/x" "$f" >/dev/null 2>&1 ||
-      unsquashfs -n -f -d "$work/x" "$f" >/dev/null 2>&1 ||
-      wimextract "$f" all --dest-dir="$work/x" >/dev/null 2>&1 ||
-      innoextract -s -d "$work/x" "$f" >/dev/null 2>&1 ||
-      cabextract -q -d "$work/x" "$f" >/dev/null 2>&1 ||
+  if unpack bsdtar -xf "$f" -C "$work/x" ||
+      unpack 7zz x -y -bso0 -bsp0 -o"$work/x" "$f" ||
+      unpack unsquashfs -n -f -d "$work/x" "$f" ||
+      unpack wimextract "$f" all --dest-dir="$work/x" ||
+      unpack innoextract -s -d "$work/x" "$f" ||
+      unpack cabextract -q -d "$work/x" "$f" ||
       (rpm2cpio "$f" 2>/dev/null | cpio -idmu --quiet -D "$work/x" 2>/dev/null) ||
       (dmg2img -s "$f" "$work/raw" >/dev/null 2>&1 &&
         mount -o ro,nosuid,nodev,noexec,loop "$work/raw" "$work/mnt" 2>/dev/null &&
@@ -147,6 +236,7 @@ if [ "$opened" = 0 ] && room_for "$(stat -c %s -- "$f" 2>/dev/null || echo 0)"; 
   then
     if [ "$opened" = 0 ] && [ -n "$(ls -A "$work/x" 2>/dev/null)" ]; then
       opened=1
+      [ -z "$seen" ] || drop_seen "$work/x"
       scan_tree "$work/x"
     fi
   fi
