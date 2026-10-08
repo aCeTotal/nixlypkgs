@@ -15,11 +15,18 @@ let
       coreutils
       expand
       inotify-tools
+      polkit
+      procps
     ];
     text = builtins.readFile ./inbox.sh;
   };
+
+  policy = pkgs.writeTextDir "share/polkit-1/actions/org.nixlyos.download-save.policy"
+    (builtins.readFile ./save.policy);
 in
 {
+  environment.systemPackages = [ policy ];
+
   # Save dialog cannot grant writes.
   environment.etc."brave/policies/managed/downloads.json".text = builtins.toJSON {
     DownloadDirectory = inbox;

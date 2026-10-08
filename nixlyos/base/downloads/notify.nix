@@ -6,12 +6,13 @@ let
     runtimeInputs = with pkgs; [
       coreutils
       libnotify
+      nautilus
     ];
     text = builtins.readFile ./notify.sh;
   };
 in
 {
-  # A held file needs a reason on screen.
+  # Download gate status on screen.
   systemd.user.services.nixly-dlnotify = {
     description = "Download gate notifications";
     partOf = [ "graphical-session.target" ];
