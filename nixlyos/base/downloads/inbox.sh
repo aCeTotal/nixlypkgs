@@ -120,7 +120,16 @@ live() {
   local res=$verdicts/$2.live rc
   : >"$res.run"
   if nixly-scan-stream "$1" "$res.done" 3>&1 >"$res.report" | relay "$3"; then rc=0; else rc=$?; fi
+  [ "$rc" != 1 ] || abort "$1" "$res" "$3"
   echo "$rc" >"$res.rc"
+}
+
+# Threat mid-download kills it.
+abort() {
+  rm -f -- "$1"
+  [ ! -e "$2.done" ] || return 0
+  event threat "$3" "$(head -1 -- "$2.report")"
+  : >"$2.told"
 }
 
 hold() {
@@ -139,7 +148,7 @@ release() {
 
 # Live verdict for this file.
 streamed() {
-  local res=$verdicts/$1.live rc reason
+  local res=$verdicts/$1.live rc reason told=0
   [ -e "$res.run" ] || return 1
   printf '%s' "$2" >"$res.path"
   mv -- "$res.path" "$res.done"
@@ -148,10 +157,11 @@ streamed() {
   done
   rc=$(<"$res.rc")
   reason=$(head -1 -- "$res.report")
+  [ ! -e "$res.told" ] || told=1
   rm -f -- "$res".*
   case $rc in
     0) release "$2" "$3" ;;
-    1) rm -f -- "$2"; event threat "$3" "$reason" ;;
+    1) rm -f -- "$2"; [ "$told" = 1 ] || event threat "$3" "$reason" ;;
     2) hold "$2" "$3" "$reason" ;;
     *) return 1 ;;
   esac

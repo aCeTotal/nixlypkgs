@@ -2,7 +2,7 @@
 Type=Application
 Name=Gaea
 Comment=QuadSpinner Gaea 2 terrain designer
-Exec=@out@/bin/gaea
+Exec=gaea
 Icon=gaea
 Terminal=false
 Categories=Graphics;3DGraphics;

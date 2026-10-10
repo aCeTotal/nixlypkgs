@@ -60,6 +60,13 @@ fi
 
 cd "$WINEPREFIX/drive_c/Gaea"
 
+# Unpin device lists without CUDA.
+prefs=Data/Settings/Preferences.options
+if [ -f "$prefs" ] && ! jq -e '.Compute.Backends."$values" // [] | length == 0 or any(contains("/CUDA/"))' "$prefs" >/dev/null; then
+  jq '.Compute.Backends."$values" = []' "$prefs" > "$prefs.tmp"
+  mv "$prefs.tmp" "$prefs"
+fi
+
 wine ./Gaea.exe "$@" &
 
 wine @out@/share/gaea/embed/gaea-embed.exe >/dev/null 2>&1 &

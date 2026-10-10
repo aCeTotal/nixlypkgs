@@ -9,7 +9,7 @@ in
 
   nixpkgs.overlays = [
     (final: prev: {
-      # Blender opts back into dGPU.
+      # Blender and Gaea opt back into dGPU.
       Blender_bin_lts = final.symlinkJoin {
         inherit (prev.Blender_bin_lts) name meta;
         paths = [ prev.Blender_bin_lts ];
@@ -20,6 +20,16 @@ in
             --set __NV_PRIME_RENDER_OFFLOAD 1 \
             --set __NV_PRIME_RENDER_OFFLOAD_PROVIDER NVIDIA-G0 \
             --set __GLX_VENDOR_LIBRARY_NAME nvidia \
+            --set __VK_LAYER_NV_optimus NVIDIA_only
+        '';
+      };
+      gaea = final.symlinkJoin {
+        inherit (prev.gaea) name meta;
+        paths = [ prev.gaea ];
+        nativeBuildInputs = [ final.makeWrapper ];
+        postBuild = ''
+          wrapProgram $out/bin/gaea \
+            --unset VK_DRIVER_FILES \
             --set __VK_LAYER_NV_optimus NVIDIA_only
         '';
       };

@@ -21,26 +21,44 @@ held=/proc/$$/fd/$keep
 
 kind=""
 final=""
-nfound=0
 unverified=0
-scanned=0
 shown=0
+reader=""
 
 work=$(mktemp -d "$box/XXXXXXXX") || exit "$no_verdict"
 trap 'rm -rf "$work"' EXIT INT TERM HUP
 mkdir "$work/x" "$work/lists"
 : >"$work/seen"
 
+# First threat ends the scan.
 record() {
   printf '%s — %s\n' "${1##*/}" "$2"
-  nfound=$(( nfound + 1 ))
+  exit "$found"
 }
 
-# Bytes only, once a second.
+# Tail's fdinfo for the download.
+reader_pos() {
+  local pid fd
+  read -r pid 2>/dev/null <"$work/reader" || return 1
+  for fd in /proc/"$pid"/fd/*; do
+    [ "$fd" -ef "$held" ] || continue
+    printf '%s' "/proc/$pid/fdinfo/${fd##*/}"
+    return 0
+  done
+  return 1
+}
+
+# Archive bytes read, once a second.
 live() {
+  local pos=0
+  local -A st
   [ "$EPOCHSECONDS" != "$shown" ] || return 0
   shown=$EPOCHSECONDS
-  printf 'live 0 %s 0\n' "$scanned" >&3
+  [ -n "$reader" ] || reader=$(reader_pos) || reader=""
+  stat -A st "$held" || return 0
+  # Tail gone means all read.
+  [ -z "$reader" ] || read -r _ pos 2>/dev/null <"$reader" || pos=${st[size]}
+  printf 'live %s %s %s\n' "$(( pos * 100 / st[size] ))" "$pos" "${st[size]}" >&3
 }
 
 # Past the limit, still downloading.
@@ -71,8 +89,10 @@ unpack() {
   local sentinel
   ( while [ -e "$f" ]; do sleep "$tail_s"; done ) &
   sentinel=$!
-  tail -s "$tail_s" -c +1 -f --pid="$sentinel" -- "$held" |
-    tee >(b3sum --no-names >"$work/sum") |
+  mkfifo "$work/in"
+  tail -s "$tail_s" -c +1 -f --pid="$sentinel" -- "$held" >"$work/in" {keep}<&- &
+  echo "$!" >"$work/reader"
+  tee >(b3sum --no-names >"$work/sum") <"$work/in" |
     bsdtar -xvf - -C "$work/x" 2>&1
 }
 
@@ -102,13 +122,12 @@ retire() {
 }
 
 verdict_line() {
-  local s bytes rc list
+  local s rc list
   case $1 in
     "batch "*)
-      read -r _ bytes rc list <<<"$1"
+      read -r _ _ rc list <<<"$1"
       [ "$rc" != 2 ] || unverified=1
       retire "$list"
-      scanned=$(( scanned + bytes ))
       live ;;
     *" FOUND")
       s=${1##*: }
@@ -121,7 +140,7 @@ scan_live() {
   local line
   while IFS= read -r line; do
     verdict_line "$line"
-  done < <({ unpack || : >"$work/failed"; } | feed |
+  done < <(exec 3>&-; { unpack || : 2>/dev/null >"$work/failed"; } | feed |
     nixly-scan-batches "$work/lists")
 }
 
@@ -141,7 +160,7 @@ scan_rest() {
   while IFS= read -r line; do
     verdict_line "$line"
   done < <(find "$work/x" -type f -size -"$(( limit + 1 ))"c -printf '%s\t%p\0' |
-    nixly-scan-batches "$work/lists")
+    nixly-scan-batches "$work/lists" 3>&-)
   while IFS= read -r -d '' p; do
     deep "$p" 1 3>&-
   done < <(find "$work/x" -type f -size +"$limit"c -print0)
@@ -153,7 +172,7 @@ deep() {
   nixly-scan-expand "$@" || rc=$?
   case $rc in
     "$clean") ;;
-    "$found") nfound=$(( nfound + 1 )) ;;
+    "$found") exit "$found" ;;
     *) unverified=1 ;;
   esac
 }
@@ -172,6 +191,5 @@ case $kind in
   tar) scan_rest ;;
 esac
 
-[ "$nfound" -eq 0 ] || exit "$found"
 [ "$unverified" = 0 ] || exit "$unverifiable"
 exit "$clean"

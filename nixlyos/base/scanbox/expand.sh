@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
-# Open a file clamd cannot take in one piece and scan what is inside it.
-# Filesystem and VM images are mounted, everything else is unpacked; the
-# unpacked copy is deleted the moment the scan is over, in every exit path.
-# stdout: one "name — reason" line per finding.
-# fd 3, when open: "phase percent done total" lines.
-# 0 = clean, 1 = something found, 2 = nothing could be opened.
+# Scan inside files clamd refuses.
+# stdout: first "name — reason" finding.
+# fd 3, when open: progress lines.
+# 0 clean, 1 found, 2 unopenable.
 set -uo pipefail
 
 f=$1
@@ -17,7 +15,6 @@ max_depth=2
 limit=$(( 2 * 1024 * 1024 * 1024 ))
 headroom=$(( 2 * 1024 * 1024 * 1024 ))
 
-nfound=0
 unverified=0
 opened=0
 loop=""
@@ -33,7 +30,7 @@ chmod 700 "$work"
 mkdir -p "$work/mnt" "$work/x"
 
 cleanup() {
-  mountpoint -q "$work/mnt" && umount -R "$work/mnt" 2>/dev/null
+  mountpoint -q "$work/mnt" && umount -lR "$work/mnt" 2>/dev/null
   [ -z "$loop" ] || losetup -d "$loop" 2>/dev/null
   rm -rf "$work"
 }
@@ -72,9 +69,10 @@ unpack() {
   wait "$pid"
 }
 
+# First threat ends the scan.
 record() {
   printf '%s — %s\n' "$(basename -- "$1")" "$2"
-  nfound=$(( nfound + 1 ))
+  exit 1
 }
 
 # Printed like a finding, but it is a gap in coverage, not a detection.
@@ -130,7 +128,7 @@ scan_big() {
   sub=$("$0" "$1" "$(( depth + 1 ))" 3>&-) || rc=$?
   case $rc in
     0) ;;
-    1) printf '%s' "$sub"; nfound=$(( nfound + 1 )) ;;
+    1) printf '%s' "$sub"; exit 1 ;;
     *) note "$1" "could not be opened" ;;
   esac
   scanned=$(( scanned + $(stat -c %s -- "$1") ))
@@ -144,7 +142,7 @@ scan_tree() {
   progress scan 0 "$total"
   while IFS= read -r line; do
     verdict_line "$line" "$1"
-  done < <(nixly-scan-batches "$work/lists" <"$work/small")
+  done < <(nixly-scan-batches "$work/lists" <"$work/small" 3>&-)
   for p in "${big[@]}"; do
     scan_big "$p"
   done
@@ -246,7 +244,6 @@ rc=0
 if [ "$opened" = 0 ] || [ "$unverified" != 0 ]; then
   rc=2
 fi
-[ "$nfound" -eq 0 ] || rc=1
 
 # The unpacked copy never outlives the scan.
 cleanup

@@ -33,7 +33,6 @@ progress() {
   local -a bar=()
   read -r pct got total <<<"$4"
   case $3 in
-    live) body+=$'\n'"$(bytes "$got") scanned" ;;
     verify) ;;
     *)
       bar=(-h "int:value:$pct")

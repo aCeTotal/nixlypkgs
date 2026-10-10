@@ -10,6 +10,7 @@
   makeWrapper,
   addDriverRunpath,
   coreutils,
+  jq,
   dxvk,
   pkgsCross,
   wineWow64Packages,
@@ -134,11 +135,11 @@ stdenvNoCC.mkDerivation (finalAttrs: {
         lib.makeBinPath [
           wine
           coreutils
+          jq
         ]
       }
 
     install -Dm644 ${./gaea.desktop} $out/share/applications/gaea.desktop
-    substituteInPlace $out/share/applications/gaea.desktop --subst-var out
 
     runHook postInstall
   '';

@@ -142,6 +142,18 @@ in
         game   false
     }
 
+    // Gaea: verktoey, ikke spill.
+    window-rule {
+        app-id     "gaea"
+        game       false
+        fullscreen false
+    }
+    // Viewporten posisjonerer seg selv.
+    window-rule {
+        app-id   "gaea.viewport"
+        embedded true
+    }
+
     modkey      "Super"
     monitorkey  "Ctrl"
 
