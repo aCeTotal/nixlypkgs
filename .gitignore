@@ -1,6 +1,7 @@
 result
 result-*
 .direnv/
+__pycache__/
 
 # Agent scratch: plans and notes stay local, never in a push
 .claude/

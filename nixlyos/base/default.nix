@@ -84,6 +84,8 @@ in
     ../services/drawingtablet.nix
   ]
   ++ lib.optional isX86 ../apps/citrix.nix
+  ++ lib.optional isX86 ../apps/ue5.nix
+  ++ lib.optional isX86 ../apps/gaea.nix
   ++ [
     ../apps/dcspit.nix
     ../htpc

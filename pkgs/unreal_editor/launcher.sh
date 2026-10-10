@@ -7,10 +7,11 @@ if [ "$(ulimit -Sn)" -lt 65536 ]; then
   ulimit -Sn "$(ulimit -Hn)" 2>/dev/null || true
 fi
 
-driver="${UE5_VIDEODRIVER:-x11}"
+driver="@driver@"
 if [ "$driver" = x11 ] && [ -z "${DISPLAY:-}" ]; then
   driver=wayland
 fi
+export SDL_APP_ID=UnrealEditor
 export SDL_VIDEO_DRIVER="$driver"
 export SDL_VIDEODRIVER="$driver"
 if [ "$driver" = wayland ]; then
@@ -27,10 +28,10 @@ export MESA_SHADER_CACHE_DIR="$cache/mesa_shader_cache"
 export MESA_SHADER_CACHE_MAX_SIZE=12G
 mkdir -p "$ddc" "$MESA_SHADER_CACHE_DIR"
 
-root="$cache/UnrealEngine/engine"
-rw="$cache/UnrealEngine/rw"
-work="$cache/UnrealEngine/work"
-stamp="$cache/UnrealEngine/rw.engine-path"
+root="$cache/@state@/engine"
+rw="$cache/@state@/rw"
+work="$cache/@state@/work"
+stamp="$cache/@state@/rw.engine-path"
 if [ "$(cat "$stamp" 2>/dev/null)" != "$engine" ]; then
   echo "seeding writable engine overlay from $engine" >&2
   rm -rf "$rw" "$work" "$stamp"

@@ -16,6 +16,7 @@ in {
   libepoxy-nixly = callPackage ../pkgs/libepoxy { };
   Blender_bin_lts = callPackage ../pkgs/blender_bin_lts { };
   Unreal_editor = callPackage ../pkgs/unreal_editor { };
+  ue5_source = callPackage ../pkgs/ue5_source { };
   gaea = callPackage ../pkgs/gaea { };
   kmymoney = callPackage ../pkgs/kmymoney { };
   low-latency-layer = callPackage ../pkgs/low-latency-layer { };
