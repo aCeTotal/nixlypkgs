@@ -10,7 +10,7 @@ export DOTNET_ROOT='C:\dotnet'
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 export DOTNET_NOLOGO=1
 
-export WINEDLLOVERRIDES="d3d9,d3d10core,d3d11,d3d12,d3d12core,dxgi=n;winemenubuilder.exe=;${WINEDLLOVERRIDES:-}"
+export WINEDLLOVERRIDES="d3d9,d3d10core,d3d11,d3d12,d3d12core,dxgi=n;concrt140,msvcp140,vcruntime140,vcruntime140_1,vcomp140=n,b;winemenubuilder.exe=;${WINEDLLOVERRIDES:-}"
 export DXVK_CONFIG="dxgi.hideNvidiaGpu = False;${DXVK_CONFIG:-}"
 export LD_LIBRARY_PATH="@driverLink@/lib:${LD_LIBRARY_PATH:-}"
 
@@ -57,6 +57,8 @@ if [ "$(cat "$stamp" 2>/dev/null || true)" != "@out@" ]; then
 
   echo "@out@" > "$stamp"
 fi
+
+ln -sfn "$HOME" "$WINEPREFIX/dosdevices/h:"
 
 cd "$WINEPREFIX/drive_c/Gaea"
 

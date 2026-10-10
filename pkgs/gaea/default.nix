@@ -4,6 +4,7 @@
   fetchurl,
   fetchFromGitHub,
   innoextract,
+  cabextract,
   unzip,
   zstd,
   icoutils,
@@ -45,6 +46,11 @@ let
   dotnetDesktop = fetchurl {
     url = "https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/${dotnetVersion}/windowsdesktop-runtime-${dotnetVersion}-win-x64.zip";
     hash = "sha256-fr8NLHHAu1bRYL5egYoAgc1V6CoQZIFKL6+rAK7IXqg=";
+  };
+
+  vcRedist = fetchurl {
+    url = "https://download.visualstudio.microsoft.com/download/pr/bd1c8d9d-ba95-4eee-bc6e-df1fcc876373/CC0FF0EB1DC3F5188AE6300FAEF32BF5BEEBA4BDD6E8E445A9184072096B713B/VC_redist.x64.exe";
+    hash = "sha256-zA/w6x3D9RiK5jAPrvMr9b7rpL3W6ORFqRhAcglrcTs=";
   };
 
   nvidiaLibsVersion = "1.0.2";
@@ -89,6 +95,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
   nativeBuildInputs = [
     innoextract64
+    cabextract
     unzip
     zstd
     icoutils
@@ -105,6 +112,13 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     mv app $out/share/gaea/app
 
     install -Dm644 ${crackEngineDll} $out/share/gaea/app/Gaea.Engine.dll
+
+    # Wine's builtin ConcRT busy-spins.
+    cabextract -q -d vcredist ${vcRedist}
+    cabextract -q -F '*.dll_amd64' -d vcrt vcredist/a12
+    for dll in concrt140 msvcp140 vcruntime140 vcruntime140_1 vcomp140; do
+      install -Dm644 vcrt/$dll.dll_amd64 $out/share/gaea/app/$dll.dll
+    done
 
     unzip -q ${dotnetRuntime} -d $out/share/gaea/dotnet
     unzip -q ${dotnetDesktop} -d $out/share/gaea/dotnet
