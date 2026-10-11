@@ -7,7 +7,6 @@ let
   watched = [
     "${home}/Downloads"
     "${home}/Desktop"
-    "/tmp"
     "/var/tmp"
   ];
 in
