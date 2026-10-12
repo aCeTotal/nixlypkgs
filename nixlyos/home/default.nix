@@ -23,6 +23,7 @@
       ./audio_priority.nix
       ./caveman.nix
       ./claude.nix
+      ./meshy.nix
       ./discord_rpc.nix
       ./vulnix.nix
     ];

@@ -8,6 +8,7 @@ Machines carry no configuration tree — only `~/.local/nixlyos`:
   flake.nix     tiny; points at nixlypkgs (main)
   flake.lock    the machine's pin — updates only via nixlyos-update
   local.nix     per-machine overrides and secrets (never in this repo)
+  meshy.key     Meshy.ai API key for the meshy CLI (mode 600)
   hardware/     data written by nixlyos-detect-hw + hardware-configuration.nix
 ```
 

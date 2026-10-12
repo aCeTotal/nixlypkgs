@@ -197,5 +197,10 @@
     Keep it curated and short: entries for what this project actually produces, not a copied 300-line template. No blanket wildcards that hide real source.
     Never commit a file the .gitignore is meant to catch, and never force-add one.
     A tracked file that should be ignored is a bug: say so, and fix the ignore rule.
+
+    20. 3D Assets
+
+    Meshes, props, characters and animations come from the `meshy` CLI (skill: meshy), never hand-built geometry or placeholder shapes when a real asset is wanted.
+    Load the meshy skill before touching 3D assets in a Bevy project.
   '';
 }

@@ -10,6 +10,7 @@ in {
   };
   nixly_lockscreen = callPackage ../pkgs/nixly_lockscreen { };
   claude = callPackage ../pkgs/claude { };
+  meshy = callPackage ../pkgs/meshy { };
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
   nixlymedia = callPackage ../pkgs/nixlymedia { };
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };
