@@ -75,8 +75,8 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "22f0297ad1c54b3429b582ffe7bd5a847b86fdb4";
-    hash = "sha256-NoogV+77uHw9zMUw1D1e7fbB4LNy9RTPx7koMbOfVKk=";
+    rev = "ea0d012833be790e7d46e01dda8f7054120ee945";
+    hash = "sha256-+Q+XSFBVSuU6YrGEuMroAbXS9h9zkKeKeV3nB06iXP0=";
   };
 
   wlrootsLocal = stdenv.mkDerivation {
@@ -145,7 +145,7 @@ in
 
 stdenv.mkDerivation {
   pname = "nixlytile";
-  version = "2026.10.11";
+  version = "2026.10.14";
 
   passthru.providedSessions = [ "nixlytile" ];
 
