@@ -44,6 +44,8 @@
       "nvidia.NVreg_InitializeSystemMemoryAllocations=0"
       # No-op before Ampere vbios.
       "nvidia.NVreg_EnableResizableBar=1"
+      # GSP firmware wedges after channel resets.
+      "nvidia.NVreg_EnableGpuFirmware=0"
     ];
   };
 
