@@ -2,9 +2,8 @@
 
 {
   imports = [
-    ./gate.nix
-    ./triage.nix
-    ./oversize.nix
+    ./dirs.nix
+    ./arrival.nix
     ./noexec.nix
     ./notify.nix
     ./open.nix

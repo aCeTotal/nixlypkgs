@@ -83,7 +83,7 @@ in
     ]
     ++ lib.optional (!isArm) "8250.nr_uarts=0"
     ++ [
-      "transparent_hugepage=always"
+      "transparent_hugepage=madvise"
     ]
     ++ lib.optional (!isArm) "random.trust_cpu=on"
     ++ [

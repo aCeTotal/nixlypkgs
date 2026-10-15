@@ -1,20 +1,41 @@
 --- a/kernel/nvidia/nv-acpi.c
 +++ b/kernel/nvidia/nv-acpi.c
-@@ -146,16 +146,7 @@
- 
- static void nv_acpi_nvpcf_event(acpi_handle handle, u32 event_type, void *data)
- {
--    nv_acpi_t *pNvAcpiObject = data;
--
--    if (event_type == ACPI_NVPCF_EVENT_CHANGE)
--    {
--        rm_acpi_nvpcf_notify(pNvAcpiObject->sp);
--    }
--    else
--    {
--        nv_printf(NV_DBG_INFO,"NVRM: %s: NVPCF event 0x%x is not supported\n", __FUNCTION__, event_type);
--    }
-+    nv_printf(NV_DBG_INFO, "NVRM: %s: NVPCF event 0x%x ignored\n", __FUNCTION__, event_type);
+@@ -144,13 +144,37 @@
+     }
  }
  
- /*
++// RM must not touch a GPU in D3cold.
++static void nv_acpi_nvpcf_notify_awake(nvidia_stack_t *sp)
++{
++    nv_linux_state_t *nvl;
++    nv_state_t *nv;
++
++    LOCK_NV_LINUX_DEVICES();
++    for (nvl = nv_linux_devices; nvl != NULL; nvl = nvl->next)
++    {
++        nv = NV_STATE_PTR(nvl);
++        down(&nvl->ldata_lock);
++        if ((nv->flags & NV_FLAG_INITIALIZED) &&
++            (rm_ref_dynamic_power(sp, nv, NV_DYNAMIC_PM_FINE) == NV_OK))
++        {
++            rm_acpi_nvpcf_notify(sp);
++            rm_unref_dynamic_power(sp, nv, NV_DYNAMIC_PM_FINE);
++            up(&nvl->ldata_lock);
++            break;
++        }
++        up(&nvl->ldata_lock);
++    }
++    UNLOCK_NV_LINUX_DEVICES();
++}
++
+ static void nv_acpi_nvpcf_event(acpi_handle handle, u32 event_type, void *data)
+ {
+     nv_acpi_t *pNvAcpiObject = data;
+ 
+     if (event_type == ACPI_NVPCF_EVENT_CHANGE)
+     {
+-        rm_acpi_nvpcf_notify(pNvAcpiObject->sp);
++        nv_acpi_nvpcf_notify_awake(pNvAcpiObject->sp);
+     }
+     else
+     {

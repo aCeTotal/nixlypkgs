@@ -118,32 +118,22 @@ in
     }
   ];
 
-  # Keep the mounts permanently alive and warm: statfs every 30 s mounts
-  # them at boot (the automount alone waits for first access), keeps the
-  # TCP connections hot so they never idle out, and re-mounts after a
-  # server outage. statfs is a real FSSTAT RPC (not attribute-cached), so
-  # each tick genuinely exercises the wire. Per-disk in background so one
-  # unreachable export never delays the other; soft,timeo=5,retrans=2
-  # bounds each attempt to a few seconds.
+  # statfs every 30 s keeps NFS warm.
   systemd.services.nfs-keepalive = {
     description = "Keep NFS mounts mounted and their connections warm";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "remote-fs.target" ];
     serviceConfig = {
-      Type = "oneshot";
       ExecStart = pkgs.writeShellScript "nfs-keepalive" ''
-        for d in /mnt/nfs/*; do
-          ${pkgs.coreutils}/bin/stat -f "$d" > /dev/null 2>&1 &
+        while :; do
+          for d in /mnt/nfs/*; do
+            ${pkgs.coreutils}/bin/stat -f "$d" > /dev/null 2>&1 &
+          done
+          wait
+          ${pkgs.coreutils}/bin/sleep 30
         done
-        wait
-        exit 0
       '';
-    };
-  };
-  systemd.timers.nfs-keepalive = {
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnBootSec = "15s";
-      OnUnitActiveSec = "30s";
-      AccuracySec = "5s";
+      Restart = "always";
     };
   };
 }

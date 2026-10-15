@@ -45,6 +45,9 @@ in {
     patches = (old.patches or [ ]) ++ [ ../pkgs/bluez/hog-retry.patch ];
   });
 
+  # TTS keeps speech-dispatcher resident forever.
+  discord = prev.discord.override { withTTS = false; };
+
   flycast = prev.flycast.overrideAttrs (old: {
     postPatch = (old.postPatch or "") + ''
       sed -i '/#include "spvIR.h"/a #include <cstdint>' core/deps/glslang/SPIRV/SpvBuilder.h

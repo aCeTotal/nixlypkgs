@@ -32,6 +32,7 @@ in
     fangfrisch.settings = {
       interserver.enabled = "yes";
       urlhaus.enabled = "yes";
+      urlhaus.max_size = "16MB";
       sanesecurity.enabled = "yes";
     };
     daemon.enable = true;
@@ -57,8 +58,11 @@ in
       HeuristicAlerts = true;
       MaxRecursion = 16;
       MaxFiles = 50000;
-      MaxFileSize = "256M";
-      MaxScanSize = "1024M";
+      # 2G is the engine ceiling.
+      MaxFileSize = "2G";
+      MaxScanSize = "4G";
+      # Hitting a limit is a verdict.
+      AlertExceedsMax = true;
       # Reloading in place would double the resident signature set.
       ConcurrentDatabaseReload = false;
     };

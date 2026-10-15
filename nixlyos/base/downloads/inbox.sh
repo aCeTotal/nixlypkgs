@@ -8,7 +8,7 @@ stage=$3
 verdicts=$stage/verdicts
 q=/var/lib/nixly-quarantine
 events=/run/nixly-dlgate/events
-limit=$(( 2 * 1024 * 1024 * 1024 ))
+mark=trusted.nixly.scanned
 action=org.nixlyos.download-save
 user=$(stat -c %U -- "$inbox")
 uid=$(stat -c %u -- "$inbox")
@@ -90,28 +90,10 @@ relay() {
 
 # 0 clean, 1 threat, 2 unverifiable.
 scan() {
-  local s=$1 out rc
-  if [ "$(stat -c %s -- "$s")" -gt "$limit" ]; then
-    if nixly-scan-expand "$s" 3>&1 >"$s.report" | relay "$2"; then rc=0; else rc=$?; fi
-    out=$(cat -- "$s.report")
-    rm -f -- "$s.report"
-    printf '%s' "${out:-too large to scan and could not be unpacked}" | head -1
-    return "$rc"
-  fi
-  if out=$(clamdscan --fdpass --no-summary --infected --wait --ping 120:1 -- "$s" 2>/dev/null); then
-    rc=0
-  else
-    rc=$?
-  fi
-  out=${out##*: }
-  out=${out% FOUND}
-  case $rc:$out in
-    0:*) return 0 ;;
-    1:*ncrypted*|1:*Limits.Exceeded*) rc=2 ;;
-    1:*) ;;
-    *) out="could not be scanned" rc=2 ;;
-  esac
-  printf '%s' "$out"
+  local rc
+  if nixly-scan-file "$1" 3>&1 >"$1.report" | relay "$2"; then rc=0; else rc=$?; fi
+  head -1 -- "$1.report"
+  rm -f -- "$1.report"
   return "$rc"
 }
 
@@ -142,6 +124,7 @@ hold() {
 release() {
   local s=$1 name=$2 out
   out=$dest/$(unique "$name")
+  setfattr -n "$mark" -v 1 -- "$s" 2>/dev/null || true
   mv -- "$s" "$out"
   event clean "$name" "" "$out"
 }

@@ -6,18 +6,18 @@ let
   # Root-only, on home's filesystem.
   stage = "/home/.nixly-dlscan";
 
-  expand = pkgs.callPackage ../scanbox/expand.nix { };
+  scanFile = pkgs.callPackage ../scanbox/file.nix { };
   stream = pkgs.callPackage ../scanbox/stream.nix { };
 
   mover = pkgs.writeShellApplication {
     name = "nixly-dlinbox";
     runtimeInputs = with pkgs; [
-      clamav
+      attr
       coreutils
-      expand
       inotify-tools
       polkit
       procps
+      scanFile
       stream
     ];
     text = builtins.readFile ./inbox.sh;

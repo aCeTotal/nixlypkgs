@@ -161,6 +161,10 @@ in
     IOWeight = 20;
   };
 
+  # Builds stay off tmpfs /tmp.
+  systemd.services.nix-daemon.environment.TMPDIR = "/nix/tmp";
+  systemd.tmpfiles.rules = [ "d /nix/tmp 1777 root root -" ];
+
   # fstrim: same reasoning, async at night and never replayed at boot.
   services.fstrim = {
     interval = "Sun 04:00";

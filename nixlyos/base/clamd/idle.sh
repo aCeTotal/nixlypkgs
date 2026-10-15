@@ -3,7 +3,7 @@
 set -uo pipefail
 
 sock=/run/clamav/clamd.ctl
-grace=300
+grace=30
 idle=0
 
 # Open clients, queued clients or a USB scan.
