@@ -15,5 +15,6 @@
     ./updates.nix
     ./audit.nix
     ./headless.nix
+    ./services.nix
   ];
 }

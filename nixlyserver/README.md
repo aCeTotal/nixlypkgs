@@ -41,6 +41,17 @@ systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7 /dev/disk/by-partlabel/root
 | `nixlyserver.updates` | `auto-reboot`: nightly, reboots on kernel change | `auto`, `manual` |
 | `nixlyserver.allowedCountries` | NATO members | any ISO 3166 codes |
 
+## Services
+
+`local.nix` enables optional services; `codeindexcache` serves code.aceclan.no:
+
+```nix
+services.codeindexcache = {
+  enable = true;
+  githubTokenFile = "/etc/nixlyserver/github-token";
+};
+```
+
 ## Layout
 
 ```
@@ -56,4 +67,5 @@ users.nix       key-only admin, sudo-rs
 nix.nix         daemon access and caches
 audit.nix       auditd watches
 headless.nix    no desktop plumbing, persistent journal
+services.nix    public ports for enabled services
 ```

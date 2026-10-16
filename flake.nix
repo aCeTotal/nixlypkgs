@@ -7,6 +7,10 @@
       url = "github:aCeTotal/nixly_launcher";
       flake = false;
     };
+    codeindexcache_src = {
+      url = "github:aCeTotal/codeindexcache";
+      flake = false;
+    };
     nixly_voice_src = {
       url = "github:aCeTotal/nixly_voice";
       flake = false;
@@ -78,7 +82,7 @@
                 inherit (kp) xpadneo xone xpad-noone msi-ec;
               };
         in {
-          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer nixly-vrs proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly nixly-mic nixly-gate nixly_kalk nixly_pdf nixly_voice meshy;
+          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer nixly-vrs proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly nixly-mic nixly-gate nixly_kalk nixly_pdf nixly_voice meshy codeindexcache;
 
           # Layer for 32-bit games.
           nixly-vrs-i686 = stable.pkgsi686Linux.nixly-vrs;
@@ -121,6 +125,7 @@
         nixlymediaserver = import ./modules/nixlymediaserver.nix;
         nixly_lockscreen = import ./modules/nixly_lockscreen.nix;
         citrix-workspace = import ./modules/citrix-workspace.nix;
+        codeindexcache = import ./modules/codeindexcache.nix inputs;
       };
 
       homeManagerModules = {

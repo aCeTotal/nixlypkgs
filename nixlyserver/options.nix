@@ -26,5 +26,11 @@ in
       default = nato;
       description = "ISO 3166 codes whose public IPv4 space may open connections.";
     };
+
+    publicPorts = lib.mkOption {
+      type = lib.types.listOf lib.types.port;
+      default = [ ];
+      description = "TCP ports open to every source, past the country and VPN gate.";
+    };
   };
 }

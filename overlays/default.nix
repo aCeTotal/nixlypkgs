@@ -9,6 +9,9 @@ in {
     src = inputs.nixly_launcher_src;
   };
   nixly_lockscreen = callPackage ../pkgs/nixly_lockscreen { };
+  codeindexcache = callPackage ../pkgs/codeindexcache {
+    src = inputs.codeindexcache_src;
+  };
   claude = callPackage ../pkgs/claude { };
   meshy = callPackage ../pkgs/meshy { };
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };

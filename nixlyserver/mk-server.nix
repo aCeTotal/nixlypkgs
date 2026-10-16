@@ -30,6 +30,7 @@ nixpkgs.lib.nixosSystem {
     }
     (hardwareDir + "/hardware-configuration.nix")
     inputs.lanzaboote.nixosModules.lanzaboote
+    self.nixosModules.codeindexcache
     ./default.nix
   ]
   ++ nixpkgs.lib.optional (localConfig != null) localConfig;

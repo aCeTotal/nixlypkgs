@@ -5,6 +5,7 @@ let
   table = "ingress";
   stateDir = "nixlyserver-ingress";
   sshPorts = lib.concatMapStringsSep ", " toString config.services.openssh.ports;
+  publicPorts = lib.concatMapStringsSep ", " toString config.nixlyserver.publicPorts;
   private4 = "10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16";
   private6 = "fe80::/10, fc00::/7";
 
@@ -35,6 +36,7 @@ in
         ip6 saddr @banned6 drop
         tcp dport { ${sshPorts} } update @ssh4 { ip saddr limit rate over 6/minute burst 6 packets } add @banned4 { ip saddr } drop
         tcp dport { ${sshPorts} } update @ssh6 { ip6 saddr limit rate over 6/minute burst 6 packets } add @banned6 { ip6 saddr } drop
+        ${lib.optionalString (publicPorts != "") "tcp dport { ${publicPorts} } accept"}
         ip saddr { ${private4} } accept
         ip6 saddr { ${private6} } accept
         icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert, nd-router-advert } ip6 hoplimit 255 accept
