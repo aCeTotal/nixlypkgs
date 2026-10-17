@@ -153,6 +153,10 @@ in
     # Networks saved from the popup land in imperative.conf (update_config=1).
     allowAuxiliaryImperativeNetworks = true;
     scanOnLowSignal = false;
+    # Firmware scans never re-report an ignored AP.
+    extraConfig = ''
+      disable_scan_offload=1
+    '';
   };
 
   # VPN start/stop + autoconnect toggles from the nixlytile popup:

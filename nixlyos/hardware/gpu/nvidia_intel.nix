@@ -5,6 +5,8 @@ let
   gpu = hwData.detected;
 in
 {
+  imports = [ ./nvidia_ac_reload.nix ];
+
   services.xserver.videoDrivers = [ "nvidia" ];
 
   nixpkgs.overlays = [
