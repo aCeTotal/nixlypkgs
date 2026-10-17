@@ -1,0 +1,25 @@
+--- a/kernel/nvidia/nv-acpi.c
++++ b/kernel/nvidia/nv-acpi.c
+@@ -67,6 +67,12 @@
+ 
+ #define ACPI_NVPCF_EVENT_CHANGE    0xC0
+ 
++// SBIOS GPS reports bogus limits.
++static const NvU8 gps_dsm_guid[16] = {
++    0x01, 0x2d, 0x13, 0xa3, 0xda, 0x8c, 0xba, 0x49,
++    0xa5, 0x2e, 0xbc, 0x9d, 0x46, 0xdf, 0x6b, 0x81
++};
++
+ /*
+  * This callback will be invoked by the acpi_notifier_call_chain()
+  */
+@@ -776,6 +782,9 @@
+         return NV_ERR_INVALID_ARGUMENT;
+     }
+ 
++    if (memcmp(pAcpiDsmGuid, gps_dsm_guid, sizeof(gps_dsm_guid)) == 0)
++        return NV_ERR_NOT_SUPPORTED;
++
+     rmStatus = os_alloc_mem((void **)&argument3, inParamSize);
+     if (rmStatus != NV_OK)
+         return rmStatus;

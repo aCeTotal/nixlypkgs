@@ -31,7 +31,7 @@ in
       settingsSha256 = "sha256-LK1LU8mDkM/XVRKPBtuOZh9nIP/lGFLAJnmasEX8jhg=";
       persistencedSha256 = "sha256-qPRb+3d88+2RcpUkoBTbjIaImnQ+jX+/6p1vXcJ5geE=";
       # NVPCF-notify krasjer RM i D3cold.
-      patches = [ ./nvidia-nvpcf.patch ];
+      patches = [ ./nvidia-nvpcf.patch ./nvidia-gps.patch ];
     };
     # Forrige driver = nixpkgs unstable sin latest (610.57.04).
     previous = base.latest;
