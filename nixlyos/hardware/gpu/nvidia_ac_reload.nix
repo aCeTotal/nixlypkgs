@@ -1,15 +1,21 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 
 let
   # A charger dropout leaves the driver capped at 10 W until it reloads.
   reload = pkgs.writeShellScript "nvidia-ac-reload" ''
-    export PATH=${pkgs.kmod}/bin:${pkgs.coreutils}/bin
+    export PATH=${pkgs.kmod}/bin:${pkgs.coreutils}/bin:${config.hardware.nvidia.package.bin}/bin
 
     on_mains() {
       for s in /sys/class/power_supply/*; do
         [ "$(cat "$s/type")" = Mains ] && [ "$(cat "$s/online")" = 1 ] && return 0
       done
       return 1
+    }
+
+    capped() {
+      IFS=', ' read -r cur def < <(nvidia-smi \
+        --query-gpu=enforced.power.limit,power.default_limit --format=csv,noheader,nounits)
+      [ "''${cur%.*}" -lt "''${def%.*}" ]
     }
 
     # Idle when no reference comes from outside the module stack.
@@ -22,6 +28,7 @@ let
     }
 
     sleep 2
+    on_mains && capped || exit 0
     while on_mains; do
       if idle; then
         modprobe -r nvidia_drm nvidia_uvm nvidia_modeset nvidia
@@ -39,7 +46,9 @@ in
   '';
 
   systemd.services.nvidia-ac-reload = {
-    description = "Reload the NVIDIA driver after the charger returns";
+    description = "Reload the NVIDIA driver when capped on mains";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "systemd-modules-load.service" ];
     serviceConfig = {
       Type = "oneshot";
       ExecStart = reload;

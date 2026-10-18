@@ -18,7 +18,7 @@ lib.warnIf (missing != [ ])
   imports =
     map (n: hw.${n}) generic'
     ++ lib.optional (model != null) hw.${model}
-    ++ lib.optionals p.msiEc [ ./msi-ec.nix ./tcc-offset.nix ]
+    ++ lib.optionals p.msiEc [ ./msi-ec.nix ./thermal-limits.nix ]
     ++ [ ./fans.nix ];
 
   # common-pc-laptop enables TLP when power-profiles-daemon is off, and TLP
