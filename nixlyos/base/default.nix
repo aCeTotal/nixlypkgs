@@ -26,7 +26,6 @@ in
     ./tailscale.nix
     ./netbird.nix
     ./nix.nix
-    ./lockscreen.nix
     ./nfs.nix
     ./nfs-readahead.nix
     ./ssh.nix
@@ -63,7 +62,6 @@ in
     ./audit.nix
     ./clamd
     ./scanbox
-    ./usb
     ./downloads
     ./keyring.nix
     ./power.nix

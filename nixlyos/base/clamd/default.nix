@@ -12,6 +12,8 @@ let
   };
 in
 {
+  imports = [ ./settings.nix ];
+
   # Socket activation starts it.
   systemd.services.clamav-daemon = {
     wantedBy = lib.mkForce [ ];

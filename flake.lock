@@ -32,6 +32,22 @@
         "type": "github"
       }
     },
+    "codeindexcache_src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1792143208,
+        "narHash": "sha256-IeL2ErYhZj0fCpANjXcvQFXW7l7tB6BZCgcs+52yy5o=",
+        "owner": "aCeTotal",
+        "repo": "codeindexcache",
+        "rev": "6349fdb5cae231f17f28a4943a26aff0de319683",
+        "type": "github"
+      },
+      "original": {
+        "owner": "aCeTotal",
+        "repo": "codeindexcache",
+        "type": "github"
+      }
+    },
     "crane": {
       "locked": {
         "lastModified": 1789760033,
@@ -324,6 +340,7 @@
     },
     "root": {
       "inputs": {
+        "codeindexcache_src": "codeindexcache_src",
         "home-manager": "home-manager",
         "lanzaboote": "lanzaboote",
         "mnw": "mnw",
