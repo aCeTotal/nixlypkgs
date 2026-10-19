@@ -65,8 +65,23 @@ restore_all() {
 
 # ---------------------------------------------------------------------- CPU
 
+# Whether a laptop battery exists.
+on_battery_machine() {
+	local supply
+	for supply in "${ROOT}"/sys/class/power_supply/*; do
+		[ "$(cat "$supply/type" 2>/dev/null)" = Battery ] &&
+			[ "$(cat "$supply/scope" 2>/dev/null)" != Device ] && return 0
+	done
+	return 1
+}
+
 tune_cpu() {
 	local policy name driver govs
+
+	if on_battery_machine; then
+		log "cpu: laptop, power limits left to firmware and game"
+		return 0
+	fi
 
 	for policy in "${ROOT}"/sys/devices/system/cpu/cpufreq/policy*; do
 		[ -d "$policy" ] || continue
@@ -407,6 +422,8 @@ gpumax_nvidia() {
 do_gpumax() {
 	local card driver
 
+	on_battery_machine && return 0
+
 	for card in "${ROOT}"/sys/class/drm/card*; do
 		[ -e "$card/device/driver" ] || continue
 		case "$(basename "$card")" in *-*) continue;; esac  # skip connectors
@@ -420,6 +437,11 @@ do_gpumax() {
 
 tune_gpu() {
 	local card dev driver
+
+	if on_battery_machine; then
+		log "gpu: laptop, power limits left to firmware and game"
+		return 0
+	fi
 
 	for card in "${ROOT}"/sys/class/drm/card*; do
 		[ -e "$card/device/driver" ] || continue
