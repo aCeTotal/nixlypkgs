@@ -33,6 +33,8 @@
     extraRules = [
       { name = "sddm"; nice = 0; sched = "other"; ioclass = "best-effort"; }
       { name = "sddm-helper"; nice = 0; sched = "other"; ioclass = "best-effort"; }
+      # War Thunder rule idled thelastemperor.
+      { name = "launcher"; type = "Game"; }
     ];
   };
 

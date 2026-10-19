@@ -26,11 +26,12 @@ in
     ./tailscale.nix
     ./netbird.nix
     ./nix.nix
+    ./project-roots.nix
     ./nfs.nix
     ./nfs-readahead.nix
     ./ssh.nix
   ]
-  ++ lib.optional isX86 ../apps/gaming.nix
+  ++ lib.optionals isX86 [ ../apps/gaming.nix ../apps/boost ]
   ++ [
     ../apps/gametune.nix
     ./packages.nix
