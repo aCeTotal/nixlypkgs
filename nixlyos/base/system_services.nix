@@ -118,7 +118,6 @@
     "kernel.sched_autogroup_enabled" = 1;
 
     # watermark_boost_factor and compaction_proactiveness live in perf.nix.
-    "vm.watermark_scale_factor" = 125;  # More aggressive reclaim
     "vm.zone_reclaim_mode" = 0;         # Zone reclaim off, lower latency
     "vm.stat_interval" = 10;            # Less frequent vm stats
   };

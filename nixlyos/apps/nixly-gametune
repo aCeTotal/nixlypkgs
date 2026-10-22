@@ -228,6 +228,10 @@ tune_kernel() {
 		save_and_set swappiness "${ROOT}/proc/sys/vm/swappiness" 10
 	fi
 
+	# Deep reclaim headroom only while gaming.
+	save_and_set min-free "${ROOT}/proc/sys/vm/min_free_kbytes" 131072
+	save_and_set watermark-scale "${ROOT}/proc/sys/vm/watermark_scale_factor" 125
+
 	# Proactive compaction causes multi-millisecond allocation stalls.
 	[ -f "${ROOT}/proc/sys/vm/compaction_proactiveness" ] &&
 		save_and_set compaction "${ROOT}/proc/sys/vm/compaction_proactiveness" 0

@@ -13,6 +13,9 @@ in
     priority = 100;               # Higher priority than disk swap
   };
 
+  # zswap in front of zram compresses twice.
+  boot.kernelParams = [ "zswap.enabled=0" ];
+
   boot.kernel.sysctl = {
     # Swap behavior tuned for zram
     "vm.swappiness" = 180;        # Higher for zram (kernel 5.8+)
@@ -28,7 +31,8 @@ in
 
     # Memory overcommit for gaming
     "vm.overcommit_memory" = 1;   # Always allow overcommit (games often over-allocate)
-    "vm.min_free_kbytes" = 131072; # Keep 128MB free minimum
+
+    # Watermarks stay kernel default; gametune deepens them.
   };
 
   # systemd-oomd off: earlyoom already covers this, and two killers could each

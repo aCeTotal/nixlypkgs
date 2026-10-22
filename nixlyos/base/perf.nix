@@ -56,6 +56,9 @@
     # These ship root-only; grant the users group write.
     ACTION=="add|change", SUBSYSTEM=="cpu", RUN+="${pkgs.bash}/bin/sh -c 'chgrp users /sys/devices/system/cpu/cpufreq/policy*/scaling_governor /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference 2>/dev/null; chmod 0664 /sys/devices/system/cpu/cpufreq/policy*/scaling_governor /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference 2>/dev/null || true'"
 
+    # nixlytile lifts the iGPU clock floor while animating.
+    ACTION=="add|change", SUBSYSTEM=="drm", ENV{DEVTYPE}=="drm_minor", DRIVERS=="i915|xe", RUN+="${pkgs.bash}/bin/sh -c 'cd /sys%p && chgrp users gt_min_freq_mhz device/tile0/gt0/freq0/min_freq 2>/dev/null; chmod 0664 gt_min_freq_mhz device/tile0/gt0/freq0/min_freq 2>/dev/null || true'"
+
   '' + lib.optionalString (config.nixlyos.mode != "htpc") ''
     # Idle power: runtime-autosuspend PCI + USB devices (idle → D3/suspend).
     # Wireless-class (e0) devices are exempt: autosuspending the Bluetooth

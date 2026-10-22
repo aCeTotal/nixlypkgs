@@ -75,8 +75,8 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "2e7b89fee2780c8974bc154644eea59c53048186";
-    hash = "sha256-UeM0RkSgv+VsxF0ySv5gNzDoVD60or12tB2LgefosYs=";
+    rev = "66531d28d2e9dc2bd76098b79e51a3d4551edc1d";
+    hash = "sha256-3UKF81fT6+0iOnu0+1fkL4gwDI56QMsDLUjp0+oQ6oI=";
   };
 
   wlrootsLocal = stdenv.mkDerivation {
@@ -93,6 +93,8 @@ let
       vulkan-loader vulkan-headers
     ];
     mesonFlags = [
+      # nixpkgs defaults meson to buildtype=plain.
+      "--buildtype=release"
       "-Dexamples=false"
       "-Dxwayland=enabled"
       "-Dbackends=drm,libinput"
@@ -145,7 +147,7 @@ in
 
 stdenv.mkDerivation {
   pname = "nixlytile";
-  version = "2026.10.19";
+  version = "2026.10.23";
 
   passthru.providedSessions = [ "nixlytile" ];
 

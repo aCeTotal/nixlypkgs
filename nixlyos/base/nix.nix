@@ -73,6 +73,28 @@ let
       done
     '';
   };
+
+  # Only daemon threads left: idle.
+  daemonIdle = pkgs.writeShellApplication {
+    name = "nixly-nix-daemon-idle";
+    runtimeInputs = with pkgs; [ gawk systemd ];
+    text = ''
+      cg=/sys/fs/cgroup/system.slice/nix-daemon.service
+      grace=60
+      step=10
+      pid=$(systemctl show -p MainPID --value nix-daemon.service)
+      idle=0
+      while sleep "$step"; do
+        threads=$(awk '/^Threads:/ { print $2 }' "/proc/$pid/status" 2>/dev/null) || exit 0
+        if [ "$(< "$cg/pids.current")" -gt "$threads" ]; then
+          idle=0
+          continue
+        fi
+        idle=$(( idle + step ))
+        [ "$idle" -lt "$grace" ] || exec systemctl stop --no-block nix-daemon.service
+      done
+    '';
+  };
 in
 {
   nix = {
@@ -159,6 +181,18 @@ in
     OOMScoreAdjust = 500;
     CPUWeight = 20;
     IOWeight = 20;
+  };
+
+  # Socket restarts it on demand.
+  systemd.services.nixly-nix-daemon-idle = {
+    description = "Stop nix-daemon when idle";
+    bindsTo = [ "nix-daemon.service" ];
+    after = [ "nix-daemon.service" ];
+    wantedBy = [ "nix-daemon.service" ];
+    serviceConfig = {
+      ExecStart = "${daemonIdle}/bin/nixly-nix-daemon-idle";
+      Restart = "on-failure";
+    };
   };
 
   # Builds stay off tmpfs /tmp.

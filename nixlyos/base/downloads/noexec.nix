@@ -3,13 +3,16 @@
 let
   home = "/home/${nixlyUser}";
 
-  # Self-bind adds the mount flags.
+  # Off local-fs.target: tmpfiles cycle.
   seal = dir: {
     what = dir;
     where = dir;
     type = "none";
     options = "bind,noexec,nosuid,nodev";
+    unitConfig.DefaultDependencies = false;
     after = [ "systemd-tmpfiles-setup.service" ];
+    before = [ "umount.target" ];
+    conflicts = [ "umount.target" ];
     wantedBy = [ "multi-user.target" ];
   };
 in

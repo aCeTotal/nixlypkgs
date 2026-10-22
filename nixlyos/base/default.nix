@@ -17,6 +17,7 @@ in
     ./input.nix
     ./distro.nix
     ./boot.nix
+    ./initrd-free.nix
     ./SDDM.nix
     ./networking.nix
     ./shape.nix

@@ -204,11 +204,7 @@ in
     autostart "swaybg -i \"$HOME/Pictures/wallpapers/mountains.jpg\" -m fill"
     // nm-applet/blueman-applet fjernet: nettverk + bluetooth er innebygd
     // i nixlytile (egne tray-ikoner med popup, direkte mot kernel/bluez).
-    autostart "xwayland-satellite"
-    // Uten RandR-primary regner Wine/UE4 første monitor (HDMI, 1080p) som
-    // primær display-enhet, så exclusive fullscreen bare tilbyr 1080p-moduser.
-    // Retry-løkke fordi Xwayland-satellite trenger et par sekunder på å komme opp.
-    autostart "${setRandrPrimary}"
+    // X11: nixlytile starter Xwayland ved behov.
     autostart "sh -c 'wl-paste --type text --watch clipman store --no-persist'"
     autostart "sh -c 'wl-paste --primary --type text --watch clipman store --no-persist'"
     // Prewarm KUN naar Steam allerede kjoerer (startes aldri herfra) OG

@@ -52,6 +52,8 @@
     unitConfig.StartLimitIntervalSec = 0;
     # GTK would pull gvfsd in.
     environment.GIO_USE_VFS = "local";
+    # GTK would start every portal.
+    environment.GTK_USE_PORTAL = "0";
     serviceConfig = {
       Type = "simple";
       ExecStart = "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1";
