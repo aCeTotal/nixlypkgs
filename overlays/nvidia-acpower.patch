@@ -1,0 +1,12 @@
+--- a/kernel/nvidia/nv-acpi.c
++++ b/kernel/nvidia/nv-acpi.c
+@@ -146,7 +146,8 @@
+         if (nv_acpi_get_powersource(&ac_plugged) != NV_OK)
+             return;
+ 
+-        rm_power_source_change_event(pNvAcpiObject->sp, !ac_plugged);
++        // Battery flap latches 10 W cap.
++        rm_power_source_change_event(pNvAcpiObject->sp, NV_FALSE);
+     }
+ }
+ 

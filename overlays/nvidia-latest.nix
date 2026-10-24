@@ -30,8 +30,8 @@ in
       openSha256 = "sha256-3gByMYIwFzRaLdDG+roCEOuKRRJDrljG9AlLnRZTirM=";
       settingsSha256 = "sha256-LK1LU8mDkM/XVRKPBtuOZh9nIP/lGFLAJnmasEX8jhg=";
       persistencedSha256 = "sha256-qPRb+3d88+2RcpUkoBTbjIaImnQ+jX+/6p1vXcJ5geE=";
-      # NVPCF-notify krasjer RM i D3cold.
-      patches = [ ./nvidia-nvpcf.patch ./nvidia-gps.patch ];
+      # NVPCF-notify krasjer RM i D3cold; acpower hindrer 10 W-lås ved lader-flap.
+      patches = [ ./nvidia-nvpcf.patch ./nvidia-gps.patch ./nvidia-acpower.patch ];
     };
     # Forrige driver = nixpkgs unstable sin latest (610.57.04).
     previous = base.latest;
