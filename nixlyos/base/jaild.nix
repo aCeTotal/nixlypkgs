@@ -35,4 +35,13 @@
       ];
     };
   };
+
+  # File picks never ask for a password.
+  security.polkit.extraConfig = ''
+    polkit.addRule(function(action, subject) {
+      if (action.id == "org.nixlytile.jail-grant" && subject.local && subject.active) {
+        return polkit.Result.YES;
+      }
+    });
+  '';
 }

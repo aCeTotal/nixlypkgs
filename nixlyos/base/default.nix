@@ -61,10 +61,6 @@ in
     ./attack-surface.nix
     ./secureboot.nix
     ./snapshots.nix
-    ./audit.nix
-    ./clamd
-    ./scanbox
-    ./downloads
     ./keyring.nix
     ./power.nix
     ./diskd.nix

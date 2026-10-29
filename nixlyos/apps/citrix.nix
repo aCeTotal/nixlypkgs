@@ -5,14 +5,15 @@ let
     name = "nixly-icaopen";
     runtimeInputs = with pkgs; [
       coreutils
+      inotify-tools
       systemd
     ];
     text = ''
-      tail -F -n0 /run/nixly-dlgate/events 2>/dev/null | while IFS='|' read -r kind _ _ file; do
-        case $kind:$file in
-          clean:*.ica) systemd-run --user --quiet -- ${pkgs.citrix-workspace-nixly}/bin/wfica "$file" ;;
-        esac
-      done
+      mkdir -p "$HOME/Downloads"
+      inotifywait -mq -e moved_to -e close_write --format '%w%f' --include '\.ica$' "$HOME/Downloads" |
+        while read -r file; do
+          systemd-run --user --quiet -- ${pkgs.citrix-workspace-nixly}/bin/wfica "$file"
+        done
     '';
   };
 in
@@ -76,9 +77,9 @@ in
     '';
   };
 
-  # Scanned .ica opens outside jail.
+  # Downloaded .ica opens outside jail.
   systemd.user.services.nixly-icaopen = {
-    description = "Open scanned Citrix launch files";
+    description = "Open downloaded Citrix launch files";
     partOf = [ "graphical-session.target" ];
     after = [ "graphical-session.target" ];
     wantedBy = [ "graphical-session.target" ];

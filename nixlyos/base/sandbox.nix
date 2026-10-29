@@ -56,11 +56,8 @@ in
         pkg = prev.brave;
         bin = "brave";
         profile = "brave-browser";
-        # Files arrive only through jaild.
         extraArgs = [
-          "'--ignore=whitelist \${DOWNLOADS}'"
           "'--ignore=whitelist \${HOME}/.gnupg'"
-          "--whitelist=~/${import ./downloads/inbox-dir.nix}"
           "--private-tmp"
         ];
       };

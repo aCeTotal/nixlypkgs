@@ -15,8 +15,6 @@
 
   security.apparmor.enable = false;
 
-  # Audit rules live in audit.nix.
-
   # Profiles live in sandbox.nix.
   programs.firejail.enable = true;
 

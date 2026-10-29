@@ -25,7 +25,6 @@
       ./claude.nix
       ./meshy.nix
       ./discord_rpc.nix
-      ./vulnix.nix
     ];
 
     home = {

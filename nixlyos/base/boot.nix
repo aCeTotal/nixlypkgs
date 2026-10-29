@@ -104,8 +104,8 @@ in
       (if isHtpc then "pcie_aspm=performance" else "pcie_aspm=powersave")
     ]
     ++ [
-      # audit.nix watches the persistence points; off on HTPC, it taxes syscalls.
-      (if isHtpc then "audit=0" else "audit=1")
+      # Audit hooks tax every syscall.
+      "audit=0"
     ];
 
     blacklistedKernelModules = lib.optionals (!isArm) [ "8250_pci" ];
