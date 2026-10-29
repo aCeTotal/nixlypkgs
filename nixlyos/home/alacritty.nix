@@ -16,6 +16,7 @@ general.import = [
 
 [env]
 TERM = "xterm-256color"
+TERM_PROGRAM = "alacritty"
 
 [font]
 size = 14.0

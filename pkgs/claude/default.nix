@@ -8,6 +8,9 @@
   alsa-lib,
   procps,
   ripgrep,
+  util-linux,
+  bashInteractive,
+  writeShellScript,
   bubblewrap,
   socat,
   versionCheckHook,
@@ -19,6 +22,10 @@ let
   manifest = lib.importJSON ./manifest.json;
   platformKey = "${stdenv.hostPlatform.node.platform}-${stdenv.hostPlatform.node.arch}";
   platformManifestEntry = manifest.platforms.${platformKey};
+  # Tool commands get leftover CPU.
+  idleShell = writeShellScript "claude-idle-shell" ''
+    exec ${util-linux}/bin/chrt --idle 0 ${bashInteractive}/bin/bash -c "$1"
+  '';
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "claude-code";
@@ -54,6 +61,7 @@ stdenv.mkDerivation (finalAttrs: {
       --set USE_BUILTIN_RIPGREP 0 \
       ${lib.optionalString stdenv.hostPlatform.isLinux ''
         --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ alsa-lib ]} \
+        --set-default CLAUDE_CODE_SHELL_PREFIX ${idleShell} \
       ''}--prefix PATH : ${
         lib.makeBinPath (
           [

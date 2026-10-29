@@ -76,6 +76,7 @@ in
     ../apps/newsboat.nix
     ../apps/w3m.nix
     ../apps/viewers.nix
+    ../apps/claude-thumbs.nix
     ../apps/pdf.nix
     ../apps/calculator.nix
     ../apps/mpv.nix

@@ -15,6 +15,8 @@
     enable = true;
     package = pkgs.ananicy-cpp;
     rulesProvider = pkgs.ananicy-rules-cachyos;
+    # Root-cgroup move hid nixlytile from polkit.
+    settings.cgroup_realtime_workaround = lib.mkForce false;
     # The CachyOS "Game" type is nice -5; on titles in its list that reset
     # gamemode's renice (-10) within 15 s. Redefine the type to match so
     # the two agree instead of fighting.
