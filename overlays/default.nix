@@ -14,6 +14,7 @@ in {
   };
   claude = callPackage ../pkgs/claude { };
   meshy = callPackage ../pkgs/meshy { };
+  freecad-mcp = callPackage ../pkgs/freecad-mcp { };
   nixlymediaserver = callPackage ../pkgs/nixlymediaserver { };
   nixlymedia = callPackage ../pkgs/nixlymedia { };
   citrix-workspace-nixly = callPackage ../pkgs/citrix-workspace-nixly { };

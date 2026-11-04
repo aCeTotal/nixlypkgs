@@ -75,6 +75,7 @@ in
     ../apps/claude-thumbs.nix
     ../apps/pdf.nix
     ../apps/calculator.nix
+    ../apps/freecad.nix
     ../apps/mpv.nix
     ../apps/retroarch.nix
     ../apps/rom-playlists
