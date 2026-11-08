@@ -17,6 +17,10 @@
 # display adapter.
 { pkgs, lib, config, ... }:
 
+let
+  # Intel iGPU PCI slot.
+  igpuSlot = "0000:00:02.0";
+in
 lib.mkIf (config.nixlyos.mode == "htpc") {
   systemd.services.htpc-gpu-clocks = {
     description = "Pin Intel Arc GPU clocks at RP1 (VRM noise on TV/eARC above)";
@@ -36,11 +40,15 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
           for card in /sys/class/drm/card*; do
             [ -e "$card/gt_RP0_freq_mhz" ] || continue
             rp1=$(cat "$card/gt_RP1_freq_mhz")
+            cap=$rp1
+            # iGPU has no card VRM.
+            [ "$(basename "$(readlink -f "$card/device")")" = ${igpuSlot} ] \
+              && cap=$(cat "$card/gt_RP0_freq_mhz")
             # min first: on a rebuild min may already sit at RP1, and
             # max may never drop below min.
             echo "$rp1" > "$card/gt_min_freq_mhz"   || true
-            echo "$rp1" > "$card/gt_max_freq_mhz"   || true
-            echo "$rp1" > "$card/gt_boost_freq_mhz" || true
+            echo "$cap" > "$card/gt_max_freq_mhz"   || true
+            echo "$cap" > "$card/gt_boost_freq_mhz" || true
             pinned=1
           done
           [ "$pinned" = 1 ] && break

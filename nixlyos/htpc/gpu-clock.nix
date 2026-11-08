@@ -12,6 +12,9 @@
 { pkgs, lib, config, ... }:
 
 let
+  # Intel iGPU PCI slot.
+  igpuSlot = "0000:00:02.0";
+
   gpuClock = pkgs.writeShellScriptBin "htpc-gpu-clock" ''
     set -u
     case "''${1:-}" in
@@ -24,15 +27,15 @@ let
       rp0=$(cat "$card/gt_RP0_freq_mhz" 2>/dev/null) || continue
       rp1=$(cat "$card/gt_RP1_freq_mhz" 2>/dev/null) || continue
 
+      cap=$rp1
+      [ "$mode" = high ] && cap=$rp0
+      # iGPU has no card VRM.
+      [ "$(basename "$(readlink -f "$card/device")")" = ${igpuSlot} ] && cap=$rp0
+
       # Floor first: max may never drop below min.
       echo "$rp1" > "$card/gt_min_freq_mhz" 2>/dev/null || true
-      if [ "$mode" = high ]; then
-        echo "$rp0" > "$card/gt_max_freq_mhz" 2>/dev/null || true
-        echo "$rp0" > "$card/gt_boost_freq_mhz" 2>/dev/null || true
-      else
-        echo "$rp1" > "$card/gt_max_freq_mhz" 2>/dev/null || true
-        echo "$rp1" > "$card/gt_boost_freq_mhz" 2>/dev/null || true
-      fi
+      echo "$cap" > "$card/gt_max_freq_mhz" 2>/dev/null || true
+      echo "$cap" > "$card/gt_boost_freq_mhz" 2>/dev/null || true
     done
   '';
 

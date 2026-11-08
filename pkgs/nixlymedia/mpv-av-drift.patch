@@ -1,0 +1,11 @@
+--- a/player/video.c
++++ b/player/video.c
+@@ -772,7 +772,7 @@
+     // but it likely would be wrong anyway, and we'd run into the same
+     // issues again, except with more complex code.
+     // 1 means drifts to positive, -1 means drifts to negative
+-    double max_drift = vsync / 2;
++    double max_drift = MPMIN(vsync / 2, 0.004);
+     double av_diff = mpctx->last_av_difference;
+     int new = mpctx->display_sync_drift_dir;
+     if (av_diff * -mpctx->display_sync_drift_dir >= 0)

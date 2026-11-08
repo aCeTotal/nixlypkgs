@@ -19,8 +19,13 @@
 }:
 
 let
+  # A/V drift corrected at 4 ms.
+  mpv = mpv-unwrapped.overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [ ./mpv-av-drift.patch ];
+  });
+
   runtimeLibs = [
-    mpv-unwrapped
+    mpv
     libGL
     libva
     libvdpau
@@ -54,7 +59,7 @@ rustPlatform.buildRustPackage rec {
   ];
 
   buildInputs = [
-    mpv-unwrapped
+    mpv
     openssl
     fontconfig
     freetype
@@ -67,11 +72,11 @@ rustPlatform.buildRustPackage rec {
   postInstall = ''
     for size in 16x16 32x32 64x64 128x128; do
       install -Dm644 \
-        ${mpv-unwrapped}/share/icons/hicolor/$size/apps/mpv.png \
+        ${mpv}/share/icons/hicolor/$size/apps/mpv.png \
         $out/share/icons/hicolor/$size/apps/nixlymedia.png
     done
     install -Dm644 \
-      ${mpv-unwrapped}/share/icons/hicolor/scalable/apps/mpv.svg \
+      ${mpv}/share/icons/hicolor/scalable/apps/mpv.svg \
       $out/share/icons/hicolor/scalable/apps/nixlymedia.svg
 
     install -Dm644 /dev/stdin $out/share/applications/nixlymedia.desktop <<EOF
