@@ -43,11 +43,11 @@ rustPlatform.buildRustPackage rec {
   version = "2026.11.08";
 
   src = fetchFromGitHub {
-    name = "nixlymedia-src-cdc7803";
+    name = "nixlymedia-src-3da8f09";
     owner = "aCeTotal";
     repo = "nixlymedia";
-    rev = "cdc7803c6a225b89019643d8c2170709a683ff93";
-    hash = "sha256-USJEzMZQoVp0lHjuJskeAsE7NhY670Fi+Cu9wK2LCk4=";
+    rev = "3da8f093ef98117138d992cd0c6bfdf79b499612";
+    hash = "sha256-IcaeY1UkpgmSwGF1anwIOUjWqEJOd6psP1F8zieOOko=";
   };
 
   cargoHash = "sha256-kFugkS8x1TOVTwJ4gC1cVj3g3/6uDcE3vwh/2iSAcMI=";
