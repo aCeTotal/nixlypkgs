@@ -160,25 +160,19 @@ fi
 lockbak="$tmp/flake.lock"
 cp "$FLAKE/flake.lock" "$lockbak" 2>/dev/null || : > "$lockbak"
 spin_start "Henter siste versjoner …"
-# Re-lock from scratch instead of `nix flake update nixlypkgs`: update
-# re-resolves the whole subtree to branch heads, while a fresh lock inherits
-# every nested rev from nixlypkgs' own tested flake.lock. On top of that,
-# nixpkgs stable (and home-manager, which tracks the same release) always
-# moves to the newest head of its branch, so stable security updates flow
-# without a maintainer bump. Kernel/chaotic, unstable and our own packages
-# stay exactly as pinned. A failed build still rolls back the whole lock.
+# Fresh lock inherits nixlypkgs' pins.
 rm -f "$FLAKE/flake.lock"
-# cd instead of --flake: the pinned nix (stable nixpkgs) still uses the old
-# CLI where flake lock/update only operate on the current directory.
-# --refresh: skip the 1h github fetcher cache, or a push made minutes ago
-# resolves to the previous rev and the new flake.nix meets old code.
-if ! (cd "$FLAKE" && nix flake lock --refresh &&
-      nix flake update --refresh nixlypkgs/nixos-stable nixlypkgs/home-manager) >>"$log" 2>&1; then
+# cd: pinned nix's old CLI.
+if ! (cd "$FLAKE" && nix flake lock --refresh) >>"$log" 2>&1; then
   spin_stop ""
   cp "$lockbak" "$FLAKE/flake.lock"
   tail -20 "$log" >&2
   exit 1
 fi
+cp "$FLAKE/flake.lock" "$tmp/pinned.lock"
+# Stable branches move to head.
+(cd "$FLAKE" && nix flake update --refresh nixlypkgs/nixos-stable nixlypkgs/home-manager) >>"$log" 2>&1 ||
+  cp "$tmp/pinned.lock" "$FLAKE/flake.lock"
 tick "Siste versjoner hentet"
 
 [ "$skey" = "$(tree_key)" ] && [ "$ssys" = "$running" ] && up_to_date
@@ -398,13 +392,16 @@ rebuild() {
 rebuild && rc=0 || rc=$?
 (( rc == 3 )) && up_to_date
 
-# The whole update is one pin, so the rollback is one step: the previous lock,
-# which is known to build.
-if (( rc == 1 )) && ! cmp -s "$lockbak" "$FLAKE/flake.lock"; then
-  cp "$lockbak" "$FLAKE/flake.lock"
+# Roll back only what broke.
+for lock in "$tmp/pinned.lock" "$lockbak"; do
+  (( rc == 1 )) || break
+  cmp -s "$lock" "$FLAKE/flake.lock" && continue
+  cp "$lock" "$FLAKE/flake.lock"
   rebuild && rc=0 || rc=$?
   (( rc == 3 )) && rc=0
-fi
+  [ "$lock" = "$tmp/pinned.lock" ] && (( rc != 1 )) &&
+    say "${DIM}Nyeste nixos-stable/home-manager feilet — beholdt testet versjon${RST}"
+done
 
 case $rc in
   0|2) ;;

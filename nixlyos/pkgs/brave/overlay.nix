@@ -1,6 +1,6 @@
 final: prev: {
   # Replaces wrapper's feature list.
-  brave = prev.brave.override {
+  brave = (final.callPackage ./package.nix { }).override {
     commandLineArgs = builtins.concatStringsSep " " [
       # Session kill fakes crashes.
       "--hide-crash-restore-bubble"
