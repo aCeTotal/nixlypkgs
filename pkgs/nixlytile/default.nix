@@ -5,8 +5,6 @@
 , makeWrapper
 , autoPatchelfHook
 , addDriverRunpath
-, meson
-, ninja
 , wayland
 , wayland-scanner
 , wayland-protocols
@@ -23,9 +21,7 @@
 , libxcb-wm
 , libgbm
 , hwdata
-, libliftoff
 , libdisplay-info
-, lcms2
 , libxcb-errors
 , cairo
 , librsvg
@@ -75,35 +71,9 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "a4303648c0044d4d8fa54dfb6d55db6f31e2a79f";
-    hash = "sha256-4OI7e/nDk/WX94l7DN/bw0kTwUnkSL1Ca0r/MI3Pp4Q=";
+    rev = "ac5593d25259f119bc2edad3839d93400e0b856a";
+    hash = "sha256-VVZxhjIzN1HscLuOjsczBhlNRkq+chhVxW0tZO2pb00=";
   };
-
-  wlrootsLocal = stdenv.mkDerivation {
-    pname = "wlroots-nixly";
-    version = "0.20.2";
-    src = nixlytileSrc + "/wlroots";
-    patches = [
-    ];
-    nativeBuildInputs = [ meson ninja pkg-config wayland-scanner glslang ];
-    buildInputs = [
-      wayland wayland-protocols libdrm libxkbcommon pixman libinput
-      xwayland seatd libxcb libxcb-wm
-      libgbm hwdata libliftoff libdisplay-info lcms2 libxcb-errors
-      vulkan-loader vulkan-headers
-    ];
-    mesonFlags = [
-      # nixpkgs defaults meson to buildtype=plain.
-      "--buildtype=release"
-      "-Dexamples=false"
-      "-Dxwayland=enabled"
-      "-Dbackends=drm,libinput"
-      "-Drenderers=vulkan"
-      "-Dallocators=gbm"
-    ];
-  };
-
-  wlrootsPc = "wlroots-0.20";
 
   runtimeDeps = [
     swaybg
@@ -147,7 +117,7 @@ in
 
 stdenv.mkDerivation {
   pname = "nixlytile";
-  version = "2026.11.08";
+  version = "2026.11.14";
 
   passthru.providedSessions = [ "nixlytile" ];
 
@@ -158,6 +128,7 @@ stdenv.mkDerivation {
     wayland
     wayland-scanner
     wayland-protocols
+    glslang
     makeWrapper
     autoPatchelfHook
     addDriverRunpath
@@ -165,7 +136,6 @@ stdenv.mkDerivation {
 
   buildInputs = [
     wayland
-    wlrootsLocal
     libinput
     libxkbcommon
     fcft
@@ -176,6 +146,11 @@ stdenv.mkDerivation {
     xwayland
     libxcb
     libxcb-wm
+    libxcb-errors
+    seatd
+    libgbm
+    libdisplay-info
+    hwdata
 
     cairo
     librsvg
@@ -201,13 +176,7 @@ stdenv.mkDerivation {
 
   dontWrapQtApps = true;
 
-  buildPhase = ''
-    runHook preBuild
-    make \
-      WLR_INCS="$(${pkg-config}/bin/pkg-config --cflags ${wlrootsPc})" \
-      WLR_LIBS="$(${pkg-config}/bin/pkg-config --libs ${wlrootsPc})"
-    runHook postBuild
-  '';
+  enableParallelBuilding = true;
 
   installPhase = ''
     runHook preInstall
@@ -218,7 +187,7 @@ stdenv.mkDerivation {
          install
 
     wrapProgram $out/bin/nixlytile \
-      --set WLR_RENDERER vulkan \
+      --set NIXLY_RENDERER vulkan \
       --prefix PATH : ${lib.makeBinPath runtimeDeps} \
       --prefix XDG_DATA_DIRS : "${nixlycc}/share:${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share:${shared-mime-info}/share" \
       --run 'l="''${XDG_STATE_HOME:-$HOME/.local/state}/nixlytile"; mkdir -p "$l" && { [ -s "$l/session.log" ] && mv -f "$l/session.log" "$l/session.log.1"; exec 2>>"$l/session.log"; echo "=== session start $(date -Is) ===" >&2; }'

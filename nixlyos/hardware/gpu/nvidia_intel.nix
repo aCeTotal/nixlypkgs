@@ -131,7 +131,7 @@ in
     # Never trim the cache mid-session; eviction shows up as recompile hitches.
     __GL_SHADER_DISK_CACHE_SKIP_CLEANUP = "1";
     MESA_SHADER_CACHE_MAX_SIZE = "10G";
-    # No global WLR_RENDERER: the nixlytile wrapper exports vulkan itself.
+    # Wrapper sets NIXLY_RENDERER itself.
     ELECTRON_OZONE_PLATFORM_HINT = "auto";
   };
 }

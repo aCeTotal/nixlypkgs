@@ -99,7 +99,7 @@ lib.mkIf (config.nixlyos.mode != "htpc") {
       vrr_runloop_enable = "false"
       fastforward_ratio = "0.0"
       video_shader_enable = "true"
-      video_shader_dir = "$HOME/.config/retroarch/shaders"
+      video_shader_dir = "~/.config/retroarch/shaders"
 
       # Audio
       audio_driver = "pipewire"
@@ -121,14 +121,14 @@ lib.mkIf (config.nixlyos.mode != "htpc") {
       joypad_autoconfig_dir = "${pkgs.retroarch-joypad-autoconfig}/share/libretro/autoconfig"
 
       # Core / content paths
-      libretro_directory = "$HOME/.config/retroarch/cores"
-      libretro_info_path = "$HOME/.config/retroarch/cores"
-      system_directory = "$HOME/.config/retroarch/system"
-      savefile_directory = "$HOME/.config/retroarch/saves"
-      savestate_directory = "$HOME/.config/retroarch/states"
-      screenshot_directory = "$HOME/.config/retroarch/screenshots"
-      playlist_directory = "$HOME/.config/retroarch/playlists"
-      thumbnails_directory = "$HOME/.config/retroarch/thumbnails"
+      libretro_directory = "~/.config/retroarch/cores"
+      libretro_info_path = "~/.config/retroarch/cores"
+      system_directory = "~/.config/retroarch/system"
+      savefile_directory = "~/.config/retroarch/saves"
+      savestate_directory = "~/.config/retroarch/states"
+      screenshot_directory = "~/.config/retroarch/screenshots"
+      playlist_directory = "~/.config/retroarch/playlists"
+      thumbnails_directory = "~/.config/retroarch/thumbnails"
 
       # Online updater: lets the in-app updater fetch icon and thumbnail packs.
       network_on_demand_thumbnails = "true"

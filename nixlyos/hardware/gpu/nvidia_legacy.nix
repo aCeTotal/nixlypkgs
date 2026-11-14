@@ -10,7 +10,7 @@ let
   # Fall back to latest if nixpkgs dropped the branch upstream.
   branch = if builtins.hasAttr gpu.nvidiaBranch np then gpu.nvidiaBranch else "latest";
 
-  # 470 was the last branch with GBM; wlroots and SDDM Wayland need it.
+  # nixlytile and SDDM need GBM (470+).
   gbmOk = !(builtins.elem branch [ "legacy_390" "legacy_340" ]);
 
   hybrid = gpu.intel != "";

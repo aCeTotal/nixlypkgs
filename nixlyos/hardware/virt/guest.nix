@@ -8,6 +8,6 @@
   hardware.graphics.enable = true;
 
   environment.sessionVariables = {
-    WLR_NO_HARDWARE_CURSORS = "1";
+    NIXLY_NO_HARDWARE_CURSORS = "1";
   };
 }

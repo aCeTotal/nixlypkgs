@@ -22,7 +22,6 @@ in
     slurp
     wl-clipboard
     libnotify
-    sway-contrib.grimshot
     swappy
     swaybg
     clipman
@@ -157,7 +156,7 @@ in
     ${pkgs.lib.optionalString hasNvidia ''
     // Late-latch (utsett game-commit til rett foer vblank) er av paa
     // NVIDIA: driveren avviser IN_FENCE_FD (EPERM) paa 555+, saa
-    // wlroots-workarounden venter ut fencen CPU-side INNE i commiten.
+    // kompositoren venter ut fencen CPU-side INNE i commiten.
     // Latch-budsjettet (maks 10 ms) dekker ikke en vent som varer til
     // spillets GPU-arbeid er ferdig — commiten bommer paa vblank og
     // hvert spill jitrer konstant. Immediate-path gir fencen nesten en
