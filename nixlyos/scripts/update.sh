@@ -81,6 +81,19 @@ trap 'kill -- -"$sudo_keepalive" 2>/dev/null; [ -n "$spin_pid" ] && kill "$spin_
 STAMP="${XDG_STATE_HOME:-$HOME/.local/state}/nixlyos/last-build"
 mkdir -p "$(dirname "$STAMP")"
 
+# Room for a full system rebuild.
+MIN_FREE_KIB=$((50 * 1024 * 1024))
+KEEP_GENERATIONS=3d
+
+free_kib() { df --output=avail /nix | tail -1; }
+
+if (( $(free_kib) < MIN_FREE_KIB )); then
+  spin_start "Lite diskplass — rydder gamle generasjoner …"
+  sudo nix-env -p /nix/var/nix/profiles/system --delete-generations "$KEEP_GENERATIONS" >>"$log" 2>&1
+  nix-collect-garbage --delete-older-than "$KEEP_GENERATIONS" >>"$log" 2>&1 || :
+  tick "Diskplass ryddet, $(( $(free_kib) / 1024 / 1024 )) GiB ledig"
+fi
+
 # The local tree is tiny, so its content plus the running system identify the
 # last known result and let the eval be skipped entirely.
 tree_key() { cat "$FLAKE"/flake.nix "$FLAKE"/flake.lock "$FLAKE"/local.nix "$FLAKE"/custom/* "$FLAKE"/hardware/* 2>/dev/null | sha1sum | cut -d' ' -f1; }
@@ -392,16 +405,15 @@ rebuild() {
 rebuild && rc=0 || rc=$?
 (( rc == 3 )) && up_to_date
 
-# Roll back only what broke.
-for lock in "$tmp/pinned.lock" "$lockbak"; do
-  (( rc == 1 )) || break
-  cmp -s "$lock" "$FLAKE/flake.lock" && continue
-  cp "$lock" "$FLAKE/flake.lock"
+# Retry the tested pin; the old lock is restored, never reported as success.
+if (( rc == 1 )) && ! cmp -s "$tmp/pinned.lock" "$FLAKE/flake.lock"; then
+  cp "$tmp/pinned.lock" "$FLAKE/flake.lock"
   rebuild && rc=0 || rc=$?
   (( rc == 3 )) && rc=0
-  [ "$lock" = "$tmp/pinned.lock" ] && (( rc != 1 )) &&
+  (( rc != 1 )) &&
     say "${DIM}Nyeste nixos-stable/home-manager feilet — beholdt testet versjon${RST}"
-done
+fi
+(( rc == 1 )) && cp "$lockbak" "$FLAKE/flake.lock"
 
 case $rc in
   0|2) ;;
