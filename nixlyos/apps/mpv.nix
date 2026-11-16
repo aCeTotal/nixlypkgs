@@ -10,6 +10,8 @@
         # Smooth playback on any screen: mpv detects the output's refresh rate and
         # syncs to it, resampling audio and interpolating frames as needed.
         config = {
+          # Wallpaper-themed OSD and uosc.
+          include = "~/.local/state/nixly-theme/mpv.conf";
           # gpu-next plus vulkan gives the best quality on modern hardware.
           vo = "gpu-next";
           gpu-api = "vulkan";

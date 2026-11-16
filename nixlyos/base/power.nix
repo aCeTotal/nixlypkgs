@@ -4,13 +4,7 @@
   # logind owns lid and power keys.
   services.acpid.enable = lib.mkForce false;
 
-  # nixlytile reads and writes power knobs directly via sysfs
-  # (power-profiles-daemon is intentionally disabled — perf.nix owns the
-  # governor): the battery popup's platform profile (ACPI platform_profile,
-  # or msi-ec shift_mode on MSI laptops), CPU clock caps + turbo for the
-  # powersave/presence modules, and the backlight for auto-brightness.
-  # sysfs is root-owned, so make whatever exists group-writable at boot;
-  # no-op on machines without the files.
+  # nixlytile owns these power knobs (no power-profiles-daemon); grant users write.
   systemd.services.platform-profile-perms = {
     description = "Make power/clock/backlight sysfs files writable for the users group";
     wantedBy = [ "multi-user.target" ];

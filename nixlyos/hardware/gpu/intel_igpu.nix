@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, hwData, ... }:
 
 # Intel iGPU, Gen8 through Gen11, with iHD primary and i965 as legacy-codec fallback.
 # Orthogonal to gpu/intel.nix; on a hybrid box both import and the package lists merge.
@@ -19,7 +19,8 @@
     ];
   };
 
-  boot.initrd.kernelModules = [ "i915" ];
+  # Early KMS only when the iGPU drives.
+  boot.initrd.kernelModules = lib.mkIf (hwData.detected.primary == "intel") [ "i915" ];
 
   # Keep KMS state across boot stages so the EDID mode survives without a flicker.
   boot.kernelParams = [ "i915.fastboot=1" ];

@@ -26,10 +26,8 @@ in
   # On PATH for `nixly-gametune status` debugging.
   environment.systemPackages = [ gametune ];
 
-  # Started/stopped by nixlytile when ultra game mode kicks in. The daemon
-  # applies CPU/kernel/GPU tuning, attaches scx_lavd, holds
-  # /dev/cpu_dma_latency at 0 us, and restores everything on stop — or by
-  # itself if the compositor dies without stopping the unit.
+  # Started/stopped by nixlytile for ultra game mode; restores on stop or
+  # when the compositor dies. Tuning details live in the script.
   systemd.services.nixly-gametune = {
     description = "Low-latency tuning while a game is running";
     serviceConfig = {

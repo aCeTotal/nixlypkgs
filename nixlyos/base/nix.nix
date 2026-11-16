@@ -152,19 +152,22 @@ in
       Restart = "on-failure";
       RestartSec = 60;
       StateDirectory = "nixly-gc-watch";
+      Slice = "background.slice";
       Nice = 19;
       IOSchedulingClass = "idle";
     };
   };
 
-  # GC and optimise run at idle priority so they never contend with foreground apps.
+  # Idle slice (perf.nix): GC and optimise never contend with the session.
   systemd.services.nix-gc.serviceConfig = {
+    Slice = "background.slice";
     CPUSchedulingPolicy = "idle";
     IOSchedulingClass = "idle";
     Nice = 19;
   };
 
   systemd.services.nix-optimise.serviceConfig = {
+    Slice = "background.slice";
     CPUSchedulingPolicy = "idle";
     IOSchedulingClass = "idle";
     Nice = 19;

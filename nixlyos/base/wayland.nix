@@ -13,6 +13,9 @@
   programs.xwayland.enable = true;
   programs.xwayland.package = pkgs.xwayland;
 
+  # Apps skip scanning icon directories.
+  gtk.iconCache.enable = true;
+
   security.polkit.enable = true;
   services.dbus.enable = true;
 

@@ -15,6 +15,9 @@
       ./btop.nix
       ./starship.nix
       ./alacritty.nix
+      ./foot.nix
+      ./fuzzel.nix
+      ./nixly-theme.nix
       ./nixlytile.nix
       ./env.nix
       ./gtk.nix

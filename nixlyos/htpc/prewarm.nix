@@ -74,10 +74,11 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
     serviceConfig = {
       Type = "oneshot";
       ExecStart = "${firstWarmScript}";
+      Slice = "background.slice";
       Nice = 19;
       CPUSchedulingPolicy = "idle";
       IOSchedulingClass = "idle";
-      MemoryHigh = "8G";
+      MemoryHigh = "25%";
     };
   };
 
@@ -86,11 +87,12 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
     serviceConfig = {
       Type = "oneshot";
       ExecStart = "${warmScript}";
+      Slice = "background.slice";
       Nice = 19;
       CPUSchedulingPolicy = "idle";
       IOSchedulingClass = "idle";
       # The kernel reclaims prewarm's own pages before the session's.
-      MemoryHigh = "8G";
+      MemoryHigh = "25%";
     };
   };
 

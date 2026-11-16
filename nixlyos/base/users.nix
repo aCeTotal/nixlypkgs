@@ -34,4 +34,6 @@
   };
 
   users.groups.uinput = {};
+  # Polkit rules and PAM limits key on it; Feral gamemode is gone.
+  users.groups.gamemode = {};
 }

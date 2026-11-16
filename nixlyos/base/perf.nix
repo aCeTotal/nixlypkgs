@@ -1,25 +1,19 @@
-{ pkgs, lib, config, ... }:
+{ pkgs, lib, config, hwData, ... }:
 
 {
   # Performance tunings on top of linuxPackages_cachyos.
 
-  # Single owner of the governor: power-profiles-daemon and gamemode's own
-  # governor knobs are disabled elsewhere so this always wins.
+  # Boot baseline; nixlytile and nixly-gametune own it at runtime.
   powerManagement.cpuFreqGovernor = "performance";
 
-  # Demote background work (nix builds, indexers, updaters) to SCHED_IDLE/
-  # low nice via the CachyOS rule set. Complements gamemode, which only
-  # boosts the game itself. Touches nice/ionice only, never CPU affinity,
-  # so it cannot race nixlytile.
+  # Background work at nice/ionice via the CachyOS rules; never CPU affinity.
   services.ananicy = {
     enable = true;
     package = pkgs.ananicy-cpp;
     rulesProvider = pkgs.ananicy-rules-cachyos;
     # Root-cgroup move hid nixlytile from polkit.
     settings.cgroup_realtime_workaround = lib.mkForce false;
-    # The CachyOS "Game" type is nice -5; on titles in its list that reset
-    # gamemode's renice (-10) within 15 s. Redefine the type to match so
-    # the two agree instead of fighting.
+    # CachyOS "Game" is nice -5; match nixlytile's -10 instead of fighting it.
     extraTypes = [
       { type = "Game"; nice = -10; ioclass = "best-effort"; ionice = 0; }
     ];
@@ -38,6 +32,12 @@
       # War Thunder rule idled thelastemperor.
       { name = "launcher"; type = "Game"; }
     ];
+  };
+
+  # Top-level idle slice: SCHED_IDLE inside system.slice still competes with user.slice.
+  systemd.slices.background.sliceConfig = {
+    CPUWeight = "idle";
+    IOWeight = 10;
   };
 
   # MGLRU: keep the last second of the working set out of reclaim so memory
@@ -61,11 +61,8 @@
     # nixlytile lifts the iGPU clock floor while animating.
     ACTION=="add|change", SUBSYSTEM=="drm", ENV{DEVTYPE}=="drm_minor", DRIVERS=="i915|xe", RUN+="${pkgs.bash}/bin/sh -c 'cd /sys%p && chgrp users gt_min_freq_mhz device/tile0/gt0/freq0/min_freq 2>/dev/null; chmod 0664 gt_min_freq_mhz device/tile0/gt0/freq0/min_freq 2>/dev/null || true'"
 
-  '' + lib.optionalString (config.nixlyos.mode != "htpc") ''
-    # Idle power: runtime-autosuspend PCI + USB devices (idle → D3/suspend).
-    # Wireless-class (e0) devices are exempt: autosuspending the Bluetooth
-    # adapter drops headsets mid-stream (bluetooth.nix owns BT power policy).
-    # Skipped on the mains HTPC: a D3 wake mid-frame is a stutter.
+  '' + lib.optionalString (hwData.dmi.isLaptop && config.nixlyos.mode != "htpc") ''
+    # Laptop idle power; mains machines stutter on a D3 wake. BT (e0) exempt.
     ACTION=="add", SUBSYSTEM=="pci", TEST=="power/control", ATTR{power/control}="auto"
     ACTION=="add", SUBSYSTEM=="usb", ATTR{bDeviceClass}!="e0", TEST=="power/control", ATTR{power/control}="auto"
     # HID exempt: a suspended keyboard kills its own backlight, and the

@@ -5,6 +5,8 @@ let
   isArm = platform.arch == "aarch64";
   bootMode = platform.bootMode or "efi";
   isHtpc = config.nixlyos.mode == "htpc";
+  # Battery power policy; towers and the HTPC run on mains.
+  laptop = hwData.dmi.isLaptop && !isHtpc;
 in
 {
   boot = {
@@ -96,12 +98,11 @@ in
       # Strict unmap blocks stale DMA but costs a TLB flush per unmap.
       (if isHtpc then "iommu.strict=0" else "iommu.strict=1")
       "split_lock_detect=off"
-      # NVMe deep sleep and PCIe L1 are battery knobs; the mains HTPC keeps
-      # both links awake so nothing stalls mid asset-stream.
-      (if isHtpc
-       then "nvme_core.default_ps_max_latency_us=0"
-       else "nvme_core.default_ps_max_latency_us=100000")
-      (if isHtpc then "pcie_aspm=performance" else "pcie_aspm=powersave")
+      # Mains machines keep NVMe and PCIe links awake mid asset-stream.
+      (if laptop
+       then "nvme_core.default_ps_max_latency_us=100000"
+       else "nvme_core.default_ps_max_latency_us=0")
+      (if laptop then "pcie_aspm=powersave" else "pcie_aspm=performance")
     ]
     ++ [
       # Audit hooks tax every syscall.
@@ -110,14 +111,15 @@ in
 
     blacklistedKernelModules = lib.optionals (!isArm) [ "8250_pci" ];
 
-    # Idle power on the laptop; the HTPC keeps the codec awake (eARC pops) and
-    # leaves i915 panel knobs alone since it drives no internal panel.
-    extraModprobeConfig = if isHtpc then ''
-      options snd_hda_intel power_save=0 power_save_controller=N
-    '' else ''
-      options snd_hda_intel power_save=1 power_save_controller=Y
-      options i915 enable_fbc=1 enable_psr=1
-    '';
+    # HTPC codec stays awake (eARC pops); towers keep the kernel default,
+    # since an always-on PCH codec hissed through S/PDIF. FBC: intel_igpu.nix.
+    extraModprobeConfig =
+      if isHtpc then ''
+        options snd_hda_intel power_save=0 power_save_controller=N
+      '' else lib.optionalString laptop ''
+        options snd_hda_intel power_save=1 power_save_controller=Y
+        options i915 enable_psr=1
+      '';
   };
 
   # Secure Boot keys, lanzaboote and TPM live in secureboot.nix.
@@ -153,7 +155,7 @@ in
     "fs.suid_dumpable" = 0;                            # no core dumps from SUID
     "kernel.kexec_load_disabled" = 1;                  # no kexec persistence path
     "kernel.perf_event_paranoid" = 2;                  # deny perf to non-root
-    "net.core.bpf_jit_harden" = 2;                     # harden JIT vs spraying
+    "net.core.bpf_jit_harden" = 1;                     # 2 slows root BPF (scx_lavd)
     "dev.tty.ldisc_autoload" = 0;                      # block ldisc privesc autoload
     "vm.unprivileged_userfaultfd" = 0;                 # remove an exploit primitive
     "net.ipv4.tcp_syncookies" = 1;                     # SYN-flood resistance

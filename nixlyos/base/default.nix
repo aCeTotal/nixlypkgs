@@ -60,6 +60,7 @@ in
     ./sandbox.nix
     ./attack-surface.nix
     ./secureboot.nix
+    ./ext4.nix
     ./snapshots.nix
     ./keyring.nix
     ./power.nix
@@ -68,6 +69,7 @@ in
     ./disks-auto.nix
     ./nixlyos-tools.nix
     ./update-stage.nix
+    ./gpu-select.nix
     ./nixlytile.nix
     ../apps/newsboat.nix
     ../apps/w3m.nix
@@ -78,6 +80,7 @@ in
     ../apps/freecad.nix
     ../apps/mpv.nix
     ../apps/retroarch.nix
+    ../apps/dgpu-apps.nix
     ../apps/rom-playlists
     ../services/drawingtablet.nix
   ]

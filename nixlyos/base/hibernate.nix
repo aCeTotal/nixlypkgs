@@ -3,47 +3,35 @@
 let
   hw = hwData.resources;
   nvidia = builtins.elem "nvidia" config.services.xserver.videoDrivers;
+  # htpc/trim.nix disables every sleep target.
+  laptop = hwData.dmi.isLaptop && config.nixlyos.mode != "htpc";
+  # amdgpu dGPUs evict VRAM into RAM; old data lacks amdDgpu.
+  vramGiB = if laptop && (hwData.detected.amdDgpu or (hwData.detected.amd != "")) then 16 else 0;
 in
-# The whole mechanism depends on the HibernateLocation EFI variable, which
-# does not exist on extlinux/BIOS machines (ARM SBCs, legacy VMs) — those
-# would pay the multi-GiB swapfile without hibernate ever working.
+# Resume reads the HibernateLocation EFI variable.
 lib.mkIf (hwData.platform.bootMode == "efi") {
-  # Lid close on battery = suspend-then-hibernate (idle.nix): S3 for the
-  # first 2 h (instant wake), then an RTC alarm wakes the machine just long
-  # enough to write the hibernation image and power off (0 W). If the
-  # hibernate step ever fails, systemd drops back into suspend — never a
-  # lost session.
-  #
-  # Machine-independent by design: NixOS creates the swapfile at activation
-  # (btrfs gets `btrfs filesystem mkswapfile`, others dd + chattr +C), and
-  # systemd picks the swap device and computes the file's physical offset
-  # itself at hibernate time, recording it in the HibernateLocation EFI
-  # variable that the systemd initrd reads on the next boot. No per-machine
-  # UUID or resume_offset anywhere; needs only EFI (systemd-boot implies it)
-  # and boot.initrd.systemd (on in boot.nix).
-
-  # /swapfile, not /swap/swapfile: the btrfs creation path does not mkdir
-  # the parent, and / always exists. Full RAM + headroom so even an
-  # uncompressible image fits. zram (prio 100) takes all runtime swap;
-  # this file only ever holds the hibernation image.
+  # systemd skips zram and records this file's offset in HibernateLocation.
   swapDevices = [{
     device = "/swapfile";
-    size = (hw.memGiB + 5) * 1024;
+    size = (hw.memGiB + vramGiB + 5) * 1024;
     priority = 0;
   }];
 
-  systemd.sleep.settings.Sleep.HibernateDelaySec = "2h";
+  # Kernel caps it; the 2/5-of-RAM default reclaimed slowly through zram.
+  systemd.tmpfiles.rules = [
+    "w /sys/power/image_size - - - - ${toString (hw.memGiB * 1024 * 1024 * 1024)}"
+  ];
 
-  # The NixOS nvidia module only hooks nvidia-suspend/-resume into
-  # systemd-suspend.service and systemd-hibernate.service; the
-  # suspend-then-hibernate unit is separate and would skip the dGPU
-  # state save/restore without these. AMD/Intel need nothing here.
-  systemd.services.nvidia-suspend = lib.mkIf nvidia {
-    before = [ "systemd-suspend-then-hibernate.service" ];
-    wantedBy = [ "systemd-suspend-then-hibernate.service" ];
+  # Straight to disk: suspend-then-hibernate hung in its S3 resume.
+  services.logind.settings.Login = lib.mkIf laptop {
+    HandleLidSwitch = "hibernate";
+    HandleLidSwitchExternalPower = "hibernate";
   };
-  systemd.services.nvidia-resume = lib.mkIf nvidia {
-    after = [ "systemd-suspend-then-hibernate.service" ];
-    wantedBy = [ "systemd-suspend-then-hibernate.service" ];
+
+  # Preserve VRAM on disk; the driver's default /tmp is tmpfs.
+  hardware.nvidia = lib.mkIf (laptop && nvidia
+    && lib.versionAtLeast config.hardware.nvidia.package.version "430.09") {
+    powerManagement.enable = lib.mkForce true;
+    moduleParams.nvidia.NVreg_TemporaryFilePath = "/var/tmp";
   };
 }

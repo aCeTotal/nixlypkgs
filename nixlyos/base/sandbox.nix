@@ -23,16 +23,12 @@ let
         rm -f $out/bin/${bin}
         cat > $out/bin/${bin} <<'EOF'
         #!${final.runtimeShell} -e
-        fj=/run/wrappers/bin/firejail
-        # Reach running instance's singleton socket.
-        if $fj --list | grep -qE '^[0-9]+:[^:]*:${bin}:'; then
-          exec $fj --quiet --join=${bin} ${pkg}/bin/${bin} "$@"
-        fi
-        exec $fj --name=${bin} \
+        # Options first: joining rejects them after.
+        exec /run/wrappers/bin/firejail --quiet \
           ${builtins.concatStringsSep " " extraArgs} \
           --profile=${final.firejail}/etc/firejail/${profile}.profile \
           ${dbusArgs} \
-          -- ${pkg}/bin/${bin} "$@"
+          --join-or-start=${bin} ${pkg}/bin/${bin} "$@"
         EOF
         chmod 0755 $out/bin/${bin}
 
@@ -59,6 +55,9 @@ in
         extraArgs = [
           "'--ignore=whitelist \${HOME}/.gnupg'"
           "--private-tmp"
+          # GTK theme imports wallpaper colours.
+          "'--whitelist=\${HOME}/.local/state/nixly-theme'"
+          "'--read-only=\${HOME}/.local/state/nixly-theme'"
         ];
       };
     })

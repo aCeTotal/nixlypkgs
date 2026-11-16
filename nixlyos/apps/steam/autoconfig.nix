@@ -158,7 +158,7 @@ writeScript "steam-autoconfig" ''
           print("[steam-autoconfig] Global config patched.", file=sys.stderr)
 
   def patch_app_launch_options(user_cfg):
-      # Inject `<wrap> %command%` into per-app LaunchOptions for PRIME offload and gamemode.
+      # Inject `<wrap> %command%` into per-app LaunchOptions.
       wrap = "${gameWrap}"
       new_prefix = f"{wrap} %command%"
       changed = False
@@ -196,7 +196,7 @@ writeScript "steam-autoconfig" ''
               changed = True
               continue
 
-          # Migrate old `gamemoderun %command%`; the wrap handles gamemode itself now.
+          # Migrate old `gamemoderun %command%` prefixes.
           if "gamemoderun %command%" in opts:
               app["LaunchOptions"] = opts.replace(
                   "gamemoderun %command%", new_prefix, 1
@@ -247,7 +247,7 @@ writeScript "steam-autoconfig" ''
       sv2 = ensure(user_cfg, ["streaming_v2"])
       changed |= set_leaf(sv2, "BackgroundRecording", "0")
 
-      # Per-game PRIME offload + gamemode auto-apply
+      # Per-game PRIME offload
       changed |= patch_app_launch_options(user_cfg)
 
       if changed:
@@ -293,12 +293,11 @@ writeScript "steam-autoconfig" ''
               out.append(p)
       return out
 
-  # Matched by manifest name so new tools are covered without a hardcoded appid list.
+  # Match tools by manifest name.
   def is_tool(name):
       return (
           name.startswith("Proton")
           or name.startswith("Steam Linux Runtime")
-          or "EasyAntiCheat" in name
           or "BattlEye" in name
       )
 

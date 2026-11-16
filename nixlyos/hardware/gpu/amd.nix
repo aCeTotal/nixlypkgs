@@ -1,5 +1,8 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, hwData, ... }:
 
+let
+  drives = hwData.detected.primary == "amd";
+in
 {
   hardware.graphics = {
     enable = true;
@@ -26,8 +29,9 @@
   ];
 
   environment.sessionVariables = {
-    LIBVA_DRIVER_NAME = "radeonsi";
-    VDPAU_DRIVER = "radeonsi";
+    # Only the session GPU pins VA-API and VDPAU.
+    LIBVA_DRIVER_NAME = lib.mkIf drives "radeonsi";
+    VDPAU_DRIVER = lib.mkIf drives "radeonsi";
     # RADV explicitly, so an amdvlk package in the profile cannot hijack the ICD.
     AMD_VULKAN_ICD = "RADV";
     # glthread globally, not just Mesa's per-app list, for CPU-bound OpenGL titles.

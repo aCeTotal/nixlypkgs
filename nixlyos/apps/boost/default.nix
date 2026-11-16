@@ -2,11 +2,11 @@
 { pkgs, ... }:
 
 let
-  boost = pkgs.runCommandCC "nixly-boost" { } ''
-    mkdir -p $out/bin
-    $CC -O2 -Wall -Wextra -Werror \
-      -DGAMEMODE_LIB='"${pkgs.gamemode.lib}/lib"' \
-      ${./boost.c} -o $out/bin/nixly-boost
+  boost = pkgs.runCommandCC "nixly-boost" { nativeBuildInputs = [ pkgs.makeBinaryWrapper ]; } ''
+    mkdir -p $out/libexec
+    $CC -O2 -Wall -Wextra -Werror ${./boost.c} -o $out/libexec/nixly-boost
+    makeBinaryWrapper ${pkgs.nixly-dgpu}/bin/nixly-dgpu $out/bin/nixly-boost \
+      --add-flag $out/libexec/nixly-boost
   '';
 in
 {

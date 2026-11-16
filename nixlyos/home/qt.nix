@@ -1,26 +1,25 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 
 {
-  # Qt/KDE theming for Dolphin and friends outside Plasma, reading kdeglobals.
-  # platformTheme.package is explicit to avoid pulling in the whole Plasma closure.
+  # Explicit packages skip Plasma closure.
   qt = {
     enable = true;
     platformTheme = {
       name = "kde";
-      package = [ pkgs.kdePackages.plasma-integration ];
+      package = with pkgs.kdePackages; [ plasma-integration plasma-integration.qt5 ];
     };
     style = {
       name = "breeze";
-      package = [ pkgs.kdePackages.breeze ];
+      package = with pkgs.kdePackages; [ breeze breeze.qt5 ];
     };
   };
 
-  # The colours must be spelled out as [Colors:*] groups; ColorScheme=BreezeDark
-  # alone is just a name and still yields a light theme.
-  xdg.configFile."kdeglobals".source = pkgs.runCommand "kdeglobals" { } ''
-    cp ${pkgs.kdePackages.breeze}/share/color-schemes/BreezeDark.colors $out
-    chmod +w $out
-    cat >> $out <<'EOF'
+  # Breeze Dark fallback layer.
+  home.packages = [ (pkgs.runCommand "nixly-kdeglobals" { } ''
+    mkdir -p $out/etc/xdg
+    cp ${pkgs.kdePackages.breeze}/share/color-schemes/BreezeDark.colors $out/etc/xdg/kdeglobals
+    chmod +w $out/etc/xdg/kdeglobals
+    cat >> $out/etc/xdg/kdeglobals <<'EOF'
 
     [General]
     font=Noto Sans,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1
@@ -57,5 +56,9 @@
     Speedbar Width=148
     View Style=DetailTree
     EOF
-  '';
+  '') ];
+
+  # Written by nixlytile's wallpaper theme.
+  xdg.configFile."kdeglobals".source =
+    config.lib.file.mkOutOfStoreSymlink "${config.xdg.stateHome}/nixly-theme/kdeglobals-colors";
 }

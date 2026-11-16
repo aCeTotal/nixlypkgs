@@ -65,4 +65,7 @@
 
   # File dialogs browse local files.
   systemd.user.services.xdg-desktop-portal-gtk.environment.GIO_USE_VFS = "local";
+
+  # Up at login, not on first app.
+  systemd.user.services.xdg-desktop-portal.wantedBy = [ "graphical-session.target" ];
 }

@@ -1,7 +1,10 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, hwData, ... }:
 
-# NVIDIA-only host: like gpu/nvidia.nix but without prime, which needs an intelBusId.
+# NVIDIA drives the session; any iGPU stays secondary.
 
+let
+  blackwell = hwData.detected.nvidiaArch == "blackwell_plus";
+in
 {
   services.xserver.videoDrivers = [ "nvidia" ];
 
@@ -25,7 +28,8 @@
     nvidiaPersistenced = true;
     powerManagement.enable = false;
     powerManagement.finegrained = false;
-    open = false;
+    # Blackwell runs only the open modules.
+    open = blackwell;
     nvidiaSettings = false;
     # Latest branch (newest NVIDIA driver); built against the nixlyos kernel.
     # mkDefault so custom/modules.nix can fall back to nvidiaPackages.previous
@@ -44,9 +48,9 @@
       "nvidia.NVreg_InitializeSystemMemoryAllocations=0"
       # No-op before Ampere vbios.
       "nvidia.NVreg_EnableResizableBar=1"
-      # GSP firmware wedges after channel resets.
-      "nvidia.NVreg_EnableGpuFirmware=0"
-    ];
+    ]
+    # GSP wedges after channel resets; open modules require it.
+    ++ lib.optional (!blackwell) "nvidia.NVreg_EnableGpuFirmware=0";
   };
 
   environment.systemPackages = with pkgs; [
@@ -72,6 +76,8 @@
     __GL_SHADER_DISK_CACHE_SIZE = "10737418240";   # 10 GiB
     __GL_SHADER_DISK_CACHE_SKIP_CLEANUP = "1";
     ELECTRON_OZONE_PLATFORM_HINT = "auto";
+    # Compositor renders on NVIDIA, not the iGPU.
+    NIXLY_NVIDIA_PRIMARY = lib.mkIf (hwData.detected.primary == "nvidia") "1";
   };
 
   # Same vars on the unit too, in case the PAM env import races.

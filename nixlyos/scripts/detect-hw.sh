@@ -70,12 +70,17 @@ has_nvidia=0 has_amd=0 has_intel_igpu=0 has_intel_dgpu=0
 has_amd_igpu=0 has_amd_dgpu=0
 bus_nvidia="" bus_intel="" bus_amd="" dev_nvidia=""
 amd_legacy=0 intel_legacy=0
+disp_nvidia=0 disp_igpu=0 primary=""
 
-# Intel DG2 Arc; everything else from 8086 is treated as an iGPU.
-dg2_ids=" 5690 5691 5692 5693 5694 5695 5696 5697 56a0 56a1 56a2 56a3 56a5 56a6 "
+# Intel discrete; other 8086 devices are iGPUs.
+intel_is_dgpu() {
+  local i=$1
+  (( i >= 0x5690 && i <= 0x56c2 )) ||   # DG2 Alchemist, Arc Pro, embedded, Flex
+  (( i >= 0xe200 && i <= 0xe2ff ))      # Battlemage (Xe2)
+}
 
-# The display part of an AMD APU, used only for the status line.
-amd_apu_ids=" 1114 13c0 150e 1586 15bf 15c8 15d8 15dd 15e7 1636 1638 163f 164c 164d 164e 1681 98e4 "
+# AMD APU display IDs.
+amd_apu_ids=" 1114 13c0 1506 150e 1586 15bf 15c8 15d8 15dd 15e7 1636 1638 163f 164c 164d 164e 1681 98e4 "
 amd_is_apu() {
   local d=$1 i=$2
   [[ $amd_apu_ids == *" $d "* ]] ||
@@ -120,39 +125,69 @@ to_bus_id() {
   printf 'PCI:%d@%d:%d:%d\n' "$((16#$bus))" "$((16#$dom))" "$((16#$slot))" "$((16#$fn))"
 }
 
+# Cached status; never wakes the GPU.
+has_display() {
+  local s st
+  for s in "$1"/drm/card*/card*-*/status; do
+    [[ -r $s ]] || continue
+    read -r st < "$s"
+    [[ $st == connected ]] && return 0
+  done
+  return 1
+}
+
 for dev in /sys/bus/pci/devices/*; do
   read -r cls < "$dev/class"
   [[ $cls == 0x03* ]] || continue
   read -r vnd < "$dev/vendor"
   read -r did < "$dev/device"
   addr=${dev##*/}
+  disp=0
+  has_display "$dev" && disp=1
   case "$vnd" in
     0x10de)
+      kind=nvidia
       has_nvidia=1
+      disp_nvidia=$(( disp_nvidia | disp ))
       [[ -n $bus_nvidia ]] || { bus_nvidia=$(to_bus_id "$addr"); dev_nvidia=${did#0x}; }
       ;;
     0x1002)
+      kind=amd
       has_amd=1
-      [[ -n $bus_amd ]] || bus_amd=$(to_bus_id "$addr")
       amd_is_legacy "$((16#${did#0x}))" && amd_legacy=1
-      if amd_is_apu "${did#0x}" "$((16#${did#0x}))"; then has_amd_igpu=1; else has_amd_dgpu=1; fi
+      if amd_is_apu "${did#0x}" "$((16#${did#0x}))"; then
+        has_amd_igpu=1
+        disp_igpu=$(( disp_igpu | disp ))
+        # PRIME needs the APU address.
+        bus_amd=$(to_bus_id "$addr")
+      else
+        has_amd_dgpu=1
+        [[ -n $bus_amd ]] || bus_amd=$(to_bus_id "$addr")
+      fi
       ;;
     0x8086)
-      if [[ $dg2_ids == *" ${did#0x} "* ]]; then
+      kind=intel
+      if intel_is_dgpu "$((16#${did#0x}))"; then
         has_intel_dgpu=1
       else
         has_intel_igpu=1
+        disp_igpu=$(( disp_igpu | disp ))
         [[ -n $bus_intel ]] || bus_intel=$(to_bus_id "$addr")
         intel_is_legacy "$((16#${did#0x}))" && intel_legacy=1
       fi
       ;;
+    *) continue;;
   esac
+  # The boot GPU drives the session.
+  bv=0
+  [[ -r $dev/boot_vga ]] && read -r bv < "$dev/boot_vga"
+  if [[ -z $primary || $bv == 1 ]]; then primary=$kind; fi
 done
 
 # NVIDIA architecture to driver branch. The ranges are disjoint and must be
 # checked in order, since Fermi and Kepler have interleaved ID blocks. This is a
 # heuristic; pin the branch in the laptop register if a card lands wrong.
-#   latest  Turing and newer
+#   latest  Turing and newer (Blackwell: open modules)
 #   580     Maxwell, Pascal, Volta
 #   470     Kepler
 #   390     Fermi
@@ -172,12 +207,13 @@ if (( has_nvidia )) && [[ -n $dev_nvidia ]]; then
     elif (( i <= 0x127f )); then echo fermi    # GF114/GF116
     elif (( i <= 0x133f )); then echo kepler   # GK208 (0x1280+), GK208M
     elif (( i <= 0x1dff )); then echo maxwell_pascal_volta
-    else                         echo turing_plus
+    elif (( i <= 0x28ff )); then echo turing_plus
+    else                         echo blackwell_plus
     fi
   }
   nvidia_arch=$(arch_of "$id")
   case "$nvidia_arch" in
-    turing_plus)          nvidia_branch="latest";;
+    turing_plus|blackwell_plus) nvidia_branch="latest";;
     maxwell_pascal_volta) nvidia_branch="legacy_580";;
     kepler)               nvidia_branch="legacy_470";;
     # legacy_390 and legacy_340 are broken in nixpkgs, and a system that does not
@@ -380,31 +416,38 @@ if [[ -n $reg_modules ]]; then
   done
 fi
 
+# NVIDIA drives desktops and MUXed laptop panels.
+if (( has_nvidia )) && [[ $nvidia_branch != nouveau ]]; then
+  igpu=""
+  (( has_amd_igpu )) && igpu=amd
+  (( has_intel_igpu )) && igpu=intel
+  primary=nvidia
+  if [[ -n $igpu ]] && (( (disp_igpu && !disp_nvidia) || (is_laptop && disp_igpu == disp_nvidia) )); then
+    primary=$igpu
+  fi
+fi
+
 # GPU module selection, by name; mkNixlySystem maps names to modules.
 gpu_mods=()
 if (( has_nvidia )); then
   if [[ $nvidia_branch == nouveau ]]; then
     gpu_mods+=("nvidia_nouveau")
   elif [[ -n $nvidia_branch && $nvidia_branch != latest ]]; then
-    # Old card: a profile module that pins the legacy branch and only enables
-    # prime when an iGPU is actually present.
+    # Old card: pinned legacy branch, prime only behind the iGPU.
     gpu_mods+=("nvidia_legacy")
-  elif (( has_intel_igpu )); then
-    # Hybrid: prime offload against the iGPU-driven panel.
-    gpu_mods+=("nvidia_intel")
-  else
+  elif [[ $primary == nvidia ]]; then
     gpu_mods+=("nvidia_only")
+  else
+    # Hybrid: prime offload against the iGPU-driven panel.
+    gpu_mods+=("nvidia_hybrid")
   fi
 fi
 (( has_intel_dgpu )) && gpu_mods+=("intel")
-# The iGPU module owns i915 firmware and VA-API decoding for the compositor, so
-# it is included even when NVIDIA drives the session.
+# Secondary GPUs keep their modules.
 if (( has_intel_igpu )); then
   (( intel_legacy )) && gpu_mods+=("intel_legacy") || gpu_mods+=("intel_igpu")
 fi
-# The AMD module is shared by iGPU and dGPU, but dropped when NVIDIA drives the
-# session, since its radeonsi session variables would point at the wrong driver.
-if (( has_amd && !has_nvidia )); then
+if (( has_amd )); then
   (( amd_legacy )) && gpu_mods+=("amd_legacy") || gpu_mods+=("amd")
 fi
 
@@ -481,6 +524,8 @@ write_generated "$OUT/resources.nix" \
 }"
 
 # detected.nix.
+amd_dgpu=false
+(( has_amd_dgpu )) && amd_dgpu=true
 write_generated "$OUT/detected.nix" \
 "{
   nvidia = \"$bus_nvidia\";
@@ -488,6 +533,8 @@ write_generated "$OUT/detected.nix" \
   amd = \"$bus_amd\";
   nvidiaArch = \"$nvidia_arch\";
   nvidiaBranch = \"${nvidia_branch:-latest}\";
+  primary = \"$primary\";
+  amdDgpu = $amd_dgpu;
 }"
 
 # platform.nix: architecture, SBC SoC, boot path and hypervisor. mk-system

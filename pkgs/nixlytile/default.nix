@@ -1,6 +1,8 @@
 { lib
 , stdenv
 , fetchFromGitHub
+, fetchurl
+, linkFarm
 , pkg-config
 , makeWrapper
 , autoPatchelfHook
@@ -31,7 +33,6 @@
 , hicolor-icon-theme
 , adwaita-icon-theme
 , papirus-icon-theme
-, shared-mime-info
 , libpng
 , libjpeg
 , ffmpeg
@@ -64,6 +65,8 @@
 , grim
 , slurp
 , wl-clipboard
+, matugen
+, nerd-fonts
 , nixlycc
 }:
 
@@ -71,11 +74,35 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "ac5593d25259f119bc2edad3839d93400e0b856a";
-    hash = "sha256-VVZxhjIzN1HscLuOjsczBhlNRkq+chhVxW0tZO2pb00=";
+    rev = "4e733c063529b74aff258139e11f6beaaa7e2d9a";
+    hash = "sha256-2vaqMDn72Oa0PZ5576swXo1UnhXnwsrKqK5oCSgfQqc=";
   };
 
+  gazeModel = name: hash: fetchurl {
+    url = "https://github.com/google/mediapipe/raw/v0.8.9/mediapipe/modules/${name}";
+    inherit hash;
+  };
+
+  gazeModels = linkFarm "nixlytile-gaze-models" [
+    {
+      name = "face_detection_short_range.tflite";
+      path = gazeModel "face_detection/face_detection_short_range.tflite"
+        "sha256-O8GC658zkl2eWLXI1ZMIp2D0reqPKCNw5CjFEhLCZjM=";
+    }
+    {
+      name = "face_landmark.tflite";
+      path = gazeModel "face_landmark/face_landmark.tflite"
+        "sha256-xgP6YUkhmj6Uh9yavXoMJEdMdyYyc9JIaDeM30CqJtE=";
+    }
+    {
+      name = "iris_landmark.tflite";
+      path = gazeModel "iris_landmark/iris_landmark.tflite"
+        "sha256-0XRNKgnCX1AdOeuk+v9H5T7MqIUsXOGbzo7qw5NXUh8=";
+    }
+  ];
+
   runtimeDeps = [
+    matugen
     swaybg
     brightnessctl
     xdg-utils
@@ -117,7 +144,7 @@ in
 
 stdenv.mkDerivation {
   pname = "nixlytile";
-  version = "2026.11.14";
+  version = "2026.11.16";
 
   passthru.providedSessions = [ "nixlytile" ];
 
@@ -172,6 +199,8 @@ stdenv.mkDerivation {
 
   makeFlags = [
     "PKG_CONFIG=${pkg-config}/bin/pkg-config"
+    "ICON_FONT_DIR=${nerd-fonts.symbols-only}/share/fonts"
+    "GAZE_MODEL_DIR=${gazeModels}"
   ];
 
   dontWrapQtApps = true;
@@ -189,7 +218,7 @@ stdenv.mkDerivation {
     wrapProgram $out/bin/nixlytile \
       --set NIXLY_RENDERER vulkan \
       --prefix PATH : ${lib.makeBinPath runtimeDeps} \
-      --prefix XDG_DATA_DIRS : "${nixlycc}/share:${papirus-icon-theme}/share:${adwaita-icon-theme}/share:${hicolor-icon-theme}/share:${shared-mime-info}/share" \
+      --prefix XDG_DATA_DIRS : "${nixlycc}/share" \
       --run 'l="''${XDG_STATE_HOME:-$HOME/.local/state}/nixlytile"; mkdir -p "$l" && { [ -s "$l/session.log" ] && mv -f "$l/session.log" "$l/session.log.1"; exec 2>>"$l/session.log"; echo "=== session start $(date -Is) ===" >&2; }'
 
     runHook postInstall

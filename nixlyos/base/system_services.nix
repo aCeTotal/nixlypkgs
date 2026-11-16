@@ -105,11 +105,8 @@
     # earlyoom matches on comm (15 chars).
     extraArgs = [
       "--prefer" "^(Web Content|firefox|brave|electron)$"
-      # Games outside ultra mode get no oom_score_adj protection, so keep
-      # earlyoom away from them (and the compositor) by comm pattern. comm
-      # is 15 chars: .exe names longer than that truncate past the suffix
-      # and stay unprotected — ultra mode's -900 is the real game shield.
-      "--avoid" "^(sshd|systemd|dbus|nixlytile|wineserver|wine|retroarch|gamescope)|\\.exe"
+      # Spare the compositor (main thread comm nixlyOS) and games; long .exe names truncate.
+      "--avoid" "^(sshd|systemd|dbus|nixlytile|nixlyOS|wineserver|wine|retroarch|gamescope)|\\.exe"
     ];
   };
 

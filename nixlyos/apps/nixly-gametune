@@ -65,8 +65,8 @@ restore_all() {
 
 # ---------------------------------------------------------------------- CPU
 
-# Whether a laptop battery exists.
-on_battery_machine() {
+# A system battery, not a peripheral's.
+is_laptop() {
 	local supply
 	for supply in "${ROOT}"/sys/class/power_supply/*; do
 		[ "$(cat "$supply/type" 2>/dev/null)" = Battery ] &&
@@ -75,11 +75,22 @@ on_battery_machine() {
 	return 1
 }
 
+# Laptop with no mains or USB supply online.
+on_battery() {
+	local supply
+	is_laptop || return 1
+	for supply in "${ROOT}"/sys/class/power_supply/*; do
+		case "$(cat "$supply/type" 2>/dev/null)" in Mains|USB) ;; *) continue ;; esac
+		[ "$(cat "$supply/online" 2>/dev/null)" = 1 ] && return 1
+	done
+	return 0
+}
+
 tune_cpu() {
 	local policy name driver govs
 
-	if on_battery_machine; then
-		log "cpu: laptop, power limits left to firmware and game"
+	if on_battery; then
+		log "cpu: on battery, power limits left to firmware and game"
 		return 0
 	fi
 
@@ -426,7 +437,7 @@ gpumax_nvidia() {
 do_gpumax() {
 	local card driver
 
-	on_battery_machine && return 0
+	is_laptop && return 0
 
 	for card in "${ROOT}"/sys/class/drm/card*; do
 		[ -e "$card/device/driver" ] || continue
@@ -439,20 +450,38 @@ do_gpumax() {
 	done
 }
 
-tune_gpu() {
-	local card dev driver
+# Intel iGPUs always sit at 00:02.0; amdgpu hides board_info on APUs.
+is_igpu() {
+	local dev=$1
+	[ "$(basename "$(readlink -f "$dev")")" = 0000:00:02.0 ] && return 0
+	[ "$(basename "$(readlink -f "$dev/driver")")" = amdgpu ] && [ ! -e "$dev/board_info" ]
+}
 
-	if on_battery_machine; then
-		log "gpu: laptop, power limits left to firmware and game"
+tune_gpu() {
+	local card dev driver dgpu=0
+	local -a cards=()
+
+	if on_battery; then
+		log "gpu: on battery, power limits left to firmware and game"
 		return 0
 	fi
 
 	for card in "${ROOT}"/sys/class/drm/card*; do
 		[ -e "$card/device/driver" ] || continue
 		case "$(basename "$card")" in *-*) continue;; esac  # skip connectors
+		cards+=("$card")
+		is_igpu "$card/device" || dgpu=1
+	done
 
+	for card in "${cards[@]}"; do
 		dev=$card/device
 		driver=$(basename "$(readlink -f "$dev/driver")")
+
+		# A pinned iGPU takes package power from the dGPU games run on.
+		if [ "$dgpu" = 1 ] && is_igpu "$dev"; then
+			log "gpu $(basename "$card"): integrated beside a dGPU, left alone"
+			continue
+		fi
 
 		case "$driver" in
 		amdgpu)         tune_gpu_amd "$dev" "$(basename "$card")" ;;
@@ -586,10 +615,12 @@ dmem_protect() {
 	rel=$(awk -F'::' '$1=="0" {print $2; exit}' "/proc/$pid/cgroup" 2>/dev/null)
 	[ -n "$rel" ] && [ "$rel" != "/" ] || return 0
 	cg="$root$rel"
-	[ -d "$cg" ] && [ -f "$cg/dmem.min" ] || return 0
+	[ -d "$cg" ] || return 0
 
 	# Enable the controller in every ancestor's subtree_control (slices
 	# are process-free, so the no-internal-process rule is satisfied).
+	# Must happen BEFORE looking for dmem.min: the file only appears in
+	# the leaf once the parent's subtree_control includes +dmem.
 	d=$root
 	rest=${rel#/}
 	while [ -n "$rest" ]; do
@@ -601,6 +632,7 @@ dmem_protect() {
 		d="$d/$part"
 		case "$rest" in */*) rest=${rest#*/} ;; *) rest= ;; esac
 	done
+	[ -f "$cg/dmem.min" ] || return 0
 
 	# Protect every region up to its full capacity: background allocations
 	# can no longer evict the game's VRAM.
@@ -692,7 +724,10 @@ do_daemon() {
 	trap 'do_restore; exit 0' TERM INT
 	do_apply
 
-	if [ -w /dev/cpu_dma_latency ]; then
+	# Idle cores give their power budget to the busy ones on a laptop.
+	if is_laptop; then
+		log "laptop: C-states left alone"
+	elif [ -w /dev/cpu_dma_latency ]; then
 		exec 9<>/dev/cpu_dma_latency
 		printf '\x00\x00\x00\x00' >&9
 		log "holding /dev/cpu_dma_latency at 0 us (no deep C-states)"

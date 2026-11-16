@@ -13,7 +13,8 @@ let
   # nixlytile and SDDM need GBM (470+).
   gbmOk = !(builtins.elem branch [ "legacy_390" "legacy_340" ]);
 
-  hybrid = gpu.intel != "";
+  # The iGPU drives the session.
+  hybrid = gpu.primary != "nvidia";
 in
 {
   services.xserver.videoDrivers = [ "nvidia" ];
@@ -45,11 +46,12 @@ in
     # Always proprietary; the open modules only exist for Turing and newer.
     open = false;
 
-    # Prime only when an iGPU is actually present.
+    # Prime only when the iGPU drives.
     prime = lib.mkIf (hybrid && gbmOk) {
       offload.enable = true;
       offload.enableOffloadCmd = true;
-      intelBusId = gpu.intel;
+      intelBusId = lib.mkIf (gpu.primary == "intel") gpu.intel;
+      amdgpuBusId = lib.mkIf (gpu.primary == "amd") gpu.amd;
       nvidiaBusId = gpu.nvidia;
     };
   };
@@ -91,6 +93,8 @@ in
     __GL_SHADER_DISK_CACHE_SIZE = "10737418240";
     __GL_SHADER_DISK_CACHE_SKIP_CLEANUP = "1";
     ELECTRON_OZONE_PLATFORM_HINT = "auto";
+    # Compositor renders on NVIDIA, not the iGPU.
+    NIXLY_NVIDIA_PRIMARY = lib.mkIf (gbmOk && !hybrid) "1";
   };
 
   # GBM/GLX vendor only when the branch has GBM and no iGPU drives the panel.

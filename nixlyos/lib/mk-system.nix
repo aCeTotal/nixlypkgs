@@ -3,8 +3,8 @@
 # from hardwareDir (written by nixlyos-detect-hw into ~/.local/nixlyos):
 #
 #   hardware-configuration.nix   nixos-generate-config output
-#   selection.nix                { cpu = "intel"; gpus = [ "nvidia_intel" ... ]; }
-#   detected.nix                 PCI bus ids + NVIDIA arch/branch
+#   selection.nix                { cpu = "intel"; gpus = [ "nvidia_hybrid" ... ]; }
+#   detected.nix                 PCI bus ids + NVIDIA arch/branch + session GPU
 #   resources.nix                cores/RAM/psABI level/build parallelism
 #   dmi.nix                      vendor/model/laptop flag
 #   profile.nix                  nixos-hardware module names + flags
@@ -62,8 +62,14 @@ let
   # Same file as flake packages.totalvim, for the same cache-hit reason.
   totalvimPkg = import ./totalvim.nix { inherit pkgs inputs; system = effectiveSystem; };
 
+  detected = import (hardwareDir + "/detected.nix");
+
   hwData = {
-    detected = import (hardwareDir + "/detected.nix");
+    # Older detect-hw lacks primary; laptop panels sit on the iGPU.
+    detected = {
+      primary = nixpkgs.lib.findFirst (v: detected.${v} != "") "intel"
+        (if hwData.dmi.isLaptop then [ "intel" "amd" "nvidia" ] else [ "intel" "nvidia" "amd" ]);
+    } // detected;
     resources = import (hardwareDir + "/resources.nix");
     dmi = import (hardwareDir + "/dmi.nix");
     profile = import (hardwareDir + "/profile.nix");
@@ -72,7 +78,9 @@ let
 
   selection = import (hardwareDir + "/selection.nix");
   cpuModule = ../hardware/cpu + "/${selection.cpu}.nix";
-  gpuModules = map (n: ../hardware/gpu + "/${n}.nix") selection.gpus;
+  # Names an older detect-hw still writes.
+  renamedGpus = { nvidia_intel = "nvidia_hybrid"; };
+  gpuModules = map (n: ../hardware/gpu + "/${renamedGpus.${n} or n}.nix") selection.gpus;
 
   # SBCs get the generic ARM SoC module (Mesa graphics); board specifics come
   # from the nixos-hardware candidate matched in profile.nix. Guests get the

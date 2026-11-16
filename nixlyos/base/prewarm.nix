@@ -13,14 +13,7 @@ let
     if ${pkgs.systemd}/bin/systemctl is-active -q nixly-gametune.service; then
       exit 1
     fi
-    if ${pkgs.procps}/bin/pgrep -x gamemoded >/dev/null 2>&1; then
-      clients=$(${pkgs.systemd}/bin/busctl --user get-property \
-        com.feralinteractive.GameMode /com/feralinteractive/GameMode \
-        com.feralinteractive.GameMode ClientCount 2>/dev/null \
-        | ${pkgs.gawk}/bin/awk '{print $2}')
-      [ "''${clients:-0}" -gt 0 ] && exit 1
-    fi
-    # Non-Steam launches that neither gametune nor gamemoded sees:
+    # Non-Steam launches gametune misses:
     # wine/Proton outside Steam (Lutris, Heroic) and libretro.
     ${pkgs.procps}/bin/pgrep -x wineserver >/dev/null 2>&1 && exit 1
     ${pkgs.procps}/bin/pgrep -x retroarch >/dev/null 2>&1 && exit 1
@@ -101,8 +94,8 @@ let
     S="$HOME/.local/share/Steam"
     [ -d "$S" ] || S="$HOME/.steam/steam"
     if [ -d "$S" ]; then
-      warm "$S/ubuntu12_32"
-      warm "$S/ubuntu12_64"
+      warm "$S/steamrt64"
+      warm "$S/steamrt32"
       warm "$S/linux32"
       warm "$S/linux64"
       warm "$S/config"
@@ -215,7 +208,7 @@ in
       CPUSchedulingPolicy = "idle";
       Nice = 19;
       # Cap so the kernel reclaims prewarm's own pages instead of the session's.
-      MemoryHigh = "8G";
+      MemoryHigh = "25%";
     };
   };
 

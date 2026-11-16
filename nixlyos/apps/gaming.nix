@@ -3,34 +3,7 @@
 {
   imports = [ ./steam ./geforce-now ];
 
-  programs.gamemode = {
-    enable = true;
-    settings = {
-      general = {
-        renice = 10;
-        ioprio = 0;               # Real-time I/O priority
-        inotify = 131072;         # Unity games and big mods hit the 8192 ceiling
-        inhibit_screensaver = 1;
-        softrealtime = "auto";
-        reaper_freq = 5;          # Check for game exit every 5s
-        # No desiredgov/defaultgov: perf.nix owns the governor.
-      };
-      gpu = {
-        apply_gpu_optimisations = "accept-responsibility";
-        gpu_device = 0;
-        nv_powermizer_mode = 1;   # Prefer max performance for Nvidia
-        nv_core_clock_mhz_offset = 0;
-        nv_mem_clock_mhz_offset = 0;
-        amd_performance_level = "high"; # AMD DPM to max while gaming; no-op elsewhere
-      };
-      cpu = {
-        park_cores = "no";
-        # nixlytile owns CPU affinity; two writers raced.
-        pin_cores = "no";
-      };
-      # No custom start/end: nixlytile shows its own "Game Mode On" notification.
-    };
-  };
+  # No Feral gamemode: nixlytile and nixly-gametune own priority, governor and GPU.
 
   environment.systemPackages = with pkgs; [
     steamcmd
@@ -65,7 +38,6 @@
   ]
   ++ (with pkgs; [
 
-    libnotify           # gamemode notifications
     schedtool
 
     mpv

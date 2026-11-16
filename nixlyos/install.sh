@@ -14,13 +14,32 @@ require_cmd() {
 
 confirm() { return 0; }
 
+# Fastest metadata-free NVMe LBA format.
+nvme_fastest_lbaf() {
+  require_cmd nvme
+  local now best
+  IFS=: read -r now best < <(nvme id-ns "$1" | awk '
+    $1 != "lbaf" { next }
+    / \(in use\)/ { now = $2 }
+    $4 != "ms:0" { next }
+    { ds = substr($5, 7) + 0; rp = substr($6, 4); sub(/^0x/, "", rp); rp += 0 }
+    ds > 12 { next }
+    best == "" || rp < brp || (rp == brp && ds > bds) { best = $2; brp = rp; bds = ds }
+    END { print now ":" best }')
+  [[ -n "$best" && "$best" != "$now" ]] || return 0
+  log "Switching $1 to LBA format $best"
+  nvme format "$1" --lbaf="$best" --force || log "LBA format switch refused; keeping format $now"
+  udevadm settle
+}
+
 usage() {
   cat <<EOF
 Usage: sudo $(basename "$0") [--disk /dev/xxx] [--hostname NAME] [--user NAME] [--luks-passphrase PASS | --luks-passphrase-file FILE | --luks-passphrase-stdin | --prompt-luks-passphrase]
 
 Performs a clean NixOS installation on the selected disk with:
-- GPT: 512MiB ESP (FAT32, unencrypted), rest LUKS2 (argon2id) for root
-- Root filesystem: ext4, SSD/NVMe optimized (noatime, discard=async)
+- GPT: ${ESP_SIZE}iB ESP (FAT32, unencrypted), rest LUKS2 (argon2id, 4K sectors) for root
+- Root filesystem: ext4 (fast_commit, noatime, lazytime), tuned to the detected disk:
+  NVMe switched to its fastest LBA format, discard and dm-crypt workqueue bypass on SSDs
 - Bootloader: lanzaboote (Secure Boot via UEFI)
 - Swap: zram (no swap partition)
 - Secure Boot keys generated automatically
@@ -49,6 +68,8 @@ LUKS_PASSPHRASE_FILE=""
 LUKS_PASSPHRASE_STDIN=0
 NO_PROMPT=0
 NIXLY_USER="total"
+# Room for three kernels.
+ESP_SIZE="1G"
 
 
 while [[ $# -gt 0 ]]; do
@@ -66,7 +87,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Preconditions
-for c in parted sgdisk lsblk awk sed grep mkfs.vfat mkfs.ext4 cryptsetup blkid mount umount nixos-generate-config nixos-install base64; do
+for c in sgdisk udevadm lsblk awk sed grep mkfs.vfat mkfs.ext4 cryptsetup blkid mount umount nixos-generate-config nixos-install base64; do
   require_cmd "$c"
 done
 
@@ -107,6 +128,10 @@ fi
 
 [[ -b "$DISK" ]] || die "Disk not found: $DISK"
 
+# TRAN last: it can be empty.
+read -r ROTATIONAL DISCARD_MAX TRAN < <(lsblk -dnbo ROTA,DISC-MAX,TRAN "$DISK")
+log "Disk $DISK: transport=${TRAN:-none} rotational=$ROTATIONAL discard_max=$DISCARD_MAX"
+
 log "Proceeding to ERASE ALL DATA on $DISK (non-interactive)"
 
 # Unmount anything under /mnt from previous attempts
@@ -117,16 +142,19 @@ fi
 
 swapoff -a || true
 
+if [[ "$TRAN" == nvme ]]; then
+  nvme_fastest_lbaf "$DISK"
+fi
+
 log "Wiping partition table on $DISK"
 sgdisk --zap-all "$DISK"
 
+# Aligned end keeps 4K LUKS sectors valid.
 log "Creating GPT partitions (ESP + LUKS root)"
-parted -s "$DISK" -- mklabel gpt \
-  mkpart ESP fat32 1MiB 513MiB \
-  set 1 esp on \
-  name 1 NIXESP \
-  mkpart primary 513MiB 100% \
-  name 2 NIXLUKS
+sgdisk --align-end \
+  -n "1:0:+$ESP_SIZE" -t 1:ef00 -c 1:NIXESP \
+  -n 2:0:0 -c 2:NIXLUKS \
+  "$DISK"
 
 # Resolve partition paths (handle nvme pN suffix)
 P1=$(lsblk -no PATH -r "$DISK" | sed -n '2p')
@@ -165,6 +193,7 @@ log "Setting up LUKS2 on $P2 (argon2id, high iteration time)"
 printf '%s' "$LUKS_PASSPHRASE" | cryptsetup luksFormat \
   --batch-mode \
   --type luks2 \
+  --sector-size 4096 \
   --cipher aes-xts-plain64 \
   --key-size 512 \
   --pbkdf argon2id \
@@ -173,20 +202,27 @@ printf '%s' "$LUKS_PASSPHRASE" | cryptsetup luksFormat \
   --key-file - \
   "$P2"
 
-log "Opening LUKS container as cryptroot (allow discards)"
+# Header flags apply every unlock.
+OPEN_FLAGS=(--persistent)
+(( DISCARD_MAX > 0 )) && OPEN_FLAGS+=(--allow-discards)
+(( ROTATIONAL == 0 )) && OPEN_FLAGS+=(--perf-no_read_workqueue --perf-no_write_workqueue)
+
+log "Opening LUKS container as cryptroot (${OPEN_FLAGS[*]})"
 printf '%s' "$LUKS_PASSPHRASE" | cryptsetup open \
   --type luks \
-  --allow-discards \
+  "${OPEN_FLAGS[@]}" \
   --key-file - \
   "$P2" cryptroot
 
+# Cheap fsync, no background zeroing.
 log "Creating ext4 filesystem on /dev/mapper/cryptroot"
 mkfs.ext4 -L nixos \
-  -O 64bit,metadata_csum,dir_index,extent \
+  -O 64bit,metadata_csum,dir_index,extent,fast_commit \
+  -E lazy_itable_init=0 \
   /dev/mapper/cryptroot
 
 log "Mounting target filesystem"
-mount -o noatime,discard=async,commit=120 /dev/mapper/cryptroot /mnt
+mount -o noatime,lazytime,commit=120 /dev/mapper/cryptroot /mnt
 mkdir -p /mnt/boot
 mount "$P1" /mnt/boot
 

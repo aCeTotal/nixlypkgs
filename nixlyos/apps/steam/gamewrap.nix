@@ -1,17 +1,12 @@
-{ python3, gamemode, writeScript, writeText, launchParams ? { } }:
+{ python3, writeScript, writeText, nixly-gpu-select, launchParams ? { } }:
 
-# Per-game wrapper injected into every Steam app's LaunchOptions; applies PRIME
-# offload, the per-GPU parameters from launchparams.nix, gamemoderun, and an
-# adaptive performance tier (see TIERS below): every game starts on the
-# fastest profile and is demoted automatically if it fails to stay up, so no
-# game ever needs manual launch parameters. Its store path is baked into each
-# entry, so autoconfig.nix re-patches on launch.
+# Steam LaunchOptions wrapper: dGPU offload, per-GPU launch params, adaptive tiers.
 writeScript "nixly-game-wrap" ''
   #!${python3}/bin/python3
-  """Wrap %command% with PRIME offload + adaptive perf tier + gamemoderun."""
-  import json, os, shlex, signal, subprocess, sys, time
+  """Wrap %command% with dGPU offload + adaptive perf tier."""
+  import functools, json, os, shlex, signal, subprocess, sys, time
 
-  GAMEMODERUN = "${gamemode}/bin/gamemoderun"
+  GPU_SELECT = "${nixly-gpu-select}/bin/nixly-gpu-select"
 
   # Kept in its own store file, since inlining JSON breaks on embedded quotes.
   with open("${writeText "nixly-launch-params.json"
@@ -105,61 +100,41 @@ writeScript "nixly-game-wrap" ''
           entry["streak"] = 0
       save_state(state)
 
-  def drm_gpus():
-      gpus = []
+  @functools.cache
+  def gpu_info():
+      # Boot-time pick; the same classifier runs live if it is missing.
       try:
-          for card in sorted(os.listdir("/sys/class/drm")):
-              if not card.startswith("card") or "-" in card:
-                  continue
-              dev = f"/sys/class/drm/{card}/device"
-              try:
-                  with open(dev + "/vendor") as f:
-                      vid = f.read().strip()
-                  with open(dev + "/device") as f:
-                      did = f.read().strip()
-              except OSError:
-                  continue
-              boot = "0"
-              try:
-                  with open(dev + "/boot_vga") as f:
-                      boot = f.read().strip()
-              except OSError:
-                  pass
-              gpus.append({"vid": vid, "did": did, "boot": boot,
-                           "slot": os.path.basename(os.path.realpath(dev))})
+          with open("/run/nixly/gpu.env") as f:
+              text = f.read()
       except OSError:
-          pass
-      return gpus
+          text = subprocess.run(
+              [GPU_SELECT], capture_output=True, text=True).stdout
+      return dict(line.split("=", 1) for line in text.splitlines())
+
+  def nvidia_driver(pci):
+      return os.path.exists(f"/sys/bus/pci/drivers/nvidia/{pci}")
 
   def apply_prime_offload():
-      # Multiple GPUs: games ALWAYS run on the dGPU; the iGPU is only used
-      # when it is the machine's sole GPU. Per-game only: forcing the Steam
-      # UI itself onto the dGPU crashes CEF in a respawn loop, since
-      # /run/opengl-driver is unbound inside the runtime.
-      gpus = drm_gpus()
-      if len(gpus) < 2:
+      # Per game only: the Steam UI's CEF crash-loops on the dGPU.
+      gpu = gpu_info()
+      # NVIDIA-rendered sessions need no offload.
+      if gpu.get("NIXLY_GPU_HYBRID") != "1" or os.environ.get("NIXLY_NVIDIA_PRIMARY") == "1":
           return
-      if os.path.exists("/proc/driver/nvidia/version"):
+      pci = gpu["NIXLY_DGPU_PCI"]
+      if nvidia_driver(pci):
           os.environ.setdefault("__NV_PRIME_RENDER_OFFLOAD", "1")
           os.environ.setdefault(
               "__NV_PRIME_RENDER_OFFLOAD_PROVIDER", "NVIDIA-G0")
           os.environ.setdefault("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
           os.environ.setdefault("__VK_LAYER_NV_optimus", "NVIDIA_only")
           os.environ.pop("VK_DRIVER_FILES", None)
-          dgpu = next((g for g in gpus if g["vid"] == "0x10de"), None)
+          os.environ.pop("__EGL_VENDOR_LIBRARY_FILENAMES", None)
       else:
-          # dGPU = not the boot display, preferring non-Intel when mixed.
-          cands = [g for g in gpus if g["boot"] != "1"] or gpus
-          non_intel = [g for g in cands if g["vid"] != "0x8086"]
-          dgpu = (non_intel or cands)[0]
-          slot = dgpu["slot"].replace(":", "_").replace(".", "_")
-          os.environ.setdefault("DRI_PRIME", f"pci-{slot}")
-      if dgpu:
-          # Force Vulkan onto the dGPU too (mesa device-select layer);
-          # "!" pins it even if the app asks for another device.
           os.environ.setdefault(
-              "MESA_VK_DEVICE_SELECT",
-              f"{dgpu['vid'][2:]}:{dgpu['did'][2:]}!")
+              "DRI_PRIME", "pci-" + pci.replace(":", "_").replace(".", "_"))
+      # The "!" pins Vulkan even when the app picks a device.
+      os.environ.setdefault(
+          "MESA_VK_DEVICE_SELECT", gpu["NIXLY_DGPU_VIDDID"] + "!")
 
   def apply_ntsync():
       # Functional ntsync probe, not a file check: only a semaphore that actually
@@ -240,24 +215,13 @@ writeScript "nixly-game-wrap" ''
       os.environ["MANGOHUD_CONFIG"] = f"no_display,fps_limit={cap}"
 
   def gpu_vendor():
-      # The loaded driver picks the variant (nvidia > amd > intel when several
-      # are present, matching what PRIME offload renders on).
-      if os.path.exists("/proc/driver/nvidia/version"):
-          return "nvidia"
-      found = None
-      try:
-          for card in os.listdir("/sys/class/drm"):
-              if not card.startswith("card") or "-" in card:
-                  continue
-              with open(f"/sys/class/drm/{card}/device/vendor") as f:
-                  vid = f.read().strip()
-              if vid == "0x1002":
-                  return "amd"
-              if vid == "0x8086":
-                  found = "intel"
-      except OSError:
-          pass
-      return found
+      # Vendor of the GPU games render on; NVIDIA needs its own driver.
+      gpu = gpu_info()
+      kind = "DGPU" if "NIXLY_DGPU_PCI" in gpu else "IGPU"
+      vendor = gpu.get(f"NIXLY_{kind}_VENDOR")
+      if vendor == "nvidia" and not nvidia_driver(gpu[f"NIXLY_{kind}_PCI"]):
+          return None
+      return vendor
 
   def apply_launch_params(cmd):
       # Leading KEY=VAL tokens become env vars; the rest are appended as args.
@@ -310,7 +274,7 @@ writeScript "nixly-game-wrap" ''
           tier = min(max(tier, 0), MAX_TIER)
       apply_tier(tier, gpu_vendor())
 
-      cmd = [GAMEMODERUN, *apply_launch_params(sys.argv[1:])]
+      cmd = apply_launch_params(sys.argv[1:])
       # After apply_launch_params, so a per-game MANGOHUD_CONFIG wins.
       if tier < MAX_TIER:
           apply_fps_cap()

@@ -181,7 +181,6 @@ in
     // thunar-daemonen dro med seg 5 residente gvfs-volume-monitors
     // (goa/gphoto2/afc/mtp/udisks) ved hver innlogging. Thunar starter
     // fortsatt on-demand om noe kaller den.
-    autostart "swaybg -i \"$HOME/Pictures/wallpapers/mountains.jpg\" -m fill"
     // nm-applet/blueman-applet fjernet: nettverk + bluetooth er innebygd
     // i nixlytile (egne tray-ikoner med popup, direkte mot kernel/bluez).
     // X11: nixlytile starter Xwayland ved behov.

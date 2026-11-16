@@ -1,9 +1,12 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, hwData, ... }:
 
 # Intel iGPU Gen7.5 and older, selected by detect-hw.sh from the PCI ID.
 # Unlike gpu/intel_igpu.nix, i965 is the only VA-API driver here, and GuC/HuC
 # firmware and intel-compute-runtime are dropped since both start at Gen8.
 
+let
+  drives = hwData.detected.primary == "intel";
+in
 {
   hardware.graphics = {
     enable = true;
@@ -21,7 +24,8 @@
 
   services.xserver.videoDrivers = [ "modesetting" ];
 
-  boot.initrd.kernelModules = [ "i915" ];
+  # Early KMS only when the iGPU drives.
+  boot.initrd.kernelModules = lib.mkIf drives [ "i915" ];
 
   hardware.enableRedistributableFirmware = true;
 
@@ -32,7 +36,7 @@
   ];
 
   environment.sessionVariables = {
-    LIBVA_DRIVER_NAME = "i965";
+    LIBVA_DRIVER_NAME = lib.mkIf drives "i965";
     mesa_glthread = "true";
     NIXOS_OZONE_WL = "1";
     QT_QPA_PLATFORM = "wayland";
