@@ -74,8 +74,8 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "53f5cd48ef9702128b969f9e2e6c7560b8a47250";
-    hash = "sha256-uu8J6Y8KMPlbjpJyppEN5913P9O73kX0ONNxiEm8Wig=";
+    rev = "3ed6cb32fe12c171d03c4b7682b93530f97a6f4c";
+    hash = "sha256-3s4VqSVDftueJj1pLDj7hgCqchsb7a1J3vxwPrJiOgI=";
   };
 
   gazeModel = name: hash: fetchurl {
