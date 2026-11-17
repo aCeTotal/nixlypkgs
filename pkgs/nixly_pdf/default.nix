@@ -57,13 +57,13 @@ let
 in
 stdenv.mkDerivation {
   pname = "nixly-pdf";
-  version = "0.0.1";
+  version = "2026.11.17";
 
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixly_pdf";
-    rev = "6c22ce9ae6fdda7d53c287f05e10137ca88d7ecd";
-    hash = "sha256-n8AL4B7uwzY61N1g2vBzAXVeFNNd8lX9OjMRuIiWhKQ=";
+    rev = "5f0ddcfe8ed2d314b7e82c67e802467747e44da4";
+    hash = "sha256-q5JkD+qaso3sG31kzx/JfEwiMJmRTYSezh1POnmmA04=";
   };
 
   strictDeps = true;

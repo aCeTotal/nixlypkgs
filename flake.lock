@@ -154,11 +154,11 @@
     "nixly_launcher_src": {
       "flake": false,
       "locked": {
-        "lastModified": 1791046727,
-        "narHash": "sha256-RYm9zua4Ig9sHCtpQiIFRWRt3H+PUXGuCkREpHJiorg=",
+        "lastModified": 1794875167,
+        "narHash": "sha256-+Etc331ISmm89dMr7Iia4YtHIYP5ooJho5bNBkuY5II=",
         "owner": "aCeTotal",
         "repo": "nixly_launcher",
-        "rev": "83cb850f34885a30b82b8e3e290402c05232b949",
+        "rev": "94d3518de973bdfca38a72ab1ba5a2e83856ff85",
         "type": "github"
       },
       "original": {
@@ -377,11 +377,11 @@
     "totalvim": {
       "flake": false,
       "locked": {
-        "lastModified": 1785672195,
-        "narHash": "sha256-6yvxNyJER18KkWSW8BHlJEpA28EaYehrRbVywdOOGuQ=",
+        "lastModified": 1794875230,
+        "narHash": "sha256-qOzuYjX9d8IKk3mNAmu2bL/4vV5HVL91a30e6BPUhM4=",
         "owner": "aCeTotal",
         "repo": "totalvim",
-        "rev": "61c32a81c73f22cf2dd8e1738272093b6017d77b",
+        "rev": "9d4a31f5cbc72c45920a952575272a52fd056481",
         "type": "github"
       },
       "original": {

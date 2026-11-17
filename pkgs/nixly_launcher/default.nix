@@ -42,7 +42,7 @@ let
 in
 rustPlatform.buildRustPackage {
   pname = "nixly_launcher";
-  version = "0.1.0";
+  version = "2026.11.17";
 
   inherit src;
 
