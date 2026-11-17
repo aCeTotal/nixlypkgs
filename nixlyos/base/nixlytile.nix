@@ -6,6 +6,18 @@
 
   environment.systemPackages = [ pkgs.nixlytile ];
 
+  # GPU queue priority over clients.
+  security.wrappers.nixlytile = {
+    owner = "root";
+    group = "root";
+    capabilities = "cap_sys_nice+ep";
+    # Restores what the wrapper strips.
+    source = "${pkgs.writeShellScript "nixlytile-session" ''
+      . /etc/set-environment
+      exec ${pkgs.nixlytile}/bin/nixlytile "$@"
+    ''}";
+  };
+
   xdg.portal = {
     enable = true;
     # Shortcuts and FileChooser from nixlytile.
