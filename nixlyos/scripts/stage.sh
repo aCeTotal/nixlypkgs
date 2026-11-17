@@ -33,23 +33,16 @@ cp -r "$FLAKE/hardware" "$STAGE/flake/hardware"
 # machines installed before the custom/ extension point existed.
 if [[ -d "$FLAKE/custom" ]]; then cp -r "$FLAKE/custom" "$STAGE/flake/custom"; fi
 
-# Exactly the same locking as nixlyos-update, or the staged key never
-# matches: fresh lock (inherits nixlypkgs' tested pins), then nixpkgs stable
-# and home-manager to their branch heads — except on HTPC, which tracks only
-# the tested nixlypkgs pin (mirrors the MODE gate in update.sh).
-# cd instead of --flake: the pinned nix (stable nixpkgs) still uses the old
-# CLI where flake lock/update only operate on the current directory.
-MODE=$(cat /etc/nixlyos-mode 2>/dev/null || echo desktop)
+# Same locking as nixlyos-update, or the staged key never matches.
 (cd "$STAGE/flake" && nix flake lock &&
- { [ "$MODE" = htpc ] ||
-   nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager; }) >/dev/null 2>&1 || exit 0
+ nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager) >/dev/null 2>&1 || exit 0
 
 # Pre-sized Boehm heap: the eval allocates gigabytes; starting big avoids
 # hundreds of GC cycles and cuts eval time by a third or more.
 export GC_INITIAL_HEAP_SIZE=2G
 
 # Same file list and order as tree_key in update.sh.
-key=$(cat "$STAGE/flake"/flake.nix "$STAGE/flake"/flake.lock "$STAGE/flake"/local.nix "$STAGE/flake"/hardware/* 2>/dev/null | sha1sum | cut -d' ' -f1)
+key=$(cat "$STAGE/flake"/flake.nix "$STAGE/flake"/flake.lock "$STAGE/flake"/local.nix "$STAGE/flake"/pins.nix "$STAGE/flake"/custom/* "$STAGE/flake"/hardware/* 2>/dev/null | sha1sum | cut -d' ' -f1)
 if [[ -f "$STAGE/key" && "$(<"$STAGE/key")" == "$key" && -e "$STAGE/result" ]]; then
   exit 0
 fi

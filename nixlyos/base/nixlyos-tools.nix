@@ -1,6 +1,4 @@
-# The NixlyOS command set: hardware detection and system update.
-# The scripts live in nixlyos/scripts and get their helpers
-# (ui.sh, progress.sh, laptop-register) injected as store paths.
+# NixlyOS commands: hardware, update.
 { pkgs, lib, ... }:
 
 let
@@ -27,10 +25,13 @@ let
 
   update = pkgs.writeShellApplication {
     name = "nixlyos-update";
-    runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.gnugrep pkgs.gawk pkgs.jq pkgs.git ];
-    # sudo comes from the system (wrapper with setuid), not from nixpkgs.
+    runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.gnugrep pkgs.gnused pkgs.gawk pkgs.jq pkgs.git ];
+    # Setuid sudo from the system.
     text = ''
       export PATH=/run/wrappers/bin:$PATH
+      PROGRESS_JQ=${scripts + "/update-progress.jq"}
+      ${builtins.readFile (scripts + "/update-ui.sh")}
+      ${builtins.readFile (scripts + "/update-changes.sh")}
       ${builtins.readFile (scripts + "/update.sh")}
     '';
   };

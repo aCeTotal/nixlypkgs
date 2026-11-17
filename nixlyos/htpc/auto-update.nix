@@ -36,6 +36,7 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
         # agrees with what is now running.
         if [ -f "$stage/flake/flake.lock" ]; then
           runuser -u ${nixlyUser} -- cp "$stage/flake/flake.lock" "$flake/flake.lock" || true
+          rm -f "$flake/pins.nix"
         fi
         nix-env -p /nix/var/nix/profiles/system --set "$sys"
         "$sys/bin/switch-to-configuration" boot

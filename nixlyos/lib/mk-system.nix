@@ -123,6 +123,7 @@ nixpkgs.lib.nixosSystem {
     (hardwareDir + "/devices.nix")
 
     ../base/default.nix
+    (import ./pins.nix (dirOf hardwareDir + "/pins.nix"))
     cpuModule
   ]
   ++ gpuModules

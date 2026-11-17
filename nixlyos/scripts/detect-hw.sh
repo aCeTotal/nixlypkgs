@@ -33,17 +33,16 @@ machine=$(uname -m)
 is_arm=0
 [[ $machine == aarch64 ]] && is_arm=1
 
-# CPU: vendor, cores, feature level.
-cpu_name="" cpu_flags="" nproc=0
+# CPU: vendor, cores (parked ones too), feature level.
+cpu_name="" cpu_flags=""
+nproc=$(nproc --all)
 while IFS= read -r line; do
   case "$line" in
-    processor*) (( ++nproc ));;
     vendor_id*GenuineIntel*) [[ -n $cpu_name ]] || cpu_name="intel";;
     vendor_id*AuthenticAMD*) [[ -n $cpu_name ]] || cpu_name="amd";;
     flags*) [[ -n $cpu_flags ]] || cpu_flags=" ${line#*: } ";;
   esac
 done < /proc/cpuinfo
-(( nproc > 0 )) || nproc=1
 # ARM cpuinfo has no vendor_id; the arm cpu module is vendor-neutral.
 (( is_arm )) && cpu_name="arm"
 
