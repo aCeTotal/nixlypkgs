@@ -89,7 +89,7 @@ free_kib() { df --output=avail /nix | tail -1; }
 
 if (( $(free_kib) < MIN_FREE_KIB )); then
   spin_start "Lite diskplass — rydder gamle generasjoner …"
-  sudo nix-env -p /nix/var/nix/profiles/system --delete-generations "$KEEP_GENERATIONS" >>"$log" 2>&1
+  { sudo nix-env -p /nix/var/nix/profiles/system --delete-generations "$KEEP_GENERATIONS"; } >>"$log" 2>&1
   nix-collect-garbage --delete-older-than "$KEEP_GENERATIONS" >>"$log" 2>&1 || :
   tick "Diskplass ryddet, $(( $(free_kib) / 1024 / 1024 )) GiB ledig"
 fi

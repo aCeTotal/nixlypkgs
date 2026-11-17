@@ -27,7 +27,14 @@ let
     paths = [ pkg ];
     nativeBuildInputs = [ final.makeBinaryWrapper ];
     postBuild = ''
-      # Launchers hardcode the unwrapped store path.
+      # FHS envs link the directory.
+      if [ -L "$out/share/applications" ]; then
+        apps=$(readlink -f "$out/share/applications")
+        rm "$out/share/applications"
+        mkdir "$out/share/applications"
+        ln -s "$apps"/* "$out/share/applications/"
+      fi
+      # Launchers hardcode the unwrapped path.
       for d in $out/share/applications/*.desktop; do
         [ -e "$d" ] || continue
         real=$(readlink -f "$d")
