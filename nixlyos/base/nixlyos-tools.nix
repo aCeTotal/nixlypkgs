@@ -29,8 +29,9 @@ let
     # Setuid sudo from the system.
     text = ''
       export PATH=/run/wrappers/bin:$PATH
-      PROGRESS_JQ=${scripts + "/update-progress.jq"}
+      PROGRESS_AWK=${scripts + "/update-progress.awk"}
       ${builtins.readFile (scripts + "/update-ui.sh")}
+      ${builtins.readFile (scripts + "/update-progress.sh")}
       ${builtins.readFile (scripts + "/update-changes.sh")}
       ${builtins.readFile (scripts + "/update.sh")}
     '';

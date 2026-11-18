@@ -7,17 +7,20 @@ FLAKE="${NIXLYOS_DIR:-$HOME/.local/nixlyos}"
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/nixlyos"
 STAMP="$STATE/last-build"
 STAGEDIR="$STATE/stage"
+EVAL_TIME="$STATE/eval-us"
 PINS="$FLAKE/pins.nix"
 ATTR="$FLAKE#nixosConfigurations.nixlyos.config.system.build.toplevel"
 MIN_FREE_KIB=$((50 * 1024 * 1024))
 KEEP_GENERATIONS=3d
+PASSWORD_TRIES=3
+MAX_ERRORS=3
 log="$STATE/update.log"
 mkdir -p "$STATE"
 : > "$log"
 
 tmp=$(mktemp -d -t nixlyos.XXXXXX)
 keepalive=""
-trap 'spin_stop; [ -n "$keepalive" ] && kill -- -"$keepalive" 2>/dev/null; (( tty )) && printf "\033[?25h" >&2; rm -rf "$tmp"' EXIT
+trap 'spin_stop; [ -n "$keepalive" ] && kill -- -"$keepalive" 2>/dev/null; (( tty )) && printf "\033[?25h\033[?7h\n" >&2; rm -rf "$tmp"' EXIT
 
 # Same file list as stage.sh.
 tree_key() {
@@ -27,22 +30,23 @@ tree_key() {
 
 up_to_date() {
   printf '%s %s\n' "$(tree_key)" "$running" > "$STAMP"
-  if (( tty )); then step_done "Alt er oppdatert"; else echo "Alt er oppdatert."; fi
+  step_done "Alt er oppdatert" $(( ${EPOCHREALTIME/[.,]/} - started ))
+  (( tty )) || echo "Alt er oppdatert."
   exit 0
 }
 
 validate_config() {
-  spin_start "Validerer konfig"
+  spin_start "Sjekker konfigurasjon"
   nixlyos-detect-hw "$FLAKE/hardware" >"$tmp/hw.log" 2>&1 &
   local hw=$!
   if ! nixlyos-user-config "$FLAKE" >"$tmp/uc.log" 2>&1; then
     spin_stop
-    tail -5 "$tmp/uc.log" >&2
+    tail -5 "$tmp/uc.log" | error_block "Ugyldig konfigurasjon"
     exit 1
   fi
   wait "$hw"
   cat "$tmp/hw.log" "$tmp/uc.log" >>"$log"
-  tick "Konfig validert"
+  tick "Konfigurasjon sjekket"
 }
 
 # One parallel ls-remote per moving input.
@@ -79,14 +83,30 @@ stamp_matches() {
 check_remote() {
   stamp_matches || return 0
   spin_start "Ser etter oppdateringer"
-  remote_moved && { tick "Oppdateringer funnet"; return 0; }
-  tick "Ingen nye versjoner"
+  remote_moved && { tick "Nye versjoner tilgjengelig"; return 0; }
+  spin_stop
   up_to_date
+}
+
+# Own prompt, erased once accepted.
+ask_password() {
+  local pw prompt="Passord for $USER" try
+  for (( try = 0; try < PASSWORD_TRIES; try++ )); do
+    printf '\r  %s?%s %s: \033[?25h' "$CYN" "$RST" "$prompt" >&2
+    IFS= read -rs pw
+    printf '\r\033[2K\033[?25l' >&2
+    printf '%s\n' "$pw" | sudo -S -p '' -v 2>/dev/null && return 0
+    prompt="Feil passord, prøv igjen"
+  done
+  error_block "Fikk ikke tilgang med sudo" </dev/null
+  exit 1
 }
 
 # Password once, kept warm through long builds.
 sudo_start() {
-  sudo -v
+  if ! sudo -n true 2>/dev/null; then
+    if (( tty )); then ask_password; else sudo -v; fi
+  fi
   setsid bash -c 'while sudo -n true; do sleep 50; done' </dev/null >/dev/null 2>&1 &
   keepalive=$!
 }
@@ -96,7 +116,7 @@ free_disk() {
   spin_start "Rydder gamle generasjoner"
   { sudo nix-env -p /nix/var/nix/profiles/system --delete-generations "$KEEP_GENERATIONS"; } >>"$log" 2>&1
   nix-collect-garbage --delete-older-than "$KEEP_GENERATIONS" >>"$log" 2>&1 || :
-  tick "Diskplass ryddet"
+  tick "Diskplass frigjort"
 }
 
 # Tested nixlypkgs pin, then stable/HM heads.
@@ -107,7 +127,7 @@ lock_newest() {
   if ! (cd "$FLAKE" && nix flake lock --refresh) >>"$log" 2>&1; then
     spin_stop
     cp "$tmp/old.lock" "$FLAKE/flake.lock"
-    tail -20 "$log" >&2
+    tail -20 "$log" | error_block "Kunne ikke hente nye versjoner"
     exit 1
   fi
   cp "$FLAKE/flake.lock" "$tmp/tested.lock"
@@ -139,7 +159,7 @@ build_sys() {
     --option download-buffer-size 536870912 \
     --option fallback true \
     --log-format internal-json \
-    >"$tmp/out" 2> >(tee -a "$log" | jq -nrR --unbuffered -f "$PROGRESS_JQ" | render_progress "$tmp/failed") || rc=$?
+    >"$tmp/out" 2> >(LC_ALL=C awk -f "$PROGRESS_AWK" 2>>"$log" | render_progress "$tmp/failed" "$EVAL_TIME") || rc=$?
   wait $! 2>/dev/null || :
   return "$rc"
 }
@@ -163,7 +183,7 @@ pin_failed() {
   [ "$(wc -l < "$tmp/pinned")" -eq "$(sort -u "$tmp/failed" | wc -l)" ] || return 1
   awk -F '\t' 'BEGIN { print "{" } { printf "  \"%s\" = \"%s\";\n", $1, $4 } END { print "}" }' \
     "$tmp/pinned" > "$PINS"
-  say "${YLW}!${RST} Feilet, prøver forrige versjon av $(cut -f1 "$tmp/pinned" | paste -sd' ')"
+  warn "$(cut -f1 "$tmp/pinned" | paste -sd' ') feilet, prøver forrige versjon"
 }
 
 # Newest build; failed packages pinned and retried.
@@ -178,17 +198,26 @@ attempt() {
 attempt_tested() {
   cmp -s "$tmp/tested.lock" "$FLAKE/flake.lock" && return 1
   cp "$tmp/tested.lock" "$FLAKE/flake.lock"
-  say "${YLW}!${RST} Nyeste nixos-stable/home-manager feilet, prøver testet versjon"
+  warn "Nyeste nixos-stable/home-manager feilet, prøver testet versjon"
   attempt
+}
+
+# Root causes, deduplicated.
+nix_errors() {
+  local msgs
+  msgs=$(jq -nrR --argjson keep "$MAX_ERRORS" '
+    [inputs | try (ltrimstr("@nix ") | fromjson) catch empty
+     | select(.action == "msg" and .level == 0) | .msg
+     | select(test("Reason: (\u001b\\[[0-9;]*m)?[0-9]+ dependenc") | not)]
+    | reduce .[] as $m ([]; if index([$m]) then . else . + [$m] end)
+    | .[-$keep:][]' "$log")
+  if [ -n "$msgs" ]; then printf '%s\n' "$msgs"; else tail -30 "$log"; fi
 }
 
 fail() {
   cp "$tmp/old.lock" "$FLAKE/flake.lock"
   rm -f "$PINS"
-  local msgs
-  msgs=$(jq -rR 'try (ltrimstr("@nix ") | fromjson) catch empty | select(.action == "msg" and .level == 0) | .msg' "$log" | tail -30)
-  if [ -n "$msgs" ]; then printf '%s\n' "$msgs" >&2; else tail -30 "$log" >&2; fi
-  echo "${RED}✗${RST} Oppdatering feilet ${DIM}(logg: $log)${RST}" >&2
+  { nix_errors; echo "${DIM}Logg: ${log/#"$HOME"/\~}${RST}"; } | error_block "Oppdatering feilet"
   exit 1
 }
 
@@ -211,6 +240,7 @@ needs_reboot() {
 }
 
 started=${EPOCHREALTIME/[.,]/}
+header
 validate_config
 running=$(readlink -f /run/current-system)
 check_remote
@@ -240,7 +270,7 @@ else
 fi
 printf '%s %s\n' "$(tree_key)" "$(readlink -f /run/current-system)" > "$STAMP"
 
-(( booted_only )) && echo "${YLW}!${RST} Aktivering feilet, ny versjon gjelder fra neste oppstart." >&2
-needs_reboot && echo "${YLW}!${RST} Omstart kreves."
-step_done "${BLD}Oppdatering fullført${RST}" "$(since "$started")"
+finished $(( ${EPOCHREALTIME/[.,]/} - started ))
+(( booted_only )) && warn "Aktivering feilet, ny versjon gjelder fra neste oppstart"
+needs_reboot && warn "Start maskinen på nytt for å fullføre"
 exit 0

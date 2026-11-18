@@ -44,6 +44,7 @@ in
   # Updates run on their own schedule instead.
   systemd.services.geforce-now-update = unit // {
     description = "Update NVIDIA GeForce NOW flatpak";
+    unitConfig.ConditionACPower = true;
     after = [ "network-online.target" "flatpak-system-helper.service" ];
     wants = [ "network-online.target" ];
   };

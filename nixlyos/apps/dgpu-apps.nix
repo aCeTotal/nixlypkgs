@@ -1,13 +1,9 @@
-# Hybrid laptops run every video, compute and game app on the dGPU.
+# Heavy apps run on the dGPU.
 { lib, hwData, ... }:
 
 let
-  chromiumNode = "--render-node-override=";
-
-  # Installed apps: binaries to wrap and the flag taking the dGPU render node.
+  # dGPU apps; browsers excluded.
   joined = {
-    brave = { bins = [ "brave" ]; nodeArg = chromiumNode; };
-    google-chrome = { bins = [ "google-chrome-stable" "google-chrome" ]; nodeArg = chromiumNode; };
     vlc = { bins = [ "vlc" "cvlc" "nvlc" "qvlc" "rvlc" "svlc" ]; };
     nixlymedia = { bins = [ "nixlymedia" ]; };
     lutris = { bins = [ "lutris" ]; };

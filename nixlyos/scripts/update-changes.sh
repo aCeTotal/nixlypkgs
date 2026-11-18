@@ -52,21 +52,30 @@ print_changes() {
         }
         return s
       }
-      function add(sec, name, line) {
-        rows[sec] = rows[sec] name "\t" line "\n"
+      function add(sec, name, from, to) {
+        rows[sec] = rows[sec] name "\t" from "\t" to "\n"
         if (length(name) > w) w = length(name)
+        if (to != "" && length(from) > v) v = length(from)
       }
-      function show(sec, title,   n, i, f, l) {
-        if (rows[sec] == "") return
-        printf "  %s%s%s\n", B, title, N
+      function show(sec,   n, i, f, l) {
         n = split(rows[sec], l, "\n")
-        for (i = 1; i < n; i++) { split(l[i], f, "\t"); printf "    %-*s  %s\n", w, f[1], f[2] }
+        for (i = 1; i < n; i++) {
+          split(l[i], f, "\t")
+          if (f[3] == "") printf "    %s %-*s  %s%s%s\n", sym[sec], w, f[1], from[sec], f[2], N
+          else printf "    %s %-*s  %s%-*s%s  %s%s%s\n", sym[sec], w, f[1], from[sec], v, f[2], N, to[sec], f[3], N
+        }
       }
       BEGIN {
+        split("up down new gone kept", order, " ")
+        sym["up"] = G "↑" N; from["up"] = D; to["up"] = D "→ " N G
+        sym["down"] = Y "↓" N; from["down"] = D; to["down"] = D "→ " N Y
+        sym["new"] = G "+" N; from["new"] = G
+        sym["gone"] = D "−" N; from["gone"] = D
+        sym["kept"] = Y "!" N; to["kept"] = D
         while ((getline l < top) > 0) user[l] = 1
         while ((getline l < pinned) > 0) {
           split(l, f, "\t"); kept[f[1]] = 1
-          add("kept", f[1], f[2] "  " D "(" f[3] " feilet)" N)
+          add("kept", f[1], f[2], f[3] " feilet")
         }
       }
       $2 == $3 || ($1 in kept) || $1 ~ /^nixos-system-/ { next }
@@ -75,14 +84,15 @@ print_changes() {
         gone = only($2, $3); was = top
         came = only($3, $2); now = top
       }
-      gone == "" { add("new", $1, G came N); next }
-      came == "" { add("gone", $1, D gone N); next }
-      vcmp(was, now) > 0 { add("down", $1, D gone N " → " Y came N); next }
-      { add("up", $1, D gone N " → " G came N) }
+      gone == "" { add("new", $1, came); next }
+      came == "" { add("gone", $1, gone); next }
+      vcmp(was, now) > 0 { add("down", $1, gone, came); next }
+      { add("up", $1, gone, came) }
       END {
-        show("up", "Oppdatert"); show("down", "Nedgradert")
-        show("new", "Nye"); show("gone", "Fjernet")
-        show("kept", "Beholdt forrige versjon")
-        if (deps) printf "  %s%d avhengigheter oppdatert%s\n", D, deps, N
+        if (w == 0 && deps == 0) exit
+        printf "\n  %sEndringer%s\n", B, N
+        for (i = 1; i <= 5; i++) show(order[i])
+        if (deps) printf "    %s· %d %s endret%s\n", D, deps, deps == 1 ? "avhengighet" : "avhengigheter", N
+        print ""
       }'
 }

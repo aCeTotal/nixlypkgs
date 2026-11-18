@@ -102,7 +102,7 @@ in
       (if laptop
        then "nvme_core.default_ps_max_latency_us=100000"
        else "nvme_core.default_ps_max_latency_us=0")
-      (if laptop then "pcie_aspm=powersave" else "pcie_aspm=performance")
+      (if laptop then "pcie_aspm.policy=powersave" else "pcie_aspm.policy=performance")
     ]
     ++ [
       # Audit hooks tax every syscall.

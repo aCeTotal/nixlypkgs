@@ -59,6 +59,8 @@ in
   config = lib.mkIf config.nixlyos.net.autoMeasure {
     systemd.services.nixly-speedtest = {
       description = "Measure WAN rate for cake shaping";
+      # Battery: ~300 MB of radio time.
+      unitConfig.ConditionACPower = true;
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       serviceConfig = {

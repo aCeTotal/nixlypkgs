@@ -42,6 +42,7 @@ let
           fi
         done
         if systemctl is-active -q nixly-gametune.service \
+           || ! systemd-ac-power \
            || pgrep -x wineserver >/dev/null 2>&1 \
            || pgrep -x gamescope >/dev/null 2>&1 \
            || pgrep -x retroarch >/dev/null 2>&1 \
@@ -207,5 +208,9 @@ in
     interval = "Sun 04:00";
   };
   systemd.timers.fstrim.timerConfig.Persistent = false;
+
+  # Heavy maintenance waits for wall power.
+  systemd.services.fstrim.unitConfig.ConditionACPower = true;
+  systemd.services.nix-optimise.unitConfig.ConditionACPower = true;
 }
 
