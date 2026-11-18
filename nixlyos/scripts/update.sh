@@ -9,7 +9,7 @@ STAMP="$STATE/last-build"
 STAGEDIR="$STATE/stage"
 EVAL_TIME="$STATE/eval-us"
 PINS="$FLAKE/pins.nix"
-ATTR="$FLAKE#nixosConfigurations.nixlyos.config.system.build.toplevel"
+CONFIG="$FLAKE#nixosConfigurations.nixlyos.config"
 MIN_FREE_KIB=$((50 * 1024 * 1024))
 KEEP_GENERATIONS=3d
 PASSWORD_TRIES=3
@@ -20,7 +20,8 @@ mkdir -p "$STATE"
 
 tmp=$(mktemp -d -t nixlyos.XXXXXX)
 keepalive=""
-trap 'spin_stop; [ -n "$keepalive" ] && kill -- -"$keepalive" 2>/dev/null; (( tty )) && printf "\033[?25h\033[?7h\n" >&2; rm -rf "$tmp"' EXIT
+eval_pid=""
+trap 'spin_stop; [ -n "$keepalive" ] && kill -- -"$keepalive" 2>/dev/null; [ -z "$eval_pid" ] || kill "$eval_pid" 2>/dev/null || :; (( tty )) && printf "\033[?25h\033[?7h\n" >&2; rm -rf "$tmp"' EXIT
 
 # Same file list as stage.sh.
 tree_key() {
@@ -142,24 +143,68 @@ staged_sys() {
   readlink -f "$STAGEDIR/result"
 }
 
+# Background parallel eval to $tmp/drv.
+eval_start() {
+  eval_t=${EPOCHREALTIME/[.,]/}
+  (
+    trap 'kill $! 2>/dev/null || :' EXIT
+    GC_INITIAL_HEAP_SIZE=4G NIX_SENTRY_ENDPOINT='' "$EVAL_NIX" eval --raw --no-eval-cache "$CONFIG" \
+      --apply "$(<"$EVAL_APPLY")" \
+      --option eval-cores 0 \
+      --extra-experimental-features parallel-eval \
+      --log-format internal-json \
+      </dev/null >"$tmp/drv" 2> >(grep -v '^@nix {"action":"\(start\|stop\|result\)"' >>"$log") &
+    rc=0
+    wait $! || rc=$?
+    printf '%s\n' "${EPOCHREALTIME/[.,]/}" > "$tmp/eval-end"
+    exit "$rc"
+  ) &
+  eval_pid=$!
+}
+
+# Waits with bar, records time.
+eval_wait() {
+  local rc=0 took
+  render_eval "$eval_pid" "$eval_t" "$EVAL_TIME"
+  wait "$eval_pid" || rc=$?
+  eval_pid=""
+  (( rc == 0 )) || return "$rc"
+  took=$(( $(<"$tmp/eval-end") - eval_t ))
+  printf '%s\n' "$took" > "$EVAL_TIME"
+  step_done "System evaluert" "$took"
+}
+
+# No pins; staged build, else eval.
+fresh_start() {
+  rm -f "$PINS"
+  : > "$tmp/pinned"
+  staged=$(staged_sys) || eval_start
+}
+
 # Every core, wide substitution fan-out.
 build_sys() {
-  if staged_sys > "$tmp/out"; then
+  if [ -n "$staged" ]; then
+    printf '%s\n' "$staged" > "$tmp/out"
     step_done "Ferdig bygget i bakgrunnen"
     return 0
   fi
+  : > "$tmp/failed"
+  eval_wait || return
   local rc=0
-  GC_INITIAL_HEAP_SIZE=4G nix build --no-link --print-out-paths --keep-going "$ATTR" \
-    --max-jobs "$(nproc)" --cores 0 \
-    --option substituters 'https://cache.aceclan.no?priority=5 https://cache.nixos.org' \
-    --option extra-trusted-public-keys cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak= \
-    --option max-substitution-jobs 128 \
-    --option http-connections 128 \
-    --option connect-timeout 3 \
-    --option download-buffer-size 536870912 \
-    --option fallback true \
-    --log-format internal-json \
-    >"$tmp/out" 2> >(LC_ALL=C awk -f "$PROGRESS_AWK" 2>>"$log" | render_progress "$tmp/failed" "$EVAL_TIME") || rc=$?
+  # Braces put view pid in $!.
+  {
+    nix build --no-link --print-out-paths --keep-going "$(<"$tmp/drv")^*" \
+      --max-jobs "$(nproc)" --cores 0 \
+      --option substituters 'https://cache.aceclan.no?priority=5 https://cache.nixos.org' \
+      --option extra-trusted-public-keys cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak= \
+      --option max-substitution-jobs 128 \
+      --option http-connections 128 \
+      --option connect-timeout 3 \
+      --option download-buffer-size 536870912 \
+      --option fallback true \
+      --log-format internal-json \
+      >"$tmp/out"
+  } 2> >(LC_ALL=C awk -f "$PROGRESS_AWK" 2>>"$log" | render_progress "$tmp/failed") || rc=$?
   wait $! 2>/dev/null || :
   return "$rc"
 }
@@ -186,19 +231,18 @@ pin_failed() {
   warn "$(cut -f1 "$tmp/pinned" | paste -sd' ') feilet, prøver forrige versjon"
 }
 
-# Newest build; failed packages pinned and retried.
+# Newest build, failures pinned.
 attempt() {
-  rm -f "$PINS"
-  : > "$tmp/pinned"
   build_sys && return 0
-  pin_failed && build_sys
+  pin_failed && eval_start && build_sys
 }
 
-# Retries with the tested stable/HM pin.
+# Retry on tested stable/HM.
 attempt_tested() {
   cmp -s "$tmp/tested.lock" "$FLAKE/flake.lock" && return 1
   cp "$tmp/tested.lock" "$FLAKE/flake.lock"
   warn "Nyeste nixos-stable/home-manager feilet, prøver testet versjon"
+  fresh_start
   attempt
 }
 
@@ -246,10 +290,11 @@ running=$(readlink -f /run/current-system)
 check_remote
 nix path-info -r "$running" > "$tmp/old.paths" &
 paths_pid=$!
-sudo_start
-free_disk
 lock_newest
 stamp_matches && up_to_date
+fresh_start
+sudo_start
+free_disk
 wait "$paths_pid"
 
 attempt || attempt_tested || fail

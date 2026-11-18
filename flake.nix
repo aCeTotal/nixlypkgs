@@ -28,6 +28,11 @@
       flake = false;
     };
     mnw.url = "github:Gerg-L/mnw";
+    # Parallel evaluator for nixlyos-update.
+    determinate-nix = {
+      url = "github:DeterminateSystems/nix-src/v3.24.2";
+      inputs.nixpkgs.follows = "nixos-stable";
+    };
 
     # NixlyOS gaming-kernel (CachyOS-saus + BORE + scx_lavd, generic + v3).
     # `nix flake update nixlyos-kernel` etter push til kernel-repoet.
@@ -82,7 +87,7 @@
                 inherit (kp) xpadneo xone xpad-noone msi-ec;
               };
         in {
-          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer nixly-vrs proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly nixly-mic nixly-gate nixly_kalk nixly_pdf nixly_voice meshy freecad-mcp codeindexcache;
+          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer nixly-vrs proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly nixly-mic nixly-gate nixly_kalk nixly_pdf nixly_voice meshy freecad-mcp codeindexcache determinate-nix;
 
           # Layer for 32-bit games.
           nixly-vrs-i686 = stable.pkgsi686Linux.nixly-vrs;

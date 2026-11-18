@@ -30,6 +30,8 @@ let
     text = ''
       export PATH=/run/wrappers/bin:$PATH
       PROGRESS_AWK=${scripts + "/update-progress.awk"}
+      EVAL_NIX=${pkgs.determinate-nix}/bin/nix
+      EVAL_APPLY=${scripts + "/update-eval.nix"}
       ${builtins.readFile (scripts + "/update-ui.sh")}
       ${builtins.readFile (scripts + "/update-progress.sh")}
       ${builtins.readFile (scripts + "/update-changes.sh")}

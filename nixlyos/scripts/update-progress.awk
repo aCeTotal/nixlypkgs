@@ -48,21 +48,11 @@ function start(   t, id) {
   t = num($NF)
   id = substr($0, index($0, "\"id\":") + 5) + 0
   if (t == ACT_BUILD) { building[id] = 1; emit("start\t" id "\t" $8); return }
-  if (t == ACT_TRANSFER || t == ACT_COPY_PATHS || t == ACT_BUILDS) { kind[id] = t; return }
-  if (t == 0 && index($0, "\"text\":\"evaluating derivation")) evaluating = id
-}
-
-# Eval downloads are IFD.
-function evaluated() {
-  evaluating = 0
-  dl = dlexp = 0
-  delete xfer
-  emit("evaluated")
+  if (t == ACT_TRANSFER || t == ACT_COPY_PATHS || t == ACT_BUILDS) kind[id] = t
 }
 
 function stop(   id) {
   id = num($7)
-  if (evaluating && id == evaluating) { evaluated(); return }
   if (id in building) { delete building[id]; emit("stop\t" id); return }
   delete kind[id]
   delete xfer[id]

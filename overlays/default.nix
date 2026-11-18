@@ -36,6 +36,7 @@ in {
   nixly_pdf = callPackage ../pkgs/nixly_pdf { };
   proton-nixlyos = callPackage ../pkgs/proton-nixlyos { };
   proton-nixlyos-generic = callPackage ../pkgs/proton-nixlyos { variant = "generic"; };
+  determinate-nix = (inputs.determinate-nix.overlays.internal final prev).nixComponents2.nix-cli;
 
   linux-nixlyos = (import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; }).generic;
   linux-nixlyos-v3 = (import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; }).v3;

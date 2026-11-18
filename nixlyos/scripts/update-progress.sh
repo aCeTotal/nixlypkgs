@@ -9,6 +9,7 @@ bar_row() {
   lines+=("$row")
 }
 
+# Reads now, t0, est, spin from caller.
 eval_row() {
   local t row bar sym=$spin label=Evaluerer elapsed=$(( now - t0 ))
   fmt_time t "$elapsed"
@@ -77,7 +78,8 @@ sample_rate() {
 draw() {
   local lines=() spin="$CYN${FRAMES:fr:1}$RST" up="" body
   fr=$(( (fr + 1) % 10 )) last=$now
-  if [[ $phase == eval ]]; then eval_row; else sample_rate; build_rows; fi
+  sample_rate
+  build_rows
   active_rows
   (( shown == 0 )) || printf -v up '\033[%dA' "$shown"
   printf -v body '\r%s\033[K\n' "${lines[@]}"
@@ -89,14 +91,6 @@ clear_frame() {
   (( shown )) || return 0
   printf '\033[%dA\r\033[J' "$shown" >&2
   shown=0
-}
-
-eval_done() {
-  printf '%s\n' $(( now - t0 )) > "$eval_file"
-  (( tty )) && clear_frame
-  step_done "System evaluert" $(( now - t0 ))
-  phase=build t0=$now rate_t=$now rate_dl=0 rate=0
-  dl=0 dlexp=0 sd=0 se=0 bd=0 be=0
 }
 
 # Stamps download completion.
@@ -111,7 +105,6 @@ apply_event() {
     p) p_event "${@:2}" ;;
     start) name=${3##*/} name=${name:33} active[$2]=${name%.drv} begun[$2]=$now ;;
     stop) unset "active[$2]" "begun[$2]" ;;
-    evaluated) eval_done ;;
     failed) printf '%s\n' "$2" >> "$failed_file"; nfailed=$(( nfailed + 1 )) ;;
   esac
 }
@@ -128,14 +121,28 @@ summary() {
   step_line "$RED✗$RST" "$nfailed av $(( bd + nfailed )) bygg feilet" $(( now - t0 ))
 }
 
-# $1 failed drvs, $2 eval time.
+# $1 eval pid, $2 its start, $3 last eval time.
+render_eval() {
+  local now t0=$2 est=0 spin fr=0 lines
+  (( tty )) || return 0
+  [ ! -s "$3" ] || est=$(<"$3")
+  printf '\033[?7l' >&2
+  while kill -0 "$1" 2>/dev/null; do
+    now=${EPOCHREALTIME/[.,]/} spin="$CYN${FRAMES:fr:1}$RST" lines=()
+    fr=$(( (fr + 1) % 10 ))
+    eval_row
+    printf '\r%s\033[K' "${lines[0]}" >&2
+    nap "$FRAME_S"
+  done
+  printf '\r\033[2K\033[?7h' >&2
+}
+
+# $1 failed drvs.
 render_progress() {
-  local failed_file=$1 eval_file=$2 phase=eval est=0 shown=0 fr=0 last=0 status
+  local failed_file=$1 shown=0 fr=0 last=0 status
   local now t0 rate_t dl=0 dlexp=0 sd=0 se=0 bd=0 be=0 rate=0 rate_dl=0 sd_end="" nfailed=0
   local -a ev=() active=() begun=()
   now=${EPOCHREALTIME/[.,]/} t0=$now rate_t=$now
-  [ ! -s "$eval_file" ] || est=$(<"$eval_file")
-  : > "$failed_file"
   (( tty )) && printf '\033[?7l' >&2
   while :; do
     status=0
@@ -148,5 +155,5 @@ render_progress() {
   (( tty )) || return 0
   clear_frame
   printf '\033[?7h' >&2
-  [[ $phase == eval ]] || summary
+  summary
 }
