@@ -254,11 +254,11 @@
     "nixly_launcher_src": {
       "flake": false,
       "locked": {
-        "lastModified": 1794875167,
-        "narHash": "sha256-+Etc331ISmm89dMr7Iia4YtHIYP5ooJho5bNBkuY5II=",
+        "lastModified": 1795100567,
+        "narHash": "sha256-4TJCWSOel6ips9e7/ehzoFyeAG1pEWRX3XA97UiWe/o=",
         "owner": "aCeTotal",
         "repo": "nixly_launcher",
-        "rev": "94d3518de973bdfca38a72ab1ba5a2e83856ff85",
+        "rev": "22a8f2e0aea2b73986a863fe27d5b382db13a7e1",
         "type": "github"
       },
       "original": {

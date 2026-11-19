@@ -192,12 +192,8 @@ in
     // gaten nekter fortsatt aa kjoere naar gametune/gamemoded melder
     // aktivt spill eller maskinen er travel.
     autostart "nixly-activity-prewarm"
-    // appd walker HELE $HOME ved oppstart (fileindex + gitscan) og bygger
-    // et ikon-indeks paa ~21k entries. Rett etter innlogging konkurrerer
-    // det med kompositoren om CPU og disk, og musen fryser 2-3s. Utsatt
-    // 8s (kompositor + Wayland-klienter er oppe da) og nice 19 saa
-    // indekseringen aldri preempter frame-pathen. Super+p virker fra ~8s.
-    autostart "sh -c 'sleep 8; exec nice -n 19 appd'"
+    // Utsatt 8s; filvandrerne kjoerer SCHED_IDLE.
+    autostart "sh -c 'sleep 8; exec appd'"
     // Steam startes ALDRI automatisk — hverken ved innlogging eller av
     // nixly-activity-prewarm. Brukeren starter den selv.
     ''}
