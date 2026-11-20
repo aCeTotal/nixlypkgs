@@ -30,6 +30,11 @@
 , gdk-pixbuf
 , qrencode
 , quirc
+, curl
+, libical
+, json_c
+, libxml2
+, openssl
 , hicolor-icon-theme
 , adwaita-icon-theme
 , papirus-icon-theme
@@ -74,8 +79,8 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "5e6c59c7ac759f39fcaf962b11b3b15265088d18";
-    hash = "sha256-1pEmD0sbrLFtUJsoFUzBobxkMEv2p3+h2XroTleZxg8=";
+    rev = "38909ceda14cbada29c1efadd910b9a615e74711";
+    hash = "sha256-uq8j6Jfs1rTw4VUUAtlGRDglO5cr+ttaOgFbJeOO2Ps=";
   };
 
   gazeModel = name: hash: fetchurl {
@@ -144,7 +149,7 @@ in
 
 stdenv.mkDerivation {
   pname = "nixlytile";
-  version = "2026.11.19";
+  version = "2026.11.21";
 
   passthru.providedSessions = [ "nixlytile" ];
 
@@ -184,6 +189,11 @@ stdenv.mkDerivation {
     gdk-pixbuf
     qrencode
     quirc
+    curl
+    libical
+    json_c
+    libxml2
+    openssl
     hicolor-icon-theme
     adwaita-icon-theme
     papirus-icon-theme
