@@ -293,9 +293,9 @@ nix path-info -r "$running" > "$tmp/old.paths" &
 paths_pid=$!
 if panel_managed; then lock_panel; else lock_newest; fi
 stamp_matches && up_to_date
-fresh_start
 sudo_start
 free_disk
+fresh_start
 wait "$paths_pid"
 
 attempt || attempt_tested || fail
