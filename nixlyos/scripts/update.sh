@@ -84,7 +84,7 @@ stamp_matches() {
 check_remote() {
   stamp_matches || return 0
   spin_start "Ser etter oppdateringer"
-  remote_moved && { tick "Nye versjoner tilgjengelig"; return 0; }
+  newer_release && { tick "Nye versjoner tilgjengelig"; return 0; }
   spin_stop
   up_to_date
 }
@@ -286,11 +286,12 @@ needs_reboot() {
 started=${EPOCHREALTIME/[.,]/}
 header
 validate_config
+panel_adopt
 running=$(readlink -f /run/current-system)
 check_remote
 nix path-info -r "$running" > "$tmp/old.paths" &
 paths_pid=$!
-lock_newest
+if panel_managed; then lock_panel; else lock_newest; fi
 stamp_matches && up_to_date
 fresh_start
 sudo_start

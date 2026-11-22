@@ -1,0 +1,4 @@
+{
+  cpu = "amd";
+  gpus = [ "amd" ];
+}

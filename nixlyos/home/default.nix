@@ -1,34 +1,10 @@
-{ config, pkgs, inputs, lib, nixlyUser, hwData, ... }:
+{ config, pkgs, inputs, lib, nixlyUser, hwData, nixlySelection, ... }:
 
+let
+  catalog = import ../lib/catalog-pick.nix { inherit hwData nixlySelection; };
+in
 {
-
-    imports =
-      # No user/steam.nix: its wildcard CompatToolMapping at priority 250 broke
-      # the Steam Linux Runtime, and autoconfig.nix now owns all Steam config.
-      # Blender_bin_lts is an x86-only binary bundle; referencing it on an ARM
-      # SBC fails the eval.
-      lib.optional (hwData.platform.arch == "x86_64") ./blender_setup.nix
-      ++ [
-      # programs
-      ./git.nix
-      ./bash.nix
-      ./btop.nix
-      ./starship.nix
-      ./alacritty.nix
-      ./foot.nix
-      ./fuzzel.nix
-      ./nixly-theme.nix
-      ./nixlytile.nix
-      ./env.nix
-      ./gtk.nix
-      ./qt.nix
-      ./emulator_config.nix
-      ./audio_priority.nix
-      ./caveman.nix
-      ./claude.nix
-      ./meshy.nix
-      ./discord_rpc.nix
-    ];
+    imports = catalog.pick "home";
 
     home = {
     username = nixlyUser;

@@ -1,10 +1,11 @@
-# Failed packages keep last build.
-pinsFile:
+# Pin packages to cached store paths.
+pinsFiles:
 
 { lib, ... }:
 
 let
-  pins = if builtins.pathExists pinsFile then import pinsFile else { };
+  # Later files win.
+  pins = builtins.foldl' (merged: file: merged // (if builtins.pathExists file then import file else { })) { } pinsFiles;
 
   pin = prev: name: path:
     let
@@ -19,6 +20,6 @@ in
 {
   # After overlays.default's re-application.
   nixpkgs.overlays = lib.mkAfter [
-    (final: prev: builtins.mapAttrs (pin prev) pins)
+    (final: prev: builtins.mapAttrs (pin prev) (lib.filterAttrs (name: _: prev ? ${name}) pins))
   ];
 }

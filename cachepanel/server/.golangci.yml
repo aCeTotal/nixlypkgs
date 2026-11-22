@@ -1,0 +1,20 @@
+version: "2"
+linters:
+  enable:
+    - bodyclose
+    - errorlint
+    - gocritic
+    - gosec
+    - misspell
+    - nestif
+    - nilerr
+    - noctx
+    - unconvert
+    - unparam
+    - usestdlibvars
+  settings:
+    gosec:
+      excludes:
+        # Running nix is the job.
+        - G204
+        - G702

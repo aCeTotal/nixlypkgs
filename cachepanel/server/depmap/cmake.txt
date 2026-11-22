@@ -1,0 +1,54 @@
+# CMake find_package name, then nixpkgs attrs.
+Threads none
+PkgConfig pkg-config
+GTest none
+Doxygen none
+Git none
+OpenSSL openssl
+ZLIB zlib
+CURL curl
+Boost boost
+SDL2 SDL2
+SDL3 sdl3
+OpenGL libGL
+Vulkan vulkan-loader vulkan-headers
+X11 libx11
+Freetype freetype
+Fontconfig fontconfig
+PNG libpng
+JPEG libjpeg
+TIFF libtiff
+fmt fmt
+spdlog spdlog
+nlohmann_json nlohmann_json
+Python3 python3
+Python python3
+ECM kdePackages.extra-cmake-modules
+glfw3 glfw
+GLEW glew
+Eigen3 eigen
+OpenCV opencv
+LibArchive libarchive
+SQLite3 sqlite
+Lua lua
+Iconv none
+Intl none
+ALSA alsa-lib
+PulseAudio libpulseaudio
+Wayland wayland
+LibXml2 libxml2
+EXPAT expat
+BZip2 bzip2
+LibLZMA xz
+zstd zstd
+Protobuf protobuf
+gRPC grpc
+absl abseil-cpp
+yaml-cpp yaml-cpp
+Catch2 none
+Qt6 qt6.qtbase qt6.wrapQtAppsHook
+Qt5 libsForQt5.qtbase libsForQt5.wrapQtAppsHook
+Gettext gettext
+LibUSB libusb1
+udev systemdLibs
+Curses ncurses

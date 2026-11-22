@@ -16,9 +16,7 @@
       flake = false;
     };
 
-    # NixlyOS system inputs. This flake.lock is THE system pin: machines only
-    # ever run `nix flake update nixlypkgs`, so every rev below ships exactly
-    # as tested on the testing branch.
+    # This lock is the system pin.
     nixos-stable.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
     home-manager.url = "github:nix-community/home-manager/release-26.05";
@@ -34,8 +32,7 @@
       inputs.nixpkgs.follows = "nixos-stable";
     };
 
-    # NixlyOS gaming-kernel (CachyOS-saus + BORE + scx_lavd, generic + v3).
-    # `nix flake update nixlyos-kernel` etter push til kernel-repoet.
+    # NixlyOS gaming kernel.
     nixlyos-kernel.url = "github:aCeTotal/kernel_nixlyos";
   };
 
@@ -47,37 +44,42 @@
         inherit system;
         overlays = [ self.overlays.default ];
       };
+
+      # Mirrors mk-system's instance for cache hits.
+      stableFor = system: import inputs.nixos-stable {
+        inherit system;
+        config = import ./nixlyos/lib/pkgs-config.nix;
+        overlays = [
+          self.overlays.default
+          (import ./nixlyos/pkgs/brave/overlay.nix)
+        ];
+      };
     in {
       lib = nixpkgs.lib // {
         mkNixlySystem = import ./nixlyos/lib/mk-system.nix { inherit self inputs; };
         mkNixlyServer = import ./nixlyserver/mk-server.nix { inherit self inputs; };
+        nixlyos = import ./nixlyos/lib/registry.nix { inherit (nixpkgs) lib; } // {
+          # Package set the panel builds against.
+          pkgs = stableFor;
+          # nixpkgs below it, without nixlypkgs.
+          nixpkgs = system: inputs.nixos-stable.legacyPackages.${system};
+          # Single-output package-set attrs only.
+          pinnable = system:
+            let stable = stableFor system; in
+            builtins.filter (name: stable ? ${name} && (stable.${name}.outputs or [ "out" ]) == [ "out" ])
+              (builtins.attrNames self.packages.${system});
+        };
       };
 
       overlays.default = import ./overlays/default.nix inputs;
 
       legacyPackages = forAllSystems mkPkgs;
 
-      # The nixlycaching watcher on the cache server builds every attr in
-      # packages.x86_64-linux on each main commit; whatever is listed here is
-      # what machines get from cache.aceclan.no instead of building locally.
+      # The panel caches every attr.
       packages = forAllSystems (system:
         let
-          # Machines build everything through mk-system's nixos-stable
-          # instance. Cache entries only help if they are those exact
-          # derivations, so this mirrors that instance (same nixpkgs,
-          # config and overlays) - built from unstable legacyPackages the
-          # store paths would never match a machine eval.
-          stable = import inputs.nixos-stable {
-            inherit system;
-            config = import ./nixlyos/lib/pkgs-config.nix;
-            overlays = [
-              self.overlays.default
-              (import ./nixlyos/pkgs/brave/overlay.nix)
-            ];
-          };
-          # Every out-of-tree module machines compile against a nixlyos
-          # kernel (nvidia's `.mod` is what boot.extraModulePackages builds;
-          # the rest come from apps/gaming.nix and hardware/msi-ec.nix).
+          stable = stableFor system;
+          # Out-of-tree modules per nixlyos kernel.
           kernelModules = suffix: kp:
             nixpkgs.lib.mapAttrs'
               (name: nixpkgs.lib.nameValuePair "${name}-nixlyos${suffix}")
@@ -97,10 +99,7 @@
             inherit system inputs;
           };
 
-          # The kernels are multi-output and the watcher only pushes an
-          # attr's default output: without these attrs the machines get
-          # `out` from cache but 404 on `modules`/`dev`, and nix then
-          # realises the whole kernel drv locally anyway.
+          # Kernel outputs besides out.
           linux-nixlyos-modules = stable.linux-nixlyos.modules;
           linux-nixlyos-dev = stable.linux-nixlyos.dev;
           linux-nixlyos-v3-modules = stable.linux-nixlyos-v3.modules;
@@ -109,19 +108,21 @@
           linux-nixlyserver-modules = stable.linux-nixlyserver.modules;
           linux-nixlyserver-dev = stable.linux-nixlyserver.dev;
 
-          # Kernel-independent nvidia userspace parts (unfree, so never on
-          # cache.nixos.org): the driver itself and persistenced.
+          # Unfree, never on cache.nixos.org.
           nvidia-nixlyos = stable.linuxPackages_nixlyos.nvidiaPackages.latest;
           nvidia-nixlyos-persistenced = stable.linuxPackages_nixlyos.nvidiaPackages.latest.persistenced;
-          # Previous driver stays cached as a fallback if latest misbehaves.
+          # Cached fallback driver.
           nvidia-nixlyos-previous = stable.linuxPackages_nixlyos.nvidiaPackages.previous;
           nvidia-nixlyos-previous-persistenced = stable.linuxPackages_nixlyos.nvidiaPackages.previous.persistenced;
+
+          cachepanel = stable.callPackage ./cachepanel/nix/package.nix { };
 
           dwl = stable.nixlytile;
           default = stable.nixlytile;
         }
         // kernelModules "" stable.linuxPackages_nixlyos
-        // kernelModules "-v3" stable.linuxPackages_nixlyos_v3);
+        // kernelModules "-v3" stable.linuxPackages_nixlyos_v3
+        // nixpkgs.lib.genAttrs (import ./pkgs/recipes.nix) (name: stable.${name}));
 
       nixosModules = {
         nixlypkgs = { ... }: {
@@ -131,6 +132,10 @@
         nixly_lockscreen = import ./modules/nixly_lockscreen.nix;
         citrix-workspace = import ./modules/citrix-workspace.nix;
         codeindexcache = import ./modules/codeindexcache.nix inputs;
+        cachepanel = { lib, pkgs, ... }: {
+          imports = [ ./cachepanel/nix/module.nix ];
+          services.nixly-cachepanel.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.cachepanel;
+        };
       };
 
       homeManagerModules = {

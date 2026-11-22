@@ -1,55 +1,53 @@
 #!/usr/bin/env bash
-# Background staging: eval, download and build the NEXT system generation
-# while the machine is idle, kept alive by a GC root. nixlyos-update then
-# finds the finished build and only has to activate it — seconds, not minutes.
-# Runs from a systemd timer; safe to run manually as `nixlyos-stage`.
+# Prebuilds the next generation while idle.
 set -euo pipefail
 
 FLAKE="${NIXLYOS_DIR:-$HOME/.local/nixlyos}"
 STAGE="${XDG_STATE_HOME:-$HOME/.local/state}/nixlyos/stage"
 [[ -f "$FLAKE/flake.nix" ]] || exit 0
 
-# Stay invisible: never compete with an interactive session under load, and
-# never burn battery. No online files at all means desktop — proceed.
-read -r load _ < /proc/loadavg
-cores=$(nproc)
-awk -v l="$load" -v c="$cores" 'BEGIN { exit !(l > c / 2) }' && exit 0
-ac_files=0 ac_online=0
-for f in /sys/class/power_supply/*/online; do
-  [[ -r $f ]] || continue
-  ac_files=1
-  read -r v < "$f"; [[ $v == 1 ]] && ac_online=1
-done
-(( ac_files == 1 && ac_online == 0 )) && exit 0
+# Desktops have no online files.
+idle() {
+  local load f v ac_files=0 ac_online=0
+  read -r load _ < /proc/loadavg
+  awk -v l="$load" -v c="$(nproc)" 'BEGIN { exit !(l > c / 2) }' && return 1
+  for f in /sys/class/power_supply/*/online; do
+    [[ -r $f ]] || continue
+    ac_files=1
+    read -r v < "$f"; [[ $v == 1 ]] && ac_online=1
+  done
+  (( ac_files == 0 || ac_online == 1 ))
+}
 
-# Exact copy of the flake files, nothing else: identical content means an
-# identical flake fingerprint, so the update-time eval hits the cache too.
+idle || exit 0
+
+# Identical files hit the eval cache.
 mkdir -p "$STAGE"
 rm -rf "$STAGE/flake"
 mkdir -p "$STAGE/flake"
 cp "$FLAKE/flake.nix" "$FLAKE/local.nix" "$STAGE/flake/"
 cp -r "$FLAKE/hardware" "$STAGE/flake/hardware"
-# flake.nix references ./custom/modules.nix on current machines; absent on
-# machines installed before the custom/ extension point existed.
+# Older installs lack custom/.
 if [[ -d "$FLAKE/custom" ]]; then cp -r "$FLAKE/custom" "$STAGE/flake/custom"; fi
 
-# Same locking as nixlyos-update, or the staged key never matches.
-(cd "$STAGE/flake" && nix flake lock &&
- nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager) >/dev/null 2>&1 || exit 0
+# Same locking as nixlyos-update.
+if [[ -f "$FLAKE/profile" ]]; then
+  { nixlyos-panel pin "$STAGE/flake" && (cd "$STAGE/flake" && nix flake lock); } >/dev/null 2>&1 || exit 0
+else
+  (cd "$STAGE/flake" && nix flake lock &&
+   nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager) >/dev/null 2>&1 || exit 0
+fi
 
-# Pre-sized Boehm heap: the eval allocates gigabytes; starting big avoids
-# hundreds of GC cycles and cuts eval time by a third or more.
+# Big heap, fewer GC cycles.
 export GC_INITIAL_HEAP_SIZE=2G
 
-# Same file list and order as tree_key in update.sh.
+# Same file list as update.sh's tree_key.
 key=$(cat "$STAGE/flake"/flake.nix "$STAGE/flake"/flake.lock "$STAGE/flake"/local.nix "$STAGE/flake"/pins.nix "$STAGE/flake"/custom/* "$STAGE/flake"/hardware/* 2>/dev/null | sha1sum | cut -d' ' -f1)
 if [[ -f "$STAGE/key" && "$(<"$STAGE/key")" == "$key" && -e "$STAGE/result" ]]; then
   exit 0
 fi
 
-# The out-link is the GC root that keeps the staged system alive until it is
-# either activated or replaced by the next staging round. Gentle resource use:
-# the unit runs at idle priority; substitution stays at nix defaults.
+# The out-link is the GC root.
 nix build --keep-going --out-link "$STAGE/result" \
   --option extra-substituters https://cache.aceclan.no \
   --option extra-trusted-public-keys cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak= \

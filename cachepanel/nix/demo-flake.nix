@@ -1,0 +1,53 @@
+# Demo nixlypkgs for tests.
+{
+  outputs = { self }:
+    let
+      system = "x86_64-linux";
+      # Dev stacks may lend packages.
+      packageSet = builtins.getFlake (builtins.getEnv "CACHEPANEL_DEMO_PACKAGES");
+      revision = builtins.readFile ./revision;
+      demo = name: steps: derivation {
+        inherit name system;
+        builder = "/bin/sh";
+        args = [ "-c" ''
+          echo "building ${name} at revision ${revision}"
+          i=0
+          while [ $i -lt ${toString steps} ]; do
+            echo "step $i of ${toString steps}"
+            j=0
+            while [ $j -lt 100000 ]; do j=$((j + 1)); done
+            i=$((i + 1))
+          done
+          echo ${revision} > $out
+        '' ];
+      };
+    in
+    {
+      packages.${system} = {
+        hello-demo = demo "hello-demo" 3;
+        clock-demo = demo "clock-demo" 8;
+        steady-demo = derivation {
+          name = "steady-demo";
+          inherit system;
+          builder = "/bin/sh";
+          args = [ "-c" "echo steady > $out" ];
+        };
+      };
+
+      lib.nixlyos = {
+        categories = [
+          { name = "system"; title = "System"; }
+          { name = "apps"; title = "Programmer"; }
+          { name = "hardware"; title = "Maskinvare"; }
+        ];
+        modules = [
+          { name = "mode"; title = "Systemmodus"; category = "system"; profiles = [ "desktop" "htpc" ]; path = "modules/demo.nix"; x86 = false; required = true; automatic = false; }
+          { name = "demo-app"; title = "Demoprogram"; category = "apps"; profiles = [ "desktop" ]; path = "modules/demo.nix"; x86 = false; required = false; automatic = false; }
+          { name = "gpu/demo"; title = "gpu: demo"; category = "hardware"; profiles = [ ]; path = "modules/demo.nix"; x86 = false; required = false; automatic = true; }
+        ];
+        pinnable = _: [ "hello-demo" "clock-demo" ];
+        pkgs = system: packageSet.lib.nixlyos.pkgs system;
+        nixpkgs = system: packageSet.lib.nixlyos.nixpkgs system;
+      };
+    };
+}

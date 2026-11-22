@@ -1,14 +1,10 @@
-# Background staging of the next system generation — the piece stock NixOS
-# lacks: updates are downloaded and built silently while the machine is idle,
-# so nixlyos-update usually only has to activate. The staged build sits behind
-# a GC root in ~/.local/state/nixlyos/stage and is verified by content key
-# before use, never trusted blindly.
-{ pkgs, lib, nixlyUser, ... }:
+# Stages the next generation while idle.
+{ pkgs, nixlyUser, ... }:
 
 let
   stage = pkgs.writeShellApplication {
     name = "nixlyos-stage";
-    runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.gawk ];
+    runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.gawk (import ../lib/panel-cli.nix { inherit pkgs; }) ];
     text = builtins.readFile ../scripts/stage.sh;
   };
 in
@@ -23,7 +19,7 @@ in
       Type = "oneshot";
       User = nixlyUser;
       ExecStart = "${stage}/bin/nixlyos-stage";
-      # Invisible to the session: idle CPU/IO scheduling, lowest niceness.
+      # Invisible to the session.
       Nice = 19;
       CPUSchedulingPolicy = "idle";
       IOSchedulingClass = "idle";

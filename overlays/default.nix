@@ -36,6 +36,7 @@ in {
   nixly_pdf = callPackage ../pkgs/nixly_pdf { };
   proton-nixlyos = callPackage ../pkgs/proton-nixlyos { };
   proton-nixlyos-generic = callPackage ../pkgs/proton-nixlyos { variant = "generic"; };
+  buildArchPackage = callPackage ../pkgs/build-arch-package { };
   determinate-nix = (inputs.determinate-nix.overlays.internal final prev).nixComponents2.nix-cli;
 
   linux-nixlyos = (import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; }).generic;
@@ -45,7 +46,7 @@ in {
   linux-nixlyserver = import ../pkgs/linux-nixlyserver { inherit (final) lib linux; };
   linuxPackages_nixlyserver = final.linuxPackagesFor final.linux-nixlyserver;
 
-  # bluez 5.86 drops BLE HID setup on ATT 0x0E; patch retries the read.
+  # bluez 5.86 BLE HID fix: retry reads.
   bluez-nixly = prev.bluez.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [ ../pkgs/bluez/hog-retry.patch ];
   });
@@ -59,3 +60,7 @@ in {
     '';
   });
 }
+// builtins.listToAttrs (map (name: {
+  inherit name;
+  value = callPackage ../pkgs/${name} { };
+}) (import ../pkgs/recipes.nix))

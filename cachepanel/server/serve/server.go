@@ -1,0 +1,117 @@
+package serve
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"path/filepath"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/sync/errgroup"
+
+	"cachepanel/auth"
+	"cachepanel/builds"
+	"cachepanel/config"
+	"cachepanel/database"
+	"cachepanel/profiles"
+	"cachepanel/realtime"
+	"cachepanel/release"
+	"cachepanel/repo"
+	"cachepanel/watcher"
+	"cachepanel/wizard"
+)
+
+var errNoCommit = errors.New("panelet har ikke evaluert noen commit ennå")
+
+const (
+	readHeaderTimeout = 10 * time.Second
+	idleTimeout       = 2 * time.Minute
+	shutdownTimeout   = 15 * time.Second
+)
+
+// Run serves until ctx ends.
+func Run(ctx context.Context, cfg config.Config) error {
+	db, err := database.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if err := database.Migrate(ctx, db); err != nil {
+		return fmt.Errorf("migrate: %w", err)
+	}
+	if err := auth.EnsureAdmin(ctx, db, cfg.AdminUser, cfg.AdminHash); err != nil {
+		return err
+	}
+	mirror, err := repo.Open(ctx, filepath.Join(cfg.StateDir, "nixlypkgs.git"), cfg.Repository, cfg.Branch)
+	if err != nil {
+		return err
+	}
+	hub := realtime.NewHub()
+	releases := release.New(db, mirror)
+	rebuilder := profiles.NewRebuilder(db, hub, mirror, filepath.Join(cfg.StateDir, "checks"), releases.Trigger)
+	files := builds.NewFiles(cfg.StateDir)
+	pool := builds.NewPool(db, hub, files, rebuilder.Trigger)
+	follow := watcher.New(db, hub, mirror, pool, files, rebuilder.Trigger)
+	lab := &wizard.Lab{Flake: headFlake(db, mirror), Uploads: wizard.NewUploads(filepath.Join(cfg.StateDir, "sources"), cfg.PublicURL)}
+	publisher := &wizard.Publisher{Mirror: mirror, Remote: cfg.PublishRemote, Key: cfg.PublishKey, Branch: cfg.Branch,
+		KnownHosts: filepath.Join(cfg.StateDir, "known_hosts")}
+	recipes := wizard.NewService(ctx, db, hub, lab, publisher, filepath.Join(cfg.StateDir, "recipes"), follow.Poke)
+	if err := recipes.Recover(ctx); err != nil {
+		return err
+	}
+	panel := &app{
+		cfg: cfg, db: db, hub: hub, auth: auth.NewService(db), mirror: mirror, releases: releases, rebuilder: rebuilder,
+		pool: pool, watcher: follow, recipes: recipes, uploads: lab.Uploads,
+	}
+
+	group, ctx := errgroup.WithContext(ctx)
+	group.Go(func() error { panel.auth.Run(ctx); return nil })
+	group.Go(func() error { return releases.Run(ctx) })
+	group.Go(func() error {
+		return lead(ctx, db, func(ctx context.Context) error {
+			workers, ctx := errgroup.WithContext(ctx)
+			workers.Go(func() error { return pool.Run(ctx) })
+			workers.Go(func() error { return follow.Run(ctx) })
+			workers.Go(func() error { return rebuilder.Run(ctx) })
+			return workers.Wait()
+		})
+	})
+	group.Go(func() error { return listen(ctx, cfg.HTTPAddr, panel.routes()) })
+	return group.Wait()
+}
+
+func listen(ctx context.Context, addr string, handler http.Handler) error {
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: readHeaderTimeout,
+		IdleTimeout:       idleTimeout,
+		BaseContext:       func(net.Listener) context.Context { return ctx },
+	}
+	stop := context.AfterFunc(ctx, func() {
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx)
+	})
+	defer stop()
+	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		return fmt.Errorf("listen on %s: %w", addr, err)
+	}
+	return nil
+}
+
+// headFlake picks the newest evaluated commit.
+func headFlake(db *pgxpool.Pool, mirror *repo.Mirror) func(context.Context) (string, error) {
+	return func(ctx context.Context) (string, error) {
+		var sha string
+		err := db.QueryRow(ctx, `SELECT sha FROM commits WHERE eval_state = 'done' ORDER BY position DESC LIMIT 1`).Scan(&sha)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", errNoCommit
+		}
+		return mirror.FlakeRef(sha), err
+	}
+}

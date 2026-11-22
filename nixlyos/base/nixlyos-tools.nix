@@ -7,7 +7,7 @@ let
   detectHw = pkgs.writeShellApplication {
     name = "nixlyos-detect-hw";
     runtimeInputs = [ pkgs.coreutils ];
-    # The detection logic reads /sys directly and has no other dependencies.
+    # Reads /sys only.
     text = ''
       export REGISTER=${scripts + "/laptop-register"}
       ${builtins.readFile (scripts + "/detect-hw.sh")}
@@ -23,9 +23,11 @@ let
     '';
   };
 
+  panel = import ../lib/panel-cli.nix { inherit pkgs; };
+
   update = pkgs.writeShellApplication {
     name = "nixlyos-update";
-    runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.gnugrep pkgs.gnused pkgs.gawk pkgs.jq pkgs.git ];
+    runtimeInputs = [ pkgs.coreutils pkgs.nix pkgs.gnugrep pkgs.gnused pkgs.gawk pkgs.jq pkgs.git panel ];
     # Setuid sudo from the system.
     text = ''
       export PATH=/run/wrappers/bin:$PATH
@@ -35,6 +37,7 @@ let
       ${builtins.readFile (scripts + "/update-ui.sh")}
       ${builtins.readFile (scripts + "/update-progress.sh")}
       ${builtins.readFile (scripts + "/update-changes.sh")}
+      ${builtins.readFile (scripts + "/update-panel.sh")}
       ${builtins.readFile (scripts + "/update.sh")}
     '';
   };

@@ -11,7 +11,7 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
     description = "NixlyOS nightly update + reboot (HTPC)";
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
-    path = with pkgs; [ coreutils util-linux nix systemd ];
+    path = with pkgs; [ coreutils util-linux nix systemd (import ../lib/panel-cli.nix { inherit pkgs; }) ];
     serviceConfig.Type = "oneshot";
     script = ''
       set -u
@@ -32,9 +32,9 @@ lib.mkIf (config.nixlyos.mode == "htpc") {
       [ "$sys" = "$cur" ] && [ "$sys" = "$booted" ] && exit 0
 
       if [ "$sys" != "$cur" ]; then
-        # Adopt the staged lock so nixlyos-update's tree_key/stamp logic
-        # agrees with what is now running.
+        # Keeps nixlyos-update's stamp valid.
         if [ -f "$stage/flake/flake.lock" ]; then
+          if [ -f "$flake/profile" ]; then runuser -u ${nixlyUser} -- nixlyos-panel pin || true; fi
           runuser -u ${nixlyUser} -- cp "$stage/flake/flake.lock" "$flake/flake.lock" || true
           rm -f "$flake/pins.nix"
         fi

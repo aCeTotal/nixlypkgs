@@ -48,6 +48,7 @@ Options:
   --disk                   Device to install to (e.g., /dev/nvme0n1 or /dev/sda)
   --hostname               Hostname to set (default: nixlyos)
   --user                   Target user owning ~/.local/nixlyos (default: total)
+  --profile                Profile from the Nixly panel (default: asked)
   --luks-passphrase        LUKS passphrase (non-interactive)
   --luks-passphrase-file   File containing LUKS passphrase
   --luks-passphrase-stdin  Read LUKS passphrase from stdin (non-interactive; safe from argv)
@@ -68,6 +69,7 @@ LUKS_PASSPHRASE_FILE=""
 LUKS_PASSPHRASE_STDIN=0
 NO_PROMPT=0
 NIXLY_USER="total"
+PROFILE=""
 # Room for three kernels.
 ESP_SIZE="1G"
 
@@ -78,6 +80,7 @@ while [[ $# -gt 0 ]]; do
     --disk) DISK=${2:-}; shift 2;;
     --hostname) HOSTNAME=${2:-}; shift 2;;
     --user) NIXLY_USER=${2:-}; shift 2;;
+    --profile) PROFILE=${2:-}; shift 2;;
     --luks-passphrase) LUKS_PASSPHRASE=${2:-}; shift 2;;
     --luks-passphrase-file) LUKS_PASSPHRASE_FILE=${2:-}; shift 2;;
     --luks-passphrase-stdin) LUKS_PASSPHRASE_STDIN=1; shift 1;;
@@ -116,6 +119,15 @@ if [[ "$SETUP_MODE" -eq 1 ]]; then
   log "Secure Boot er i Setup Mode – klar for nøkkelregistrering"
 else
   die "Secure Boot er ikke i Setup Mode. Gå inn i BIOS/UEFI og sett Secure Boot til Setup Mode før du kjører dette scriptet."
+fi
+
+SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+# The Nixly panel holds the profiles.
+source "$SELF_DIR/scripts/install-panel.sh"
+
+if [[ -z "$PROFILE" ]]; then
+  PROFILE=$(choose_profile) || log "Nixly-panelet svarer ikke – installerer uten profil"
 fi
 
 # Auto-pick a disk if not provided: prefer NVMe/SSD, size >= 32G, non-removable.
@@ -231,25 +243,22 @@ nixos-generate-config --root /mnt
 
 HWC=/mnt/etc/nixos/hardware-configuration.nix
 
-# The machine-local state: a tiny flake in ~/.local/nixlyos pointing at
-# nixlypkgs (main), plus the hardware data. Everything else comes
-# from nixlypkgs.
-SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# Machine state lives here.
 NIXLY_DIR="/mnt/home/$NIXLY_USER/.local/nixlyos"
 
-log "Writing machine flake to $NIXLY_DIR"
+log "Writing machine state to $NIXLY_DIR"
 mkdir -p "$NIXLY_DIR/hardware"
 cp "$HWC" "$NIXLY_DIR/hardware/hardware-configuration.nix"
 
 STATE_VERSION=$(grep -oP 'system\.stateVersion = "\K[0-9]{2}\.[0-9]{2}' /mnt/etc/nixos/configuration.nix || echo "26.05")
 
-cat > "$NIXLY_DIR/flake.nix" <<FLAKE
+# Offline fallback: nixlypkgs main.
+legacy_flake() {
+  cat > "$NIXLY_DIR/flake.nix" <<FLAKE
 {
   description = "NixlyOS machine";
 
   inputs = {
-    # Everything lives in nixlypkgs (main); its flake.lock decides every
-    # input revision this machine runs.
     nixlypkgs.url = "github:aCeTotal/nixlypkgs";
     # BEGIN USER INPUTS (generated from custom/inputs.nix — edit that instead)
     # END USER INPUTS
@@ -268,10 +277,9 @@ cat > "$NIXLY_DIR/flake.nix" <<FLAKE
   };
 }
 FLAKE
+}
 
-# Seed the custom/ extension point; nixlyos-user-config keeps it in sync
-# post-install, but the flake references custom/modules.nix already at
-# install-time eval.
+# Flake reads custom/ at install.
 mkdir -p "$NIXLY_DIR/custom"
 
 cat > "$NIXLY_DIR/custom/inputs.nix" <<'CUSTOM'
@@ -315,6 +323,13 @@ LOCAL
 
 log "Detecting CPU/GPU and writing hardware data"
 REGISTER="$SELF_DIR/scripts/laptop-register" bash "$SELF_DIR/scripts/detect-hw.sh" "$NIXLY_DIR/hardware"
+
+if [[ -n "$PROFILE" ]] && panel flake "$HOSTNAME" "$NIXLY_USER" "$STATE_VERSION" "$PROFILE"; then
+  log "Profil $PROFILE fra Nixly-panelet"
+else
+  log "Skriver flake uten profil"
+  legacy_flake
+fi
 
 # The default user is uid 1000; nixos-install runs before the user exists.
 chown -R 1000:100 "/mnt/home/$NIXLY_USER"
