@@ -21,7 +21,7 @@ mkdir -p "$STATE"
 tmp=$(mktemp -d -t nixlyos.XXXXXX)
 keepalive=""
 eval_pid=""
-trap 'spin_stop; [ -n "$keepalive" ] && kill -- -"$keepalive" 2>/dev/null; [ -z "$eval_pid" ] || kill "$eval_pid" 2>/dev/null || :; (( tty )) && printf "\033[?25h\033[?7h\n" >&2; rm -rf "$tmp"' EXIT
+trap 'spin_stop; [ -z "$keepalive" ] || kill "$keepalive" 2>/dev/null || :; [ -z "$eval_pid" ] || kill "$eval_pid" 2>/dev/null || :; (( tty )) && printf "\033[?25h\033[?7h\n" >&2; rm -rf "$tmp"' EXIT
 
 # Same file list as stage.sh.
 tree_key() {
@@ -103,12 +103,12 @@ ask_password() {
   exit 1
 }
 
-# Password once, kept warm through long builds.
+# Password once, warm per tty.
 sudo_start() {
   if ! sudo -n true 2>/dev/null; then
     if (( tty )); then ask_password; else sudo -v; fi
   fi
-  setsid bash -c 'while sudo -n true; do sleep 50; done' </dev/null >/dev/null 2>&1 &
+  ( while sudo -n -v 2>/dev/null; do nap 50; done ) </dev/null >/dev/null 2>&1 &
   keepalive=$!
 }
 
@@ -237,9 +237,18 @@ attempt() {
   pin_failed && eval_start && build_sys
 }
 
-# Retry on tested stable/HM.
+# YYYYMMDD of $1's nixos-stable.
+stable_day() {
+  jq -r '.nodes as $n | $n[$n[$n.root.inputs.nixlypkgs].inputs["nixos-stable"]].locked.lastModified
+    | strftime("%Y%m%d")' "$1"
+}
+
+# Tested stable/HM, never a downgrade.
 attempt_tested() {
+  local day
   cmp -s "$tmp/tested.lock" "$FLAKE/flake.lock" && return 1
+  IFS=. read -r _ _ day _ < "$running/nixos-version"
+  (( $(stable_day "$tmp/tested.lock") >= day )) || return 1
   cp "$tmp/tested.lock" "$FLAKE/flake.lock"
   warn "Nyeste nixos-stable/home-manager feilet, prøver testet versjon"
   fresh_start
