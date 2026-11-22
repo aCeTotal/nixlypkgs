@@ -18,6 +18,7 @@ usage: nixlyos-panel <command>
   flake <host> <user> <stateVersion> <profile>
                             write a panel-managed flake.nix
   pin [dir]                 lock flake.nix to the profile's release
+  use <profile>             follow another profile from the next update
   moved                     exit 0 when a newer release exists
   adopt                     move a pre-panel machine under the panel
 USAGE
@@ -105,6 +106,13 @@ cmd_moved() {
     ! grep -qF "$(jq -r .path <<< "$pointer")\"" "$FLAKE/flake.nix"
 }
 
+cmd_use() {
+  local name=${1:?profile}
+  [[ $name =~ $NAME_PATTERN ]] || die "invalid profile name: $name"
+  release "$name" > /dev/null || die "no published profile: $name"
+  echo "$name" > "$PROFILE_FILE"
+}
+
 # Picks the profile today's setup matches.
 cmd_adopt() {
   [[ -f $PROFILE_FILE ]] && return 0
@@ -125,6 +133,7 @@ case $command in
   profiles) cmd_profiles ;;
   flake) cmd_flake "$@" ;;
   pin) cmd_pin "$@" ;;
+  use) cmd_use "$@" ;;
   moved) cmd_moved ;;
   adopt) cmd_adopt ;;
   *) usage ;;

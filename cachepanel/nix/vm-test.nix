@@ -43,6 +43,7 @@ in
   };
 
   testScript = ''
+    import base64
     import json
 
     panel = "http://127.0.0.1:8686"
@@ -104,29 +105,49 @@ in
         kept = [v["id"] for v in packages()["hello-demo"]["versions"]]
         assert pinned in kept and len(kept) == 4, kept
 
-    with subtest("the module registry is sorted into categories"):
-        catalog = get("/catalog")
-        assert [c["name"] for c in catalog["categories"]] == ["system", "apps", "hardware"], catalog
-        modules = {m["name"]: m for m in catalog["modules"]}
-        assert modules["mode"]["required"] and modules["gpu/demo"]["automatic"], modules
+    with subtest("every module lives in the database, in import order"):
+        modules = get("/modules")
+        assert [m["slug"] for m in modules] == ["system", "security", "network", "session", "audio", "user",
+                                                "gaming", "apps", "desktop", "htpc", "hardware"], modules
+        assert {m["slug"] for m in modules if m["required"]} == {"system", "security", "network", "session", "audio", "user", "hardware"}
+        problem = json.loads(send("/modules/validate", json.dumps({"source": "{ a = ; }"})))
+        assert problem["line"] == 1 and problem["column"] == 7, problem
 
     with subtest("profiles are seeded, checked and published"):
         retry(lambda _: any(p["name"] == "desktop" and p["publishedTree"] for p in get("/profiles")), timeout_seconds=300)
         assert {p["name"] for p in get("/profiles")} == {"desktop", "laptop", "htpc"}
         desktop = get("/profiles/desktop")
         paths = [f["path"] for f in desktop["files"]]
-        assert "default.nix" in paths and "pins.nix" in paths and "profile.json" in paths, paths
+        assert "default.nix" in paths and "pins.nix" in paths and "modules/desktop.nix" in paths, paths
+        assert "modules/htpc.nix" not in paths, paths
         pins = next(f["content"] for f in desktop["files"] if f["path"] == "pins.nix")
         assert "hello-demo" in pins, pins
-        chosen = json.loads(next(f["content"] for f in desktop["files"] if f["path"] == "profile.json"))["modules"]
-        assert chosen == ["mode", "demo-app"], chosen
+        imports = next(f["content"] for f in desktop["files"] if f["path"] == "default.nix")
+        assert imports.index("./modules/system.nix") < imports.index("./modules/hardware.nix"), imports
+        htpc = [f["path"] for f in get("/profiles/htpc")["files"]]
+        assert "modules/htpc.nix" in htpc and "modules/desktop.nix" not in htpc, htpc
+
+    with subtest("editing a module keeps revisions and republishes its profiles"):
+        apps = next(m for m in get("/modules") if m["slug"] == "apps")
+        module = get(f"/modules/{apps['id']}")
+        before = next(p for p in get("/profiles") if p["name"] == "desktop")["publishedTree"]
+        body = json.dumps({"slug": "apps", "title": module["title"], "description": module["description"],
+                           "source": module["source"] + "# edited\n", "required": False})
+        server.succeed(f"echo {base64.b64encode(body.encode()).decode()} | base64 -d > /tmp/edit.json")
+        server.succeed(
+            f"curl -fsS -b /tmp/jar -X PUT -H 'X-Cachepanel-CSRF: {csrf}' "
+            f"-H 'Content-Type: application/json' -d @/tmp/edit.json {panel}/api/modules/{apps['id']}")
+        assert get(f"/modules/{apps['id']}")["revision"] == 2
+        retry(lambda _: next(p for p in get("/profiles") if p["name"] == "desktop")["publishedTree"] not in (None, before), timeout_seconds=300)
+        files = get("/profiles/desktop")["files"]
+        assert next(f["content"] for f in files if f["path"] == "modules/apps.nix").endswith("# edited\n")
 
     with subtest("machines read pointers with ETag and immutable trees"):
         server.succeed(f"curl -fsS -D /tmp/headers -o /tmp/pointer {panel}/api/v1/profiles/desktop")
         etag = server.succeed("grep -i '^etag:' /tmp/headers | cut -d' ' -f2 | tr -d '\\r'").strip()
         assert status(f"-H 'If-None-Match: {etag}' {panel}/api/v1/profiles/desktop") == "304"
         pointer = json.loads(server.succeed("cat /tmp/pointer"))
-        server.succeed(f"curl -fsS {panel}{pointer['path']} | tar -tz | grep -q tree/default.nix")
+        server.succeed(f"curl -fsS {panel}{pointer['path']} | tar -tz tree/default.nix")
 
     with subtest("uploaded sources are served to machines and analysed"):
         server.succeed("head -c 4096 /dev/urandom > /tmp/blob.bin")

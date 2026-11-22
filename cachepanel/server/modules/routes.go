@@ -11,7 +11,6 @@ import (
 
 	"cachepanel/database"
 	"cachepanel/realtime"
-	"cachepanel/repo"
 	"cachepanel/rest"
 )
 
@@ -19,18 +18,18 @@ var (
 	slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 	errSlug     = rest.Unprocessable("invalid_slug", "Filnavnet kan bare ha små bokstaver, tall og bindestrek")
 	errTitle    = rest.Unprocessable("invalid_title", "Tittel må ha 1–120 tegn")
+	errRequired = rest.Conflict("required", "Påkrevde moduler kan ikke slettes")
 )
 
-// Modules are panel-owned NixOS modules.
+// Modules are the NixOS modules profiles import.
 type Modules struct {
 	db      *pgxpool.Pool
 	hub     *realtime.Hub
-	mirror  *repo.Mirror
 	changed func()
 }
 
-func New(db *pgxpool.Pool, hub *realtime.Hub, mirror *repo.Mirror, changed func()) *Modules {
-	return &Modules{db: db, hub: hub, mirror: mirror, changed: changed}
+func New(db *pgxpool.Pool, hub *realtime.Hub, changed func()) *Modules {
+	return &Modules{db: db, hub: hub, changed: changed}
 }
 
 func (m *Modules) Mount(r chi.Router) {
@@ -41,18 +40,21 @@ func (m *Modules) Mount(r chi.Router) {
 	r.Put("/modules/{id}", rest.Handle(m.update))
 	r.Delete("/modules/{id}", rest.Handle(m.remove))
 	r.Get("/modules/{id}/revisions/{revision}", rest.Handle(m.revision))
-	r.Get("/catalog", rest.Handle(m.catalog))
-	r.Get("/catalog/{name}/source", rest.Handle(m.catalogSource))
 }
 
-const usedBy = `coalesce((SELECT json_agg(t.name ORDER BY t.name) FROM profile_modules tm JOIN profiles t ON t.id = tm.profile_id
-	WHERE tm.module_id = m.id), '[]')`
+// Required modules belong to every profile.
+const usedBy = `coalesce((SELECT json_agg(json_build_object('name', p.name, 'title', p.title, 'checkState', p.check_state)
+	ORDER BY p.id) FROM profiles p
+	WHERE m.required OR EXISTS (SELECT 1 FROM profile_modules pm WHERE pm.profile_id = p.id AND pm.module_id = m.id)), '[]')`
+
+const fields = `'id', m.id, 'slug', m.slug, 'title', m.title, 'description', m.description, 'required', m.required,
+	'position', m.position, 'revision', m.revision, 'updatedAt', m.updated_at, 'usedBy', ` + usedBy
 
 func (m *Modules) list(w http.ResponseWriter, r *http.Request) error {
 	body, err := database.JSON(r.Context(), m.db, `
-		SELECT coalesce(json_agg(json_build_object('id', m.id, 'slug', m.slug, 'title', m.title, 'description', m.description,
-			'revision', m.revision, 'updatedAt', m.updated_at, 'lines', array_length(string_to_array(m.source, E'\n'), 1),
-			'usedBy', `+usedBy+`) ORDER BY m.slug), '[]') FROM modules m`)
+		SELECT coalesce(json_agg(json_build_object(`+fields+`,
+			'lines', array_length(string_to_array(m.source, E'\n'), 1)) ORDER BY m.position), '[]')
+		FROM modules m`)
 	if err != nil {
 		return err
 	}
@@ -65,8 +67,7 @@ func (m *Modules) get(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	body, err := database.JSON(r.Context(), m.db, `
-		SELECT json_build_object('id', m.id, 'slug', m.slug, 'title', m.title, 'description', m.description,
-			'source', m.source, 'revision', m.revision, 'updatedAt', m.updated_at, 'usedBy', `+usedBy+`,
+		SELECT json_build_object(`+fields+`, 'source', m.source,
 			'revisions', (SELECT json_agg(json_build_object('revision', rv.revision, 'createdAt', rv.created_at)
 				ORDER BY rv.revision DESC) FROM module_revisions rv WHERE rv.module_id = m.id))
 		FROM modules m WHERE m.id = $1`, id)
@@ -98,6 +99,7 @@ type draft struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Source      string `json:"source"`
+	Required    bool   `json:"required"`
 }
 
 func (d draft) validate(ctx context.Context) error {
@@ -110,6 +112,7 @@ func (d draft) validate(ctx context.Context) error {
 	return validSyntax(ctx, d.Source)
 }
 
+// create appends to the import order.
 func (m *Modules) create(w http.ResponseWriter, r *http.Request) error {
 	var req draft
 	if err := rest.Decode(r, &req); err != nil {
@@ -121,8 +124,9 @@ func (m *Modules) create(w http.ResponseWriter, r *http.Request) error {
 	var id int64
 	err := pgx.BeginFunc(r.Context(), m.db, func(tx pgx.Tx) error {
 		if err := tx.QueryRow(r.Context(), `
-			INSERT INTO modules (slug, title, description, source) VALUES ($1, $2, $3, $4) RETURNING id`,
-			req.Slug, req.Title, req.Description, req.Source).Scan(&id); err != nil {
+			INSERT INTO modules (slug, title, description, source, required, position)
+			VALUES ($1, $2, $3, $4, $5, (SELECT coalesce(max(position), 0) + 1 FROM modules)) RETURNING id`,
+			req.Slug, req.Title, req.Description, req.Source, req.Required).Scan(&id); err != nil {
 			return err
 		}
 		_, err := tx.Exec(r.Context(), `INSERT INTO module_revisions (module_id, revision, source) VALUES ($1, 1, $2)`, id, req.Source)
@@ -151,10 +155,10 @@ func (m *Modules) update(w http.ResponseWriter, r *http.Request) error {
 	err = pgx.BeginFunc(r.Context(), m.db, func(tx pgx.Tx) error {
 		var revision int
 		if err := tx.QueryRow(r.Context(), `
-			UPDATE modules SET slug = $2, title = $3, description = $4, updated_at = now(),
+			UPDATE modules SET slug = $2, title = $3, description = $4, required = $6, updated_at = now(),
 				revision = revision + (source IS DISTINCT FROM $5)::int, source = $5
 			WHERE id = $1 RETURNING revision`,
-			id, req.Slug, req.Title, req.Description, req.Source).Scan(&revision); err != nil {
+			id, req.Slug, req.Title, req.Description, req.Source, req.Required).Scan(&revision); err != nil {
 			return err
 		}
 		_, err := tx.Exec(r.Context(), `
@@ -169,20 +173,32 @@ func (m *Modules) update(w http.ResponseWriter, r *http.Request) error {
 	return rest.NoContent(w)
 }
 
+// remove keeps required modules; profiles hold the rest.
 func (m *Modules) remove(w http.ResponseWriter, r *http.Request) error {
 	id, err := rest.ID(r, "id")
 	if err != nil {
 		return err
 	}
-	tag, err := m.db.Exec(r.Context(), `DELETE FROM modules WHERE id = $1`, id)
+	tag, err := m.db.Exec(r.Context(), `DELETE FROM modules WHERE id = $1 AND NOT required`, id)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return rest.NotFound()
+		return m.missingOrRequired(r.Context(), id)
 	}
 	m.announce(id)
 	return rest.NoContent(w)
+}
+
+func (m *Modules) missingOrRequired(ctx context.Context, id int64) error {
+	var exists bool
+	if err := m.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM modules WHERE id = $1)`, id).Scan(&exists); err != nil {
+		return err
+	}
+	if exists {
+		return errRequired
+	}
+	return rest.NotFound()
 }
 
 // validate checks syntax while editing.
@@ -197,7 +213,7 @@ func (m *Modules) validate(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return rest.WriteJSON(w, http.StatusOK, map[string]string{"error": problem})
+	return rest.WriteJSON(w, http.StatusOK, problem)
 }
 
 func (m *Modules) announce(id int64) {

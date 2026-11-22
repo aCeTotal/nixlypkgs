@@ -14,6 +14,9 @@
 , profileTree ? null
 }:
 
+assert profileTree != null
+  || throw "NixlyOS følger en profil i Nixly-panelet. Kjør: nix run github:aCeTotal/nixlypkgs#nixlyos-panel adopt";
+
 let
   nixpkgs = inputs.nixos-stable;
 
@@ -38,6 +41,7 @@ let
       self.overlays.default
       (import ../pkgs/brave/overlay.nix)
       (import ../pkgs/polkit-gnome/overlay.nix)
+      (import ../scripts/overlay.nix)
     ];
   };
 
@@ -60,19 +64,9 @@ let
     resources = import (hardwareDir + "/resources.nix");
     dmi = import (hardwareDir + "/dmi.nix");
     profile = import (hardwareDir + "/profile.nix");
+    selection = import (hardwareDir + "/selection.nix");
     inherit platform;
   };
-
-  selection = import (hardwareDir + "/selection.nix");
-  cpuModule = ../hardware/cpu + "/${selection.cpu}.nix";
-  # Older detect-hw names.
-  renamedGpus = { nvidia_intel = "nvidia_hybrid"; };
-  gpuModules = map (n: ../hardware/gpu + "/${renamedGpus.${n} or n}.nix") selection.gpus;
-
-  # Boards come from nixos-hardware candidates.
-  socModules = nixpkgs.lib.optional (platform.arch == "aarch64") ../hardware/soc/arm.nix;
-  virtModules = nixpkgs.lib.optional ((platform.virt or "none") != "none")
-    (../hardware/virt + "/${platform.virt}.nix");
 
   # Inputs under their familiar names.
   moduleInputs = {
@@ -82,10 +76,8 @@ let
     nixlypkgs = self;
   };
 
-  profileData = if profileTree == null then null else builtins.fromJSON (builtins.readFile (profileTree + "/profile.json"));
-
   # Local pins win over profile pins.
-  pinsFiles = nixpkgs.lib.optional (profileTree != null) (profileTree + "/pins.nix") ++ [ (dirOf hardwareDir + "/pins.nix") ];
+  pinsFiles = [ (profileTree + "/pins.nix") (dirOf hardwareDir + "/pins.nix") ];
 
   specialArgs = {
     # System inputs win name clashes.
@@ -94,7 +86,6 @@ let
     system = effectiveSystem;
     pkgs-unstable = pkgsUnstable;
     nixlyUser = username;
-    nixlySelection = if profileData == null then null else profileData.modules;
   };
 in
 nixpkgs.lib.nixosSystem {
@@ -112,17 +103,8 @@ nixpkgs.lib.nixosSystem {
     (hardwareDir + "/hardware-configuration.nix")
     (hardwareDir + "/devices.nix")
 
-    ../base/default.nix
+    (profileTree + "/default.nix")
     (import ./pins.nix pinsFiles)
-    cpuModule
-  ]
-  ++ gpuModules
-  ++ socModules
-  ++ virtModules
-  ++ [
-    inputs.nixos-hardware.nixosModules.common-pc
-    self.nixosModules.nixlypkgs
-    inputs.lanzaboote.nixosModules.lanzaboote
     inputs.home-manager.nixosModules.home-manager
     {
       home-manager = {
@@ -130,11 +112,9 @@ nixpkgs.lib.nixosSystem {
         useUserPackages = true;
         backupCommand = ''mv --force "$1" "$1.backup"'';
         extraSpecialArgs = specialArgs;
-        users.${username} = import ../home;
       };
     }
   ]
-  ++ nixpkgs.lib.optional (profileTree != null) (profileTree + "/default.nix")
   ++ nixpkgs.lib.optional (localConfig != null) localConfig
   # Guarded by user-config.sh's scan.
   ++ nixpkgs.lib.optional (userModules != null) userModules;

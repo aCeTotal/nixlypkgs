@@ -1,7 +1,8 @@
 # NixlyOS
 
-The whole NixlyOS system, built from this repo via `lib.mkNixlySystem`.
-Machines carry no configuration tree — only `~/.local/nixlyos`:
+The whole NixlyOS system, built via `lib.mkNixlySystem` from this repo and a
+profile tree published by the Nixly panel. Machines carry no configuration
+tree — only `~/.local/nixlyos`:
 
 ```
 ~/.local/nixlyos/
@@ -17,14 +18,16 @@ Machines carry no configuration tree — only `~/.local/nixlyos`:
 
 ## The panel decides
 
-The Nixly panel (`../cachepanel`) owns what every setup runs. A machine follows a
-*profile* (desktop, laptop, htpc, ...): the panel picks the nixlypkgs revision and
-a profile tree with the selected modules from `catalog.nix`, panel modules and
-packages from nixpkgs stable. Hardware modules stay automatic. The panel knows
-profiles, never individual machines: `nixlyos-update` and `nixlyos-stage` pin
-both through `nixlyos-panel`, and machines installed before the panel are
-adopted on their next update. Without `profile` a machine follows `main`
-exactly as before.
+Every NixlyOS module lives in the Nixly panel's database (`../cachepanel`),
+not in this repo. A machine follows a *profile* (desktop, laptop, htpc, ...):
+the panel publishes the nixlypkgs revision together with a profile tree that
+holds the required modules, the modules the profile selected and its extra
+packages. The hardware module picks CPU, GPU and guest support from
+`nixlyos-detect-hw`. The panel knows profiles, never individual machines:
+`nixlyos-update` and `nixlyos-stage` pin both through `nixlyos-panel`, and
+machines installed before the panel are adopted on their next update.
+`nixlyos-panel use htpc` moves a machine to another profile from its next
+update.
 
 ## Staged updates
 
@@ -38,26 +41,20 @@ system.
 
 ## Workflow
 
-1. Commit on `main` (optionally `scripts/bump-inputs.sh` first), push.
-2. The panel builds it, tests every type on `reference/profiles` and publishes.
-3. `nixlyos-update` on any machine picks up its type's release.
+1. Change modules in the panel, or packages here (commit on `main`,
+   optionally `scripts/bump-inputs.sh` first) and push.
+2. The panel builds it, tests every profile on `reference/profiles` and publishes.
+3. `nixlyos-update` on any machine picks up its profile's release.
 
 ## Layout
 
 ```
-lib/mk-system.nix   mkNixlySystem: per-machine data + type tree -> complete NixOS system
-catalog.nix        modules a type can select (apps/, services/)
-reference/         hardware profiles every type is tested on
-base/              everything that runs NixlyOS (boot, nix, session, sound, ...)
-hardware/          cpu/, gpu/, machine profile - selected by nixlyos-detect-hw
-services/          detect-activated extras (drawing tablets, on-demand, ...)
-apps/              programs that ship preconfigured (steam, citrix, mpv, ...)
-home/              home-manager entrypoint + per-app user config
-pkgs/              brave, citrix, polkit-gnome overlays local to NixlyOS
-scripts/           detect-hw, update, stage, panel (packaged as nixlyos-*
-                   tools by base/nixlyos-tools.nix), bump-inputs (maintainer)
-install.sh         installer: partitioning, LUKS2, ~/.local/nixlyos, nixos-install
-wallpapers/
+lib/mk-system.nix   mkNixlySystem: machine data + profile tree -> complete NixOS system
+reference/          hardware profiles every profile is tested on
+scripts/            detect-hw, update, stage, panel and user-config, packaged as
+                    nixlyos-* commands by scripts/overlay.nix; bump-inputs (maintainer)
+pkgs/               brave and polkit-gnome overlays local to NixlyOS
+install.sh          installer: partitioning, LUKS2, ~/.local/nixlyos, nixos-install
 ```
 
 Hardware files are pure data (module *names* and numbers, never paths), so

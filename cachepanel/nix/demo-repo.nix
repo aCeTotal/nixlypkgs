@@ -18,9 +18,8 @@ writeShellApplication {
     case "''${2:-init}" in
       init)
         [ -d "$dir/.git" ] && exit 0
-        mkdir -p "$dir/modules"
+        mkdir -p "$dir"
         install -m 0644 ${./demo-flake.nix} "$dir/flake.nix"
-        echo '{ ... }: { }' > "$dir/modules/demo.nix"
         git -C "$dir" init --quiet --initial-branch=main
         for revision in 1 2 3 4; do commit "$revision"; done
         ;;

@@ -5,7 +5,7 @@ import { CommitsPage } from "@/commits/commits-page";
 import { commitsQuery } from "@/commits/queries";
 import { ModulePage } from "@/modules/module-page";
 import { ModulesPage } from "@/modules/modules-page";
-import { catalogQuery, moduleQuery, modulesQuery } from "@/modules/queries";
+import { moduleQuery, modulesQuery } from "@/modules/queries";
 import { OverviewPage } from "@/overview/overview-page";
 import { overviewQuery } from "@/overview/queries";
 import { PackagePage } from "@/packages/package-page";
@@ -40,12 +40,11 @@ const routeTree = rootRoute.addChildren([
       getParentRoute: () => appRoute,
       path: "/profiles/$name",
       component: ProfilePage,
-      loader: ({ params }) =>
-        Promise.all([queryClient.ensureQueryData(profileQuery(params.name)), queryClient.ensureQueryData(catalogQuery)]),
+      loader: ({ params }) => queryClient.ensureQueryData(profileQuery(params.name)),
       staticData: { title: "Profil" },
     }),
     page("/modules", "Moduler", ModulesPage, () =>
-      Promise.all([queryClient.ensureQueryData(modulesQuery), queryClient.ensureQueryData(catalogQuery)]),
+      Promise.all([queryClient.ensureQueryData(modulesQuery), queryClient.ensureQueryData(profilesQuery)]),
     ),
     createRoute({
       getParentRoute: () => appRoute,

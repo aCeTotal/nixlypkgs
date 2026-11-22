@@ -30,8 +30,9 @@ func (b *Rebuilder) Mount(r chi.Router) {
 
 const summary = `
 	p.id, p.name, p.title, p.description, p.platform, p.pinned_sha AS "pinnedSha",
-	cardinality(p.catalog) AS "catalogCount", cardinality(p.packages) AS "packageCount",
-	(SELECT count(*) FROM profile_modules pm WHERE pm.profile_id = p.id) AS "moduleCount",
+	cardinality(p.packages) AS "packageCount",
+	(SELECT count(*) FROM modules m WHERE m.required
+		OR EXISTS (SELECT 1 FROM profile_modules pm WHERE pm.profile_id = p.id AND pm.module_id = m.id)) AS "moduleCount",
 	p.candidate_tree AS "candidateTree", p.candidate_rev AS "candidateRev",
 	p.published_tree AS "publishedTree", p.published_rev AS "publishedRev", p.published_at AS "publishedAt",
 	p.check_state AS "checkState", p.check_error AS "checkError", p.checked_at AS "checkedAt", p.updated_at AS "updatedAt"`
@@ -48,7 +49,6 @@ func (b *Rebuilder) list(w http.ResponseWriter, r *http.Request) error {
 func (b *Rebuilder) get(w http.ResponseWriter, r *http.Request) error {
 	var detail struct {
 		Profile map[string]any `json:"profile"`
-		Catalog []any          `json:"catalog"`
 		Modules []any          `json:"modules"`
 		Pkgs    []string       `json:"packages"`
 		Files   []File         `json:"files"`
@@ -56,18 +56,16 @@ func (b *Rebuilder) get(w http.ResponseWriter, r *http.Request) error {
 	var archive []byte
 	err := b.db.QueryRow(r.Context(), `
 		SELECT row_to_json(s), p.packages,
-			coalesce((SELECT json_agg(json_build_object('name', c.name, 'title', c.title, 'category', c.category,
-				'x86Only', c.x86_only, 'required', c.required, 'present', c.present, 'selected', c.name = ANY(p.catalog))
-				ORDER BY c.position) FROM catalog_modules c WHERE NOT c.automatic), '[]'),
 			coalesce((SELECT json_agg(json_build_object('id', m.id, 'slug', m.slug, 'title', m.title,
-				'selected', EXISTS (SELECT 1 FROM profile_modules pm WHERE pm.profile_id = p.id AND pm.module_id = m.id))
-				ORDER BY m.slug) FROM modules m), '[]'),
+				'description', m.description, 'required', m.required,
+				'selected', m.required OR EXISTS (SELECT 1 FROM profile_modules pm WHERE pm.profile_id = p.id AND pm.module_id = m.id))
+				ORDER BY m.position) FROM modules m), '[]'),
 			tr.archive
 		FROM profiles p
 			JOIN LATERAL (SELECT `+summary+`) s ON true
 			LEFT JOIN trees tr ON tr.hash = p.candidate_tree
 		WHERE p.name = $1`, chi.URLParam(r, "name")).
-		Scan(&detail.Profile, &detail.Pkgs, &detail.Catalog, &detail.Modules, &archive)
+		Scan(&detail.Profile, &detail.Pkgs, &detail.Modules, &archive)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,6 @@
 package profiles
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
@@ -16,11 +15,11 @@ type Spec struct {
 	Name     string
 	Platform string
 	Pinned   string
-	Catalog  []string
 	Packages []string
 	Modules  []Module
 }
 
+// Module is imported in order.
 type Module struct {
 	Slug   string `json:"slug"`
 	Source string `json:"source"`
@@ -32,20 +31,15 @@ type File struct {
 }
 
 // Files renders the tree's Nix sources.
-func Files(spec Spec, pins map[string]string) ([]File, error) {
-	meta, err := json.MarshalIndent(map[string]any{"name": spec.Name, "platform": spec.Platform, "modules": spec.Catalog}, "", "  ")
-	if err != nil {
-		return nil, err
-	}
+func Files(spec Spec, pins map[string]string) []File {
 	files := []File{
 		{Path: "default.nix", Content: defaultNix(spec)},
 		{Path: "pins.nix", Content: pinsNix(pins)},
-		{Path: "profile.json", Content: string(meta) + "\n"},
 	}
 	for _, module := range spec.Modules {
 		files = append(files, File{Path: "modules/" + module.Slug + ".nix", Content: module.Source})
 	}
-	return files, nil
+	return files
 }
 
 func defaultNix(spec Spec) string {

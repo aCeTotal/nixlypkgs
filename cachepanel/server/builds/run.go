@@ -104,7 +104,7 @@ func (p *Pool) finish(ctx context.Context, next claimed, j *job, failure error, 
 		p.files.removeRoot(next.ID)
 	}
 	tag, err := p.db.Exec(ctx, `
-		UPDATE versions SET state = $2, finished_at = now(), error = nullif($3, ''), closure_bytes = nullif($4, 0)
+		UPDATE versions SET state = $2, finished_at = now(), error = nullif($3, ''), closure_bytes = nullif($4::bigint, 0)
 		WHERE id = $1 AND state = 'building'`, next.ID, state, message, closure)
 	if err != nil {
 		slog.Error("record build", "version", next.ID, "error", err)

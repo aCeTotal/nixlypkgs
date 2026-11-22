@@ -2,7 +2,6 @@ package profiles
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"regexp"
@@ -24,10 +23,6 @@ var (
 	errPackage   = rest.Unprocessable("invalid_package", "Ugyldig pakke – bruk f.eks. blender eller python3Packages.numpy")
 	errPinnedRev = rest.Unprocessable("invalid_revision", "Revisjonen er ikke evaluert")
 )
-
-// Selectable modules in catalog order; required always included.
-const catalogFor = `coalesce((SELECT array_agg(c.name ORDER BY c.position) FROM catalog_modules c
-	WHERE c.present AND NOT c.automatic AND (c.required OR %s)), '{}')`
 
 type identity struct {
 	Name        string `json:"name"`
@@ -56,9 +51,7 @@ func (b *Rebuilder) create(w http.ResponseWriter, r *http.Request) error {
 	if err := req.validate(); err != nil {
 		return err
 	}
-	if _, err := b.db.Exec(r.Context(), `
-		INSERT INTO profiles (name, title, description, platform, catalog)
-		VALUES ($1, $2, $3, $4, `+fmt.Sprintf(catalogFor, `$4::text = ANY(c.defaults)`)+`)`,
+	if _, err := b.db.Exec(r.Context(), `INSERT INTO profiles (name, title, description, platform) VALUES ($1, $2, $3, $4)`,
 		req.Name, req.Title, req.Description, req.Platform); err != nil {
 		return err
 	}
@@ -69,7 +62,6 @@ func (b *Rebuilder) create(w http.ResponseWriter, r *http.Request) error {
 type settings struct {
 	identity
 	Pinned   *string  `json:"pinnedSha"`
-	Catalog  []string `json:"catalog"`
 	Modules  []int64  `json:"modules"`
 	Packages []string `json:"packages"`
 }
@@ -115,17 +107,19 @@ func save(ctx context.Context, tx pgx.Tx, current string, req settings) error {
 	var id int64
 	err := tx.QueryRow(ctx, `
 		UPDATE profiles SET name = $2, title = $3, description = $4, platform = $5, pinned_sha = $6,
-			catalog = `+fmt.Sprintf(catalogFor, `c.name = ANY($7)`)+`, packages = $8, updated_at = now()
+			packages = $7, updated_at = now()
 		WHERE name = $1 RETURNING id`,
-		current, req.Name, req.Title, req.Description, req.Platform, req.Pinned, req.Catalog, uniq(req.Packages)).Scan(&id)
+		current, req.Name, req.Title, req.Description, req.Platform, req.Pinned, uniq(req.Packages)).Scan(&id)
 	if err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM profile_modules WHERE profile_id = $1 AND module_id <> ALL($2)`, id, req.Modules); err != nil {
 		return err
 	}
+	// Required modules are implicit.
 	_, err = tx.Exec(ctx, `
-		INSERT INTO profile_modules (profile_id, module_id) SELECT $1, unnest($2::bigint[]) ON CONFLICT DO NOTHING`, id, req.Modules)
+		INSERT INTO profile_modules (profile_id, module_id) SELECT $1, id FROM modules WHERE id = ANY($2) AND NOT required
+		ON CONFLICT DO NOTHING`, id, req.Modules)
 	return err
 }
 
@@ -143,8 +137,8 @@ func (b *Rebuilder) clone(w http.ResponseWriter, r *http.Request) error {
 	err := pgx.BeginFunc(r.Context(), b.db, func(tx pgx.Tx) error {
 		var id int64
 		err := tx.QueryRow(r.Context(), `
-			INSERT INTO profiles (name, title, description, platform, pinned_sha, catalog, packages)
-			SELECT $2, $3, description, platform, pinned_sha, catalog, packages FROM profiles WHERE name = $1
+			INSERT INTO profiles (name, title, description, platform, pinned_sha, packages)
+			SELECT $2, $3, description, platform, pinned_sha, packages FROM profiles WHERE name = $1
 			RETURNING id`, chi.URLParam(r, "name"), req.Name, req.Title).Scan(&id)
 		if err != nil {
 			return err

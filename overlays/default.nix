@@ -34,6 +34,18 @@ in {
   };
   nixly_kalk = callPackage ../pkgs/nixly_kalk { };
   nixly_pdf = callPackage ../pkgs/nixly_pdf { };
+  nixly-gpu-select = callPackage ../pkgs/nixly-gpu-select { };
+  nixly-dgpu = callPackage ../pkgs/nixly-dgpu { };
+  nixly-boost = callPackage ../pkgs/nixly-boost { };
+  nixly-gametune = callPackage ../pkgs/nixly-gametune { };
+  nixly-prewarm = callPackage ../pkgs/nixly-prewarm { };
+  nixly-game-wrap = callPackage ../pkgs/nixly-game-wrap { };
+  nixly-steam-autoconfig = callPackage ../pkgs/nixly-steam-autoconfig {
+    gameWrap = final.nixly-game-wrap;
+    protonTool = final.proton-nixlyos;
+  };
+  rom-playlists = callPackage ../pkgs/rom-playlists { };
+  nixly-wallpaper = callPackage ../pkgs/nixly-wallpaper { };
   proton-nixlyos = callPackage ../pkgs/proton-nixlyos { };
   proton-nixlyos-generic = callPackage ../pkgs/proton-nixlyos { variant = "generic"; };
   buildArchPackage = callPackage ../pkgs/build-arch-package { };

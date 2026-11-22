@@ -45,7 +45,7 @@ export function ProfilesPage() {
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <Blocks className="size-3.5" />
-                  {profile.catalogCount + profile.moduleCount} moduler
+                  {profile.moduleCount} moduler
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Package className="size-3.5" />

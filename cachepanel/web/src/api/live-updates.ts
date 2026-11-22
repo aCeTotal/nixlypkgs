@@ -9,7 +9,7 @@ const invalidations: Record<string, (data: Record<string, unknown>) => unknown[]
   "commit.changed": () => [["commits"], ["overview"]],
   "watcher.changed": () => [["overview"]],
   "profile.changed": () => [["profiles"], ["profile"], ["commits"]],
-  "module.changed": () => [["modules"], ["module"], ["catalog"], ["profile"]],
+  "module.changed": () => [["modules"], ["module"], ["profile"]],
   "recipe.changed": (data) => [["recipes"], ["recipe", data.id]],
 };
 

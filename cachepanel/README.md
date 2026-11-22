@@ -6,12 +6,13 @@ the package wizard. The panel knows profiles, never individual machines.
 - **Cache** – every commit on the branch is evaluated; each package keeps its three newest derivations
   built and served by harmonia. Older ones are garbage collected. Any version can be selected, rebuilt,
   cancelled or deleted, with live progress and logs.
-- **Profiles** – Desktop, Laptop, HTPC and your own. A profile is a set of registry and panel modules,
-  packages from nixpkgs stable (nixlypkgs on top) and a nixlypkgs revision. Hardware modules are chosen on
-  each machine automatically. Machines pull their profile's release with ETags; trees are
+- **Profiles** – Desktop, Laptop, HTPC and your own. A profile is the required modules plus its chosen
+  ones, packages from nixpkgs stable (nixlypkgs on top) and a nixlypkgs revision. The hardware module
+  picks drivers on each machine. Machines pull their profile's release with ETags; trees are
   content-addressed and CDN-cacheable.
-- **Modules** – every NixlyOS module in nixlypkgs, sorted into categories, plus modules written in the
-  panel.
+- **Modules** – every NixlyOS module lives in the database with its revisions: a matrix shows which
+  profile uses what, and the editor has an outline of each module's sections, search, folding and
+  inline syntax errors.
 - **Trust** – every change to a profile is evaluated *and built* on all reference hardware before it is
   published. Machines only ever receive tested releases.
 - **Package wizard** – new nixlypkgs packages from a link, an upload, a GitHub repo or a PKGBUILD from
@@ -57,8 +58,9 @@ watcher. Change the password under the user menu after the first login.
 |---|---|
 | `server/<feature>` | Go backend, one package per feature (`builds`, `watcher`, `profiles`, `wizard`, …) |
 | `server/recipe`, `server/analyse`, `server/pkgbuild`, `server/depmap` | Wizard internals: Nix generation, source analysis, PKGBUILD reading, nixpkgs name tables |
-| `server/migrations` | SQL migrations |
+| `server/migrations` | SQL migrations; `00005_modules.sql` seeds the NixlyOS modules on fresh installs |
 | `web/src/<feature>` | React frontend, one folder per feature; `web/src/ui` is the shadcn/ui kit |
+| `web/src/modules/nix` | Nix grammar for the editor, compiled by `@lezer/generator` at build time |
 | `nix` | Package, NixOS module, dev stack, demo repository and VM test |
 
 Machines talk to the panel through `nixlyos-panel` (`nixlyos/scripts/panel.sh`).

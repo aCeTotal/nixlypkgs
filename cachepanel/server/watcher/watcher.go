@@ -165,7 +165,7 @@ func (w *Watcher) advance(ctx context.Context, c repo.Commit) error {
 		return w.failCommit(ctx, c.SHA, err)
 	}
 	w.pool.Forget(evicted)
-	w.syncCatalog(ctx, c.SHA)
+	w.syncPinnable(ctx, c.SHA)
 	w.settle(ctx, c.SHA)
 	return nil
 }

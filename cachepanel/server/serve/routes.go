@@ -72,7 +72,7 @@ func (a *app) routes() http.Handler {
 		overview.New(a.db, a.watcher, a.pool).Mount(api)
 		packages.New(a.db, a.hub, a.pool, a.rebuilder.Trigger).Mount(api)
 		commits.New(a.db, a.watcher.Poke).Mount(api)
-		modules.New(a.db, a.hub, a.mirror, a.rebuilder.Trigger).Mount(api)
+		modules.New(a.db, a.hub, a.rebuilder.Trigger).Mount(api)
 		a.rebuilder.Mount(api)
 		a.watcher.Mount(api)
 		a.recipes.Mount(api)

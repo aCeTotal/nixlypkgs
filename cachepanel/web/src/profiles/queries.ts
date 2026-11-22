@@ -11,7 +11,6 @@ export type ProfileSummary = {
   description: string;
   platform: Platform;
   pinnedSha: string | null;
-  catalogCount: number;
   packageCount: number;
   moduleCount: number;
   candidateTree: string | null;
@@ -25,20 +24,18 @@ export type ProfileSummary = {
   updatedAt: string;
 };
 
-export type ProfileCatalogModule = {
-  name: string;
+export type ProfileModule = {
+  id: number;
+  slug: string;
   title: string;
-  category: string;
-  x86Only: boolean;
+  description: string;
   required: boolean;
-  present: boolean;
   selected: boolean;
 };
 
 export type ProfileDetail = {
   profile: ProfileSummary;
-  catalog: ProfileCatalogModule[];
-  modules: { id: number; slug: string; title: string; selected: boolean }[];
+  modules: ProfileModule[];
   packages: string[];
   files: { path: string; content: string }[];
 };
@@ -49,7 +46,6 @@ export type ProfileSettings = {
   description: string;
   platform: Platform;
   pinnedSha: string | null;
-  catalog: string[];
   modules: number[];
   packages: string[];
 };

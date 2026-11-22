@@ -275,6 +275,7 @@ stdenv.mkDerivation {
           ${lib.optionalString (icaFlag program != null) ''--add-flags "${icaFlag program} $ICAInstDir"''} \
           --set ICAROOT "$ICAInstDir" \
           --set GDK_BACKEND "x11" \
+          ${x11} \
           --prefix GIO_EXTRA_MODULES : "${glib-networking}/lib/gio/modules" \
           --prefix XDG_DATA_DIRS : "${shared-mime-info}/share" \
           --prefix PATH : "${lib.makeBinPath [ xdg-utils xprop xdpyinfo ]}" \
@@ -282,6 +283,9 @@ stdenv.mkDerivation {
           --set LD_PRELOAD "${libredirect}/lib/libredirect.so ${lib.getLib pcsclite}/lib/libpcsclite.so" \
           --set NIX_REDIRECTS "/usr/share/zoneinfo=${tzdata}/share/zoneinfo:/etc/zoneinfo=${tzdata}/share/zoneinfo:/etc/timezone=$ICAInstDir/timezone:/usr/lib/x86_64-linux-gnu=$ICAInstDir/usr/lib/x86_64-linux-gnu"
       '';
+
+      # Wayland detection crashes EGL.
+      x11 = "--unset WAYLAND_DISPLAY --set XDG_SESSION_TYPE x11 --set EGL_PLATFORM x11";
 
       wrapLink = program: ''
         ${wrap program}
@@ -343,7 +347,7 @@ stdenv.mkDerivation {
         --replace-fail '@gnugrep@' "${lib.getBin gnugrep}/bin"
       chmod +x $out/bin/wfica
 
-      ln -sf $ICAInstDir/util/storebrowse $out/bin/storebrowse
+      makeWrapper $ICAInstDir/util/storebrowse $out/bin/storebrowse ${x11}
 
       echo "Expanding certificates..."
       pushd "$ICAInstDir/keystore/cacerts"
@@ -488,6 +492,12 @@ stdenv.mkDerivation {
       ICA30
         fi
       fi
+
+      # Dot-files stay out of drive mapping.
+      sed -i 's/^CDMHideHiddenFile\([[:space:]]*\)=.*/CDMHideHiddenFile\1= 1/' "$ICAInstDir/config/module.ini"
+      sed -i '/^\[ClientDrive\]/a AllowSymlinkTraversalOutsideMap=True' "$ICAInstDir/config/module.ini"
+      # Beats the wfclient.ini wfica rewrites.
+      sed -i 's/^SuperMetaToWinKeys[[:space:]]*=.*/SuperMetaToWinKeys=False/' "$ICAInstDir/config/module.ini"
 
       echo $src >> "$out/share/workspace_dependencies.pin"
 

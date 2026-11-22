@@ -8,15 +8,14 @@ import (
 var spec = Spec{
 	Name:     "desktop",
 	Platform: "desktop",
-	Catalog:  []string{"mode", "brave"},
 	Packages: []string{"blender", "python3Packages.numpy"},
-	Modules:  []Module{{Slug: "motd", Source: "{ ... }: { }"}},
+	Modules:  []Module{{Slug: "system", Source: "{ ... }: { }"}, {Slug: "motd", Source: "{ ... }: { }"}},
 }
 
 func TestDefaultNix(t *testing.T) {
 	nix := defaultNix(spec)
 	for _, want := range []string{
-		`./modules/motd.nix`,
+		"./modules/system.nix\n    ./modules/motd.nix",
 		`nixlyos.mode = lib.mkForce "desktop";`,
 		`[ "blender" ]`,
 		`[ "python3Packages" "numpy" ]`,
@@ -27,21 +26,15 @@ func TestDefaultNix(t *testing.T) {
 	}
 }
 
-func TestProfileJSONListsModules(t *testing.T) {
-	files, err := Files(spec, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if files[2].Path != "profile.json" || !strings.Contains(files[2].Content, `"brave"`) {
-		t.Fatalf("profile.json: %+v", files[2])
+func TestFilesCarryModules(t *testing.T) {
+	files := Files(spec, nil)
+	if len(files) != 4 || files[2].Path != "modules/system.nix" || files[3].Path != "modules/motd.nix" {
+		t.Fatalf("files: %+v", files)
 	}
 }
 
 func TestArchiveIsReproducible(t *testing.T) {
-	files, err := Files(spec, map[string]string{"nixlytile": "/nix/store/x-nixlytile"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	files := Files(spec, map[string]string{"nixlytile": "/nix/store/x-nixlytile"})
 	first, _, err := Archive(files)
 	if err != nil {
 		t.Fatal(err)
@@ -65,10 +58,7 @@ func TestArchiveIsReproducible(t *testing.T) {
 }
 
 func TestArchiveRoundTrips(t *testing.T) {
-	files, err := Files(spec, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	files := Files(spec, nil)
 	_, archive, err := Archive(files)
 	if err != nil {
 		t.Fatal(err)

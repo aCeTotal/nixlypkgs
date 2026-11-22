@@ -19,7 +19,7 @@ export function NewModuleDialog() {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const create = useMutation({
-    mutationFn: () => createModule({ slug, title, description: "", source: template }),
+    mutationFn: () => createModule({ slug, title, description: "", source: template, required: false }),
     onSuccess: ({ id }) => navigate({ to: "/modules/$id", params: { id: String(id) } }),
   });
   const submit = (event: FormEvent) => {
@@ -37,8 +37,8 @@ export function NewModuleDialog() {
       <DialogContent>
         <form onSubmit={submit} className="space-y-6">
           <DialogHeader>
-            <DialogTitle>Ny panelmodul</DialogTitle>
-            <DialogDescription>En vanlig NixOS-modul. Velg den på typene som skal bruke den.</DialogDescription>
+            <DialogTitle>Ny modul</DialogTitle>
+            <DialogDescription>En vanlig NixOS-modul. Velg den på profilene som skal bruke den.</DialogDescription>
           </DialogHeader>
           <FieldGroup>
             <Field>

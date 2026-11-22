@@ -18,7 +18,7 @@ let
     pkg // { out = pkg; };
 in
 {
-  # After overlays.default's re-application.
+  # Last, so pins win.
   nixpkgs.overlays = lib.mkAfter [
     (final: prev: builtins.mapAttrs (pin prev) (lib.filterAttrs (name: _: prev ? ${name}) pins))
   ];

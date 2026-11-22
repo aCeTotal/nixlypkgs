@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,10 +18,20 @@ const (
 	parseKeep    = 4 << 10
 )
 
-var ansi = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
+var (
+	ansi     = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
+	position = regexp.MustCompile(`«stdin»:(\d+):(\d+)`)
+)
+
+// problem is a syntax error; empty when valid.
+type problem struct {
+	Error  string `json:"error"`
+	Line   int    `json:"line,omitempty"`
+	Column int    `json:"column,omitempty"`
+}
 
 // parse returns Nix's syntax error.
-func parse(ctx context.Context, source string) (string, error) {
+func parse(ctx context.Context, source string) (problem, error) {
 	ctx, cancel := context.WithTimeout(ctx, parseTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "nix-instantiate", "--parse", "-")
@@ -29,21 +40,26 @@ func parse(ctx context.Context, source string) (string, error) {
 	cmd.Stderr = output
 	err := cmd.Run()
 	if err == nil {
-		return "", nil
+		return problem{}, nil
 	}
 	if _, rejected := errors.AsType[*exec.ExitError](err); !rejected {
-		return "", err
+		return problem{}, err
 	}
-	return ansi.ReplaceAllString(output.String(), ""), nil
+	found := problem{Error: ansi.ReplaceAllString(output.String(), "")}
+	if match := position.FindStringSubmatch(found.Error); match != nil {
+		found.Line, _ = strconv.Atoi(match[1])
+		found.Column, _ = strconv.Atoi(match[2])
+	}
+	return found, nil
 }
 
 func validSyntax(ctx context.Context, source string) error {
-	problem, err := parse(ctx, source)
+	found, err := parse(ctx, source)
 	if err != nil {
 		return err
 	}
-	if problem != "" {
-		return rest.Unprocessable("invalid_nix", problem)
+	if found.Error != "" {
+		return rest.Unprocessable("invalid_nix", found.Error)
 	}
 	return nil
 }

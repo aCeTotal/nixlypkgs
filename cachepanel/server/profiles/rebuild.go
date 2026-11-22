@@ -64,9 +64,6 @@ func (b *Rebuilder) Run(ctx context.Context) error {
 }
 
 func (b *Rebuilder) rebuild(ctx context.Context) error {
-	if err := seed(ctx, b.db); err != nil {
-		return err
-	}
 	specs, err := loadSpecs(ctx, b.db)
 	if err != nil {
 		return err
@@ -103,11 +100,7 @@ func (b *Rebuilder) candidate(ctx context.Context, spec Spec, rev string, pins m
 	if rev == "" {
 		return false, nil
 	}
-	files, err := Files(spec, pins)
-	if err != nil {
-		return false, err
-	}
-	hash, archive, err := Archive(files)
+	hash, archive, err := Archive(Files(spec, pins))
 	if err != nil {
 		return false, err
 	}

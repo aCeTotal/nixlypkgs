@@ -1,87 +1,119 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { Blocks, Check, FileCode, Lock, ShieldCheck } from "lucide-react";
 import { timeAgo } from "@/format/time";
+import { PlatformIcon } from "@/profiles/platform-icon";
+import { profilesQuery, type ProfileSummary } from "@/profiles/queries";
 import { PageHeader } from "@/shell/page-header";
-import { Badge } from "@/ui/badge";
+import { StatTile } from "@/shell/stat-tile";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
-import { CatalogSection } from "./catalog-section";
 import { NewModuleDialog } from "./new-module-dialog";
-import { catalogQuery, modulesQuery } from "./queries";
+import { modulesQuery, type ModuleSummary } from "./queries";
 
 export function ModulesPage() {
   const { data: modules } = useSuspenseQuery(modulesQuery);
-  const { data: catalog } = useSuspenseQuery(catalogQuery);
-  const sections = catalog.categories
-    .map((category) => ({ ...category, modules: catalog.modules.filter((module) => module.category === category.name) }))
-    .filter((section) => section.modules.length > 0);
+  const { data: profiles } = useSuspenseQuery(profilesQuery);
+  const required = modules.filter((module) => module.required);
+  const optional = modules.filter((module) => !module.required);
+  const lines = modules.reduce((sum, module) => sum + module.lines, 0);
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <PageHeader
         title="Moduler"
-        description="Registeret over alt en maskin kan få: modulene i nixlypkgs sortert etter kategori, og egne panelmoduler."
+        description="Alt systemene er bygget av. Påkrevde moduler er med i alle profiler; de valgfrie velges per profil. Rekkefølgen er importrekkefølgen."
         actions={<NewModuleDialog />}
       />
-      <Tabs defaultValue="catalog">
-        <TabsList>
-          <TabsTrigger value="catalog">nixlypkgs ({catalog.modules.length})</TabsTrigger>
-          <TabsTrigger value="panel">Panelmoduler ({modules.length})</TabsTrigger>
-        </TabsList>
-        <TabsContent value="catalog" className="pt-4">
-          <div className="grid gap-4 xl:grid-cols-2">
-            {sections.map((section) => (
-              <CatalogSection key={section.name} title={section.title} modules={section.modules} />
-            ))}
-          </div>
-        </TabsContent>
-        <TabsContent value="panel" className="pt-4">
-          <div className="overflow-hidden rounded-xl border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Modul</TableHead>
-                  <TableHead>Brukes av</TableHead>
-                  <TableHead className="text-right">Linjer</TableHead>
-                  <TableHead className="text-right">Revisjon</TableHead>
-                  <TableHead className="text-right">Endret</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {modules.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
-                      Ingen panelmoduler ennå. Lag en for å teste nye ting på en profil.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {modules.map((module) => (
-                  <TableRow key={module.id}>
-                    <TableCell>
-                      <Link to="/modules/$id" params={{ id: String(module.id) }} className="font-medium hover:text-primary hover:underline">
-                        {module.title}
-                      </Link>
-                      <p className="font-mono text-xs text-muted-foreground">{module.slug}.nix</p>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {module.usedBy.length === 0 && <span className="text-sm text-muted-foreground">Ingen profiler</span>}
-                        {module.usedBy.map((profile) => (
-                          <Badge key={profile} variant="secondary">
-                            {profile}
-                          </Badge>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{module.lines}</TableCell>
-                    <TableCell className="text-right tabular-nums">{module.revision}</TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">{timeAgo(module.updatedAt)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-      </Tabs>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatTile label="Moduler" value={modules.length} hint={`${lines.toLocaleString("nb-NO")} linjer Nix`} icon={Blocks} />
+        <StatTile label="Påkrevd" value={required.length} hint="Med i alle profiler" icon={ShieldCheck} tone="info" />
+        <StatTile label="Profiler" value={profiles.length} hint="Testes før utrulling" icon={FileCode} tone="success" />
+      </div>
+      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-full min-w-72">Modul</TableHead>
+              {profiles.map((profile) => (
+                <TableHead key={profile.id} className="px-3 text-center">
+                  <Link
+                    to="/profiles/$name"
+                    params={{ name: profile.name }}
+                    className="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-primary"
+                  >
+                    <PlatformIcon platform={profile.platform} className="size-3.5 text-muted-foreground" />
+                    {profile.title}
+                  </Link>
+                </TableHead>
+              ))}
+              <TableHead className="text-right">Linjer</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Endret</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <Group title="Påkrevd" modules={required} profiles={profiles} />
+            <Group title="Valgfrie" modules={optional} profiles={profiles} />
+          </TableBody>
+        </Table>
+      </div>
     </div>
+  );
+}
+
+function Group({ title, modules, profiles }: { title: string; modules: ModuleSummary[]; profiles: ProfileSummary[] }) {
+  const navigate = useNavigate();
+  if (modules.length === 0) return null;
+  return (
+    <>
+      <TableRow className="bg-muted/40 hover:bg-muted/40">
+        <TableCell colSpan={profiles.length + 3} className="py-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          {title}
+        </TableCell>
+      </TableRow>
+      {modules.map((module) => (
+        <TableRow
+          key={module.id}
+          onClick={() => navigate({ to: "/modules/$id", params: { id: String(module.id) } })}
+          className="group cursor-pointer"
+        >
+          <TableCell className="whitespace-normal">
+            <Link
+              to="/modules/$id"
+              params={{ id: String(module.id) }}
+              className="font-medium group-hover:text-primary"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {module.title}
+            </Link>
+            <p className="font-mono text-xs text-muted-foreground">{module.slug}.nix</p>
+            {module.description && <p className="mt-0.5 text-sm text-muted-foreground">{module.description}</p>}
+          </TableCell>
+          {profiles.map((profile) => (
+            <TableCell key={profile.id} className="px-3 text-center">
+              <Usage module={module} profile={profile} />
+            </TableCell>
+          ))}
+          <TableCell className="text-right tabular-nums">{module.lines.toLocaleString("nb-NO")}</TableCell>
+          <TableCell className="text-right text-sm whitespace-nowrap text-muted-foreground">{timeAgo(module.updatedAt)}</TableCell>
+        </TableRow>
+      ))}
+    </>
+  );
+}
+
+function Usage({ module, profile }: { module: ModuleSummary; profile: ProfileSummary }) {
+  if (module.required) {
+    return (
+      <span title="Påkrevd" className="inline-grid size-6 place-items-center rounded-full bg-info-soft text-info">
+        <Lock className="size-3.5" />
+      </span>
+    );
+  }
+  if (!module.usedBy.some((user) => user.name === profile.name)) {
+    return <span className="inline-block size-1.5 rounded-full bg-border" aria-label="Ikke valgt" />;
+  }
+  return (
+    <span title="Valgt" className="inline-grid size-6 place-items-center rounded-full bg-success-soft text-success">
+      <Check className="size-3.5" />
+    </span>
   );
 }

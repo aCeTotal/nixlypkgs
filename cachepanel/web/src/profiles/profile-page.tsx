@@ -16,15 +16,14 @@ import { profileQuery, saveProfile, type ProfileDetail, type ProfileSettings } f
 
 const route = getRouteApi("/app/profiles/$name");
 
-function settingsOf({ profile, catalog, modules, packages }: ProfileDetail): ProfileSettings {
+function settingsOf({ profile, modules, packages }: ProfileDetail): ProfileSettings {
   return {
     name: profile.name,
     title: profile.title,
     description: profile.description,
     platform: profile.platform,
     pinnedSha: profile.pinnedSha,
-    catalog: catalog.filter((module) => module.selected && !module.required).map((module) => module.name),
-    modules: modules.filter((module) => module.selected).map((module) => module.id),
+    modules: modules.filter((module) => module.selected && !module.required).map((module) => module.id),
     packages,
   };
 }

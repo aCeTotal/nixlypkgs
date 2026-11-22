@@ -35,16 +35,6 @@
       };
 
       lib.nixlyos = {
-        categories = [
-          { name = "system"; title = "System"; }
-          { name = "apps"; title = "Programmer"; }
-          { name = "hardware"; title = "Maskinvare"; }
-        ];
-        modules = [
-          { name = "mode"; title = "Systemmodus"; category = "system"; profiles = [ "desktop" "htpc" ]; path = "modules/demo.nix"; x86 = false; required = true; automatic = false; }
-          { name = "demo-app"; title = "Demoprogram"; category = "apps"; profiles = [ "desktop" ]; path = "modules/demo.nix"; x86 = false; required = false; automatic = false; }
-          { name = "gpu/demo"; title = "gpu: demo"; category = "hardware"; profiles = [ ]; path = "modules/demo.nix"; x86 = false; required = false; automatic = true; }
-        ];
         pinnable = _: [ "hello-demo" "clock-demo" ];
         pkgs = system: packageSet.lib.nixlyos.pkgs system;
         nixpkgs = system: packageSet.lib.nixlyos.nixpkgs system;

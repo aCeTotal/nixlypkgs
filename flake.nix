@@ -52,13 +52,16 @@
         overlays = [
           self.overlays.default
           (import ./nixlyos/pkgs/brave/overlay.nix)
+          (import ./nixlyos/scripts/overlay.nix)
         ];
       };
     in {
       lib = nixpkgs.lib // {
         mkNixlySystem = import ./nixlyos/lib/mk-system.nix { inherit self inputs; };
         mkNixlyServer = import ./nixlyserver/mk-server.nix { inherit self inputs; };
-        nixlyos = import ./nixlyos/lib/registry.nix { inherit (nixpkgs) lib; } // {
+        nixlyos = {
+          # Caches every machine trusts.
+          caches = import ./nixlyos/lib/caches.nix;
           # Package set the panel builds against.
           pkgs = stableFor;
           # nixpkgs below it, without nixlypkgs.
@@ -89,7 +92,7 @@
                 inherit (kp) xpadneo xone xpad-noone msi-ec;
               };
         in {
-          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer nixly-vrs proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly nixly-mic nixly-gate nixly_kalk nixly_pdf nixly_voice meshy freecad-mcp codeindexcache determinate-nix;
+          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer nixly-vrs proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly nixly-mic nixly-gate nixly_kalk nixly_pdf nixly_voice meshy freecad-mcp codeindexcache determinate-nix nixlyos-panel;
 
           # Layer for 32-bit games.
           nixly-vrs-i686 = stable.pkgsi686Linux.nixly-vrs;
