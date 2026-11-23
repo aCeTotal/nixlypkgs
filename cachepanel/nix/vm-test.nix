@@ -109,8 +109,8 @@ in
     with subtest("every module lives in the database, in import order"):
         modules = get("/modules")
         assert [m["slug"] for m in modules] == ["system", "security", "network", "session", "audio", "user",
-                                                "gaming", "apps", "desktop", "htpc", "hardware"], modules
-        assert {m["slug"] for m in modules if m["required"]} == {"system", "security", "network", "session", "audio", "user", "hardware"}
+                                                "gaming", "apps", "desktop", "htpc", "server", "hardware"], modules
+        assert {m["slug"] for m in modules if m["required"]} == {"system", "security", "network", "user", "hardware"}
         problem = json.loads(send("/modules/validate", json.dumps({"source": "{ a = ; }"})))
         assert problem["line"] == 1 and problem["column"] == 7, problem
 
@@ -125,7 +125,7 @@ in
 
     with subtest("profiles are seeded, checked and land in testing"):
         retry(lambda _: all(p["testingTree"] for p in get("/profiles")), timeout_seconds=300)
-        assert {p["name"] for p in get("/profiles")} == {"desktop", "laptop", "htpc"}
+        assert {p["name"] for p in get("/profiles")} == {"desktop", "htpc", "server"}
         assert all(p["stableTree"] is None for p in get("/profiles"))
         assert status(f"{panel}/api/v1/profiles/desktop") == "404"
         assert status(f"{panel}/api/v1/profiles/desktop/testing") == "200"
@@ -139,11 +139,14 @@ in
         assert imports.index("./modules/system.nix") < imports.index("./modules/hardware.nix"), imports
         htpc = [f["path"] for f in get("/profiles/htpc")["files"]]
         assert "modules/htpc.nix" in htpc and "modules/desktop.nix" not in htpc, htpc
+        headless = [f["path"] for f in get("/profiles/server")["files"]]
+        assert "modules/server.nix" in headless and "modules/session.nix" not in headless and "modules/audio.nix" not in headless, headless
+        assert "modules/session.nix" in paths and "modules/audio.nix" in paths, paths
 
     with subtest("stable moves only on an approval of everything reviewed"):
         retry(lambda _: all(p["checkState"] in ("passed", "skipped") for p in get("/profiles")), timeout_seconds=300)
         awaiting = get("/approval")["profiles"]
-        assert {p["name"] for p in awaiting} == {"desktop", "laptop", "htpc"}, awaiting
+        assert {p["name"] for p in awaiting} == {"desktop", "htpc", "server"}, awaiting
         desktop = next(p for p in awaiting if p["name"] == "desktop")
         assert {"path": "modules/desktop.nix", "change": "added"} in desktop["files"], desktop
         assert approval_status(approve(awaiting[:1])) == "409"
@@ -204,6 +207,8 @@ in
         server.succeed(f"test -f /var/lib/cachepanel/cache/{narinfo}.narinfo")
         server.succeed(f"curl -fsS {panel}/nix-cache-info | grep -q 'WantMassQuery: 1'")
         server.succeed(f"curl -fsS {panel}/{narinfo}.narinfo | grep -q 'Sig: cache.aceclan.no-1:'")
+        nar_hash = server.succeed(f"curl -fsS {panel}/{narinfo}.narinfo | sed -n 's/^NarHash: sha256://p'").strip()
+        server.succeed(f"curl -fsS -o /dev/null '{panel}/nar/{nar_hash}.nar?hash={narinfo}'")
         server.succeed(f"nix store verify --store {panel} --option trusted-public-keys \"$(cat /var/lib/nixly-cache/keys/cache-pub.key)\" {out}")
         server.wait_until_succeeds("journalctl -u nixly-cachepanel | grep -q '\"msg\":\"garbage collection\"'", timeout=120)
         server.wait_until_succeeds(f"test ! -e /var/lib/cachepanel/cache/{evicted}.narinfo", timeout=120)

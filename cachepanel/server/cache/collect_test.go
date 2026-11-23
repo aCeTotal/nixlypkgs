@@ -24,8 +24,8 @@ func write(t *testing.T, dir, name, content string) {
 func publish(t *testing.T, dir, path string, references ...string) {
 	t.Helper()
 	write(t, dir, path[:hashLength]+narinfoSuffix,
-		"StorePath: /nix/store/"+path+"\nURL: nar/"+path[:hashLength]+".nar.zst\nReferences: "+strings.Join(references, " ")+"\n")
-	write(t, dir, "nar/"+path[:hashLength]+".nar.zst", "nar")
+		"StorePath: /nix/store/"+path+"\nURL: nar/"+path[:hashLength]+".nar\nReferences: "+strings.Join(references, " ")+"\n")
+	write(t, dir, "nar/"+path[:hashLength]+".nar", "nar")
 }
 
 func TestSweepKeepsClosures(t *testing.T) {
@@ -55,7 +55,7 @@ func TestSweepKeepsClosures(t *testing.T) {
 	}
 	slices.Sort(left)
 	want := []string{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.narinfo", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.narinfo", "nar",
-		"nar/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.nar.zst", "nar/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.nar.zst", "nix-cache-info"}
+		"nar/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.nar", "nar/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.nar", "nix-cache-info"}
 	if !slices.Equal(left, want) {
 		t.Errorf("left %v, want %v", left, want)
 	}

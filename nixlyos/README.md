@@ -8,7 +8,7 @@ tree — only `~/.local/nixlyos`:
 ~/.local/nixlyos/
   flake.nix     tiny; nixlypkgs revision and profile tree pinned by the panel
   flake.lock    the machine's pin — updates only via nixlyos-update
-  profile       the Nixly panel profile this machine follows (desktop, laptop, htpc)
+  profile       the Nixly panel profile this machine follows (desktop, htpc, server)
   branch        stable (default) or testing, set by nixlyos-panel branch
   local.nix     per-machine overrides and secrets (never in this repo)
   meshy.key     Meshy.ai API key for the meshy CLI (mode 600)
@@ -18,7 +18,7 @@ tree — only `~/.local/nixlyos`:
 ## The panel decides
 
 Every NixlyOS module lives in the Nixly panel's database (`../cachepanel`),
-not in this repo. A machine follows a *profile* (desktop, laptop, htpc, ...):
+not in this repo. A machine follows a *profile* (desktop, htpc, server, ...):
 the panel publishes the nixlypkgs revision together with a profile tree that
 holds the required modules, the modules the profile selected and its extra
 packages. The hardware module picks CPU, GPU and guest support from

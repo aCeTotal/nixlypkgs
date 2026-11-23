@@ -138,7 +138,6 @@ cmd_adopt() {
   [[ -f $PROFILE_FILE ]] && return 0
   local name=desktop host user version
   [[ $(cat /etc/nixlyos-mode 2>/dev/null) == htpc ]] && name=htpc
-  [[ $name == desktop && $(cat /sys/class/dmi/id/chassis_type 2>/dev/null) =~ ^(8|9|10|14|31|32)$ ]] && name=laptop
   host=$(grep -oP 'hostName = "\K[^"]+' "$FLAKE/flake.nix") || die "no hostName in flake.nix"
   user=$(grep -oP 'username = "\K[^"]+' "$FLAKE/flake.nix") || die "no username in flake.nix"
   version=$(grep -oP 'stateVersion = "\K[^"]+' "$FLAKE/flake.nix") || die "no stateVersion in flake.nix"

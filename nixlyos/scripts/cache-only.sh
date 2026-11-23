@@ -4,6 +4,9 @@ CACHE_OPTS=(
   --option extra-trusted-public-keys cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak=
   --option connect-timeout 3
   --option fallback false
+  # Always ask the cache fresh.
+  --option narinfo-cache-positive-ttl 0
+  --option narinfo-cache-negative-ttl 0
 )
 
 # Source builds $1 would need.

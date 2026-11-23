@@ -53,8 +53,9 @@ func (c *Cache) Push(ctx context.Context, paths ...string) error {
 	return nil
 }
 
+// Plain NARs keep harmonia's URLs.
 func (c *Cache) url() string {
-	url := "file://" + c.dir + "?compression=zstd&parallel-compression=true"
+	url := "file://" + c.dir + "?compression=none"
 	if c.key != "" {
 		url += "&secret-key=" + c.key
 	}

@@ -1,7 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { api } from "@/api/http";
 
-export type Platform = "desktop" | "htpc";
+export type Platform = "desktop" | "htpc" | "server";
 export type CheckState = "pending" | "running" | "passed" | "failed" | "skipped";
 export type Branch = "stable" | "testing";
 
@@ -54,7 +54,7 @@ export type ProfileSettings = {
   packages: string[];
 };
 
-export const platformLabels: Record<Platform, string> = { desktop: "Desktop and laptop", htpc: "HTPC" };
+export const platformLabels: Record<Platform, string> = { desktop: "Desktop and laptop", htpc: "HTPC", server: "Server" };
 
 export const testingAhead = (profile: ProfileSummary) =>
   profile.testingRev !== null && (profile.testingTree !== profile.stableTree || profile.testingRev !== profile.stableRev);

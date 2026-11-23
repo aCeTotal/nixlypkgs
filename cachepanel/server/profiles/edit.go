@@ -16,7 +16,7 @@ import (
 var (
 	namePattern  = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
 	attrPattern  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_'-]*(\.[A-Za-z_][A-Za-z0-9_'-]*)*$`)
-	platforms    = map[string]bool{"desktop": true, "htpc": true}
+	platforms    = map[string]bool{"desktop": true, "htpc": true, "server": true}
 	errName      = rest.Unprocessable("invalid_name", "The ID may only contain lowercase letters, digits and hyphens (max 32)")
 	errTitle     = rest.Unprocessable("invalid_title", "The name needs 1–80 characters")
 	errPlatform  = rest.Unprocessable("invalid_platform", "Unknown platform")
