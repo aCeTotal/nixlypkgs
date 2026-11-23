@@ -42,14 +42,14 @@ export function BuildProgress({ versionId, compact }: { versionId: number; compa
       </div>
       <div className={cn("flex items-center justify-between gap-3 text-xs text-muted-foreground tabular-nums", compact && "text-[0.7rem]")}>
         <span className="truncate">
-          {progress.activity || "Forbereder"}
+          {progress.activity || "Preparing"}
           {progress.phase && ` · ${progress.phase}`}
         </span>
         <span className="shrink-0">
-          {progress.builds.expected > 0 && `${progress.builds.done}/${progress.builds.expected} bygg · `}
-          {progress.paths.expected > 0 && `${progress.paths.done}/${progress.paths.expected} hentet · `}
+          {progress.builds.expected > 0 && `${progress.builds.done}/${progress.builds.expected} built · `}
+          {progress.paths.expected > 0 && `${progress.paths.done}/${progress.paths.expected} fetched · `}
           {formatDuration(elapsed)}
-          {remaining !== null && remaining > 0 && ` · ~${formatDuration(remaining)} igjen`}
+          {remaining !== null && remaining > 0 && ` · ~${formatDuration(remaining)} left`}
         </span>
       </div>
       {!compact && progress.line && <p className="truncate font-mono text-[0.7rem] text-muted-foreground/80">{progress.line}</p>}

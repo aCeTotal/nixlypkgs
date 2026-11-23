@@ -14,7 +14,8 @@ import { packageQuery, packagesQuery } from "@/packages/queries";
 import { appRoute, rootRoute } from "@/shell/app-route";
 import { ProfilePage } from "@/profiles/profile-page";
 import { ProfilesPage } from "@/profiles/profiles-page";
-import { profileQuery, profilesQuery } from "@/profiles/queries";
+import { approvalQuery, profileQuery, profilesQuery } from "@/profiles/queries";
+import { TestingPage } from "@/profiles/testing-page";
 import { NewRecipePage } from "@/recipes/new-recipe-page";
 import { recipeQuery, recipesQuery } from "@/recipes/queries";
 import { RecipePage } from "@/recipes/recipe-page";
@@ -25,7 +26,7 @@ const loginRoute = createRoute({
   path: "/login",
   validateSearch: (search: Record<string, unknown>) => ({ redirect: typeof search.redirect === "string" ? search.redirect : undefined }),
   component: LoginPage,
-  staticData: { title: "Logg inn" },
+  staticData: { title: "Sign in" },
 });
 
 const page = (path: string, title: string, component: () => React.ReactNode, loader?: () => Promise<unknown>) =>
@@ -34,16 +35,17 @@ const page = (path: string, title: string, component: () => React.ReactNode, loa
 const routeTree = rootRoute.addChildren([
   loginRoute,
   appRoute.addChildren([
-    page("/", "Oversikt", OverviewPage, () => queryClient.ensureQueryData(overviewQuery)),
-    page("/profiles", "Profiler", ProfilesPage, () => queryClient.ensureQueryData(profilesQuery)),
+    page("/", "Overview", OverviewPage, () => queryClient.ensureQueryData(overviewQuery)),
+    page("/profiles", "Profiles", ProfilesPage, () => queryClient.ensureQueryData(profilesQuery)),
+    page("/testing", "Testing", TestingPage, () => queryClient.ensureQueryData(approvalQuery)),
     createRoute({
       getParentRoute: () => appRoute,
       path: "/profiles/$name",
       component: ProfilePage,
       loader: ({ params }) => queryClient.ensureQueryData(profileQuery(params.name)),
-      staticData: { title: "Profil" },
+      staticData: { title: "Profile" },
     }),
-    page("/modules", "Moduler", ModulesPage, () =>
+    page("/modules", "Modules", ModulesPage, () =>
       Promise.all([queryClient.ensureQueryData(modulesQuery), queryClient.ensureQueryData(profilesQuery)]),
     ),
     createRoute({
@@ -51,25 +53,25 @@ const routeTree = rootRoute.addChildren([
       path: "/modules/$id",
       component: ModulePage,
       loader: ({ params }) => queryClient.ensureQueryData(moduleQuery(Number(params.id))),
-      staticData: { title: "Modul" },
+      staticData: { title: "Module" },
     }),
-    page("/packages", "Pakker", PackagesPage, () => queryClient.ensureQueryData(packagesQuery)),
+    page("/packages", "Derivations", PackagesPage, () => queryClient.ensureQueryData(packagesQuery)),
     createRoute({
       getParentRoute: () => appRoute,
       path: "/packages/$attr",
       component: PackagePage,
       loader: ({ params }) => queryClient.ensureQueryData(packageQuery(params.attr)),
-      staticData: { title: "Pakke" },
+      staticData: { title: "Derivation" },
     }),
     page("/commits", "Commits", CommitsPage, () => queryClient.ensureInfiniteQueryData(commitsQuery)),
-    page("/recipes", "Nye pakker", RecipesPage, () => queryClient.ensureQueryData(recipesQuery)),
-    page("/recipes/new", "Ny pakke", NewRecipePage),
+    page("/recipes", "Add derivation", RecipesPage, () => queryClient.ensureQueryData(recipesQuery)),
+    page("/recipes/new", "Add derivation", NewRecipePage),
     createRoute({
       getParentRoute: () => appRoute,
       path: "/recipes/$id",
       component: RecipePage,
       loader: ({ params }) => queryClient.ensureQueryData(recipeQuery(Number(params.id))),
-      staticData: { title: "Ny pakke" },
+      staticData: { title: "Add derivation" },
     }),
   ]),
 ]);

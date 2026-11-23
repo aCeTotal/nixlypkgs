@@ -16,17 +16,16 @@ import (
 	"cachepanel/watcher"
 )
 
-const storeDir = "/nix/store"
-
 // Overview is one dashboard request.
 type Overview struct {
-	db      *pgxpool.Pool
-	watcher *watcher.Watcher
-	pool    *builds.Pool
+	db       *pgxpool.Pool
+	watcher  *watcher.Watcher
+	pool     *builds.Pool
+	cacheDir string
 }
 
-func New(db *pgxpool.Pool, w *watcher.Watcher, pool *builds.Pool) *Overview {
-	return &Overview{db: db, watcher: w, pool: pool}
+func New(db *pgxpool.Pool, w *watcher.Watcher, pool *builds.Pool, cacheDir string) *Overview {
+	return &Overview{db: db, watcher: w, pool: pool, cacheDir: cacheDir}
 }
 
 func (o *Overview) Mount(r chi.Router) {
@@ -56,7 +55,7 @@ func (o *Overview) get(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	var stat syscall.Statfs_t
-	if err := syscall.Statfs(storeDir, &stat); err != nil {
+	if err := syscall.Statfs(o.cacheDir, &stat); err != nil {
 		return err
 	}
 	if stat.Bsize <= 0 {

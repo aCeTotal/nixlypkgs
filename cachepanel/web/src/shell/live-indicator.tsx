@@ -2,11 +2,11 @@ import { useConnection } from "@/api/realtime";
 import { cn } from "@/ui/cn";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
-const labels = { open: "Live", connecting: "Kobler til", closed: "Frakoblet" } as const;
+const labels = { open: "Live", connecting: "Connecting", closed: "Offline" } as const;
 const hints = {
-  open: "Sanntidsoppdateringer er aktive",
-  connecting: "Kobler til sanntid…",
-  closed: "Sanntid frakoblet – prøver igjen",
+  open: "Live updates are on",
+  connecting: "Connecting to live updates…",
+  closed: "Live updates lost – retrying",
 } as const;
 const dots = { open: "bg-success", connecting: "bg-warning", closed: "bg-destructive" } as const;
 

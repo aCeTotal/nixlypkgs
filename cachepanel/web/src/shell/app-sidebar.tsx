@@ -26,7 +26,7 @@ export function AppSidebar() {
           <img src="/favicon.svg" alt="" className="size-9 shrink-0 rounded-xl shadow-md shadow-primary/30" />
           <span className="truncate leading-tight group-data-[collapsible=icon]:hidden">
             <span className="block font-semibold tracking-tight">Nixly Panel</span>
-            <span className="block text-xs text-muted-foreground">Cache · profiler · pakker</span>
+            <span className="block text-xs text-muted-foreground">Cache · profiles · derivations</span>
           </span>
         </Link>
       </SidebarHeader>
@@ -44,6 +44,7 @@ export function AppSidebar() {
                         <span>{item.label}</span>
                       </Link>
                     </SidebarMenuButton>
+                    {item.badge && <item.badge />}
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>

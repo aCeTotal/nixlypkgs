@@ -1,23 +1,13 @@
-{ config, lib, pkgs, options, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   cfg = config.services.nixly-cachepanel;
   inherit (lib) mkOption types;
   stateDir = "/var/lib/cachepanel";
-  harmoniaAddress = "127.0.0.1:5002";
   githubRepo = builtins.match "https://github.com/([^/]+)/([^/]+)" (lib.removeSuffix ".git" (lib.removeSuffix "/" cfg.repository));
   generatedKey = "/var/lib/nixly-cachepanel-publish/id_ed25519";
   publishKey = if cfg.publish.keyFile == null then generatedKey else cfg.publish.keyFile;
   publishing = cfg.publish.remote != null;
-
-  harmonia = {
-    enable = true;
-    signKeyPaths = [ "${cfg.cache.keyDir}/cache-priv.key" ];
-    settings = {
-      bind = harmoniaAddress;
-      priority = 30;
-    };
-  };
 in
 {
   options.services.nixly-cachepanel = {
@@ -89,10 +79,17 @@ in
     };
 
     cache = {
-      enable = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Serve the store as a signed binary cache with harmonia.";
+      dir = mkOption {
+        type = types.str;
+        default = "${stateDir}/cache";
+        example = "/mnt/bigdisk2/nixlyos/cache";
+        description = "Directory holding the signed binary cache; put it on a big disk.";
+      };
+      publicKey = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        example = "cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak=";
+        description = "Public half of the signing key; lets this host substitute from its own cache.";
       };
       keyName = mkOption {
         type = types.str;
@@ -130,9 +127,10 @@ in
       systemd.services.nixly-cachepanel = {
         description = "Nixly panel";
         wantedBy = [ "multi-user.target" ];
-        after = [ "network-online.target" "postgresql.service" "nix-daemon.socket" ];
+        after = [ "network-online.target" "postgresql.service" "nix-daemon.socket" "nixly-cache-keygen.service" ];
         wants = [ "network-online.target" ];
-        requires = [ "postgresql.service" ];
+        requires = [ "postgresql.service" "nixly-cache-keygen.service" ];
+        unitConfig.RequiresMountsFor = [ cfg.cache.dir ];
         path = [ config.nix.package ];
         environment = {
           CACHEPANEL_DATABASE_URL = "postgres:///cachepanel?host=/run/postgresql";
@@ -145,6 +143,8 @@ in
           CACHEPANEL_PUBLIC_URL = cfg.publicURL;
           CACHEPANEL_PUBLISH_REMOTE = lib.mkIf publishing cfg.publish.remote;
           CACHEPANEL_PUBLISH_KEY = lib.mkIf publishing "%d/publish-key";
+          CACHEPANEL_CACHE_DIR = cfg.cache.dir;
+          CACHEPANEL_CACHE_KEY = "%d/cache-key";
           HOME = stateDir;
           NIX_REMOTE = "daemon";
           NIX_SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
@@ -158,7 +158,8 @@ in
           Restart = "always";
           RestartSec = "5s";
           LimitNOFILE = 1048576;
-          LoadCredential = lib.mkIf publishing "publish-key:${publishKey}";
+          LoadCredential = [ "cache-key:${cfg.cache.keyDir}/cache-priv.key" ] ++ lib.optional publishing "publish-key:${publishKey}";
+          ReadWritePaths = [ cfg.cache.dir ];
           NoNewPrivileges = true;
           PrivateTmp = true;
           PrivateDevices = true;
@@ -205,11 +206,12 @@ in
       };
     })
 
-    (lib.mkIf cfg.cache.enable {
+    {
+      systemd.tmpfiles.rules = [ "d ${cfg.cache.dir} 0755 cachepanel cachepanel -" ];
+
       systemd.services.nixly-cache-keygen = {
         description = "Generate the binary cache signing key";
         wantedBy = [ "multi-user.target" ];
-        before = [ "harmonia.service" ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
@@ -229,12 +231,12 @@ in
         '';
       };
 
-      # NixOS 26.05 nests it.
-      services.harmonia = if options.services.harmonia ? cache then { cache = harmonia; } else harmonia;
+    }
 
-      systemd.services.harmonia = {
-        after = [ "nixly-cache-keygen.service" ];
-        requires = [ "nixly-cache-keygen.service" ];
+    (lib.mkIf (cfg.cache.publicKey != null) {
+      nix.settings = {
+        extra-substituters = [ "file://${cfg.cache.dir}" ];
+        extra-trusted-public-keys = [ cfg.cache.publicKey ];
       };
     })
 
@@ -243,15 +245,6 @@ in
         enable = true;
         virtualHosts.${cfg.domain}.extraConfig = ''
           encode zstd gzip
-
-          @cache path /nix-cache-info /*.narinfo /*.ls /nar/* /log/* /serve/*
-          handle @cache {
-            reverse_proxy ${harmoniaAddress} {
-              transport http {
-                read_timeout 300s
-              }
-            }
-          }
 
           handle /cache-pub.key {
             root * ${cfg.cache.keyDir}

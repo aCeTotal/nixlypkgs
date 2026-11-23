@@ -139,7 +139,7 @@ function SheetContent({
               size="icon"
             >
               <XIcon />
-              <span className="sr-only">Lukk</span>
+              <span className="sr-only">Close</span>
             </Button>
           </SheetPrimitive.Close>
         )}

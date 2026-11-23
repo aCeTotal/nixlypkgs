@@ -32,11 +32,11 @@ export function VersionCard({ pkg, version, newest }: VersionCardProps) {
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-semibold">{version.name}</h3>
               <StateBadge state={version.state} />
-              {newest && <Badge variant="outline">Nyeste</Badge>}
+              {newest && <Badge variant="outline">Newest</Badge>}
               {selected && (
                 <Badge>
                   <Lock />
-                  Valgt
+                  Selected
                 </Badge>
               )}
             </div>
@@ -56,48 +56,48 @@ export function VersionCard({ pkg, version, newest }: VersionCardProps) {
             {pkg.pinnable && version.state === "cached" && !selected && (
               <Button size="sm" onClick={() => choose.mutate(version.id)} disabled={choose.isPending}>
                 <Lock />
-                Bruk denne
+                Use this
               </Button>
             )}
             {selected && (
               <Button size="sm" variant="outline" onClick={() => choose.mutate(null)} disabled={choose.isPending}>
                 <LockOpen />
-                Følg systemet
+                Follow the system
               </Button>
             )}
             {rebuildable && (
               <Button size="sm" variant="outline" onClick={() => act.mutate("build")} disabled={act.isPending}>
                 <Hammer />
-                {version.state === "pending" ? "Bygg nå" : "Bygg på nytt"}
+                {version.state === "pending" ? "Build now" : "Build again"}
               </Button>
             )}
             {running && (
               <Button size="sm" variant="outline" onClick={() => act.mutate("cancel")} disabled={act.isPending}>
                 <Ban />
-                Avbryt
+                Cancel
               </Button>
             )}
             {!selected && version.state !== "pending" && version.state !== "building" && (
               <ConfirmButton
-                label="Slett cache"
+                label="Delete from cache"
                 icon={Trash2}
-                title={`Slette cachen for ${version.name}?`}
-                description="Byggresultatet fjernes fra serveren ved neste opprydding. Versjonen kan bygges på nytt senere."
+                title={`Delete ${version.name} from the cache?`}
+                description="The build is removed from the server at the next cleanup. The version can be built again later."
                 onConfirm={() => act.mutate("drop")}
               />
             )}
             <Button size="sm" variant="ghost" onClick={() => setShowLog(!showLog)}>
               <ScrollText />
-              Logg
+              Log
             </Button>
           </div>
         </div>
         {version.state === "building" && <BuildProgress versionId={version.id} />}
         <dl className="grid gap-3 text-sm sm:grid-cols-4">
-          <Fact label="Commit-tid" value={dateTime(version.last.time)} />
-          <Fact label="Bygget" value={version.finishedAt ? timeAgo(version.finishedAt) : "–"} />
-          <Fact label="Byggetid" value={formatDuration(secondsBetween(version.startedAt, version.finishedAt))} />
-          <Fact label="Størrelse" value={formatBytes(version.closureBytes)} />
+          <Fact label="Commit time" value={dateTime(version.last.time)} />
+          <Fact label="Built" value={version.finishedAt ? timeAgo(version.finishedAt) : "–"} />
+          <Fact label="Build time" value={formatDuration(secondsBetween(version.startedAt, version.finishedAt))} />
+          <Fact label="Size" value={formatBytes(version.closureBytes)} />
         </dl>
         <div className="space-y-1 rounded-lg bg-muted/50 p-3 font-mono text-xs">
           <p className="truncate text-muted-foreground">{version.drvPath}</p>

@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	errInvalidCredentials = &rest.Error{Status: http.StatusUnauthorized, Code: "invalid_credentials", Message: "Feil brukernavn eller passord"}
-	errTooManyAttempts    = &rest.Error{Status: http.StatusTooManyRequests, Code: "too_many_attempts", Message: "For mange forsøk. Vent ett minutt."}
-	errWrongPassword      = rest.Unprocessable("wrong_password", "Nåværende passord er feil")
+	errInvalidCredentials = &rest.Error{Status: http.StatusUnauthorized, Code: "invalid_credentials", Message: "Wrong username or password"}
+	errTooManyAttempts    = &rest.Error{Status: http.StatusTooManyRequests, Code: "too_many_attempts", Message: "Too many attempts. Wait a minute."}
+	errWrongPassword      = rest.Unprocessable("wrong_password", "The current password is wrong")
 )
 
 type me struct {

@@ -21,7 +21,7 @@ export function UserMenu() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="rounded-full" aria-label={`Brukermeny for ${user.username}`}>
+          <Button variant="ghost" size="icon" className="rounded-full" aria-label={`User menu for ${user.username}`}>
             <span className="grid size-8 place-items-center rounded-full bg-gradient-to-br from-primary/20 to-chart-5/25 text-primary">
               <UserRound className="size-4" />
             </span>
@@ -35,7 +35,7 @@ export function UserMenu() {
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => setChangingPassword(true)}>
             <KeyRound />
-            Bytt passord
+            Change password
           </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={async () => {
@@ -44,7 +44,7 @@ export function UserMenu() {
             }}
           >
             <LogOut />
-            Logg ut
+            Sign out
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

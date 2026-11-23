@@ -11,19 +11,19 @@ export function ProfilePackages({ packages, update }: ProfilePackagesProps) {
     <div className="grid gap-4 xl:grid-cols-[1fr_22rem]">
       <Card>
         <CardHeader>
-          <CardTitle>Pakker</CardTitle>
-          <CardDescription>Installeres i systemet i tillegg til det modulene tar med.</CardDescription>
+          <CardTitle>Packages</CardTitle>
+          <CardDescription>Installed system-wide on top of what the modules bring.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <AttrSearch
-            label="Søk etter pakke"
-            placeholder="Søk, f.eks. blender eller python3Packages.numpy"
+            label="Search for a package"
+            placeholder="Search, e.g. blender or python3Packages.numpy"
             exclude={packages}
             onPick={(attr) => update({ packages: [...packages, attr] })}
           />
           {packages.length === 0 ? (
             <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Ingen ekstra pakker – profilen får det modulene installerer.
+              No extra packages – the profile gets what its modules install.
             </p>
           ) : (
             <ul className="flex flex-wrap gap-2">
@@ -33,7 +33,7 @@ export function ProfilePackages({ packages, update }: ProfilePackagesProps) {
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    aria-label={`Fjern ${attr}`}
+                    aria-label={`Remove ${attr}`}
                     onClick={() => update({ packages: packages.filter((pkg) => pkg !== attr) })}
                   >
                     <X />
@@ -48,13 +48,13 @@ export function ProfilePackages({ packages, update }: ProfilePackagesProps) {
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p className="flex items-center gap-2 font-medium text-foreground">
             <Info className="size-4 text-primary" />
-            Alltid stable
+            Always stable
           </p>
           <p>
-            Pakkene kommer fra nixpkgs stable med nixlypkgs på toppen – det samme som cachen bygger. nixlypkgs-pakkene har
-            de tre siste versjonene i cachen; profilen følger revisjonen under Innstillinger.
+            Packages come from nixpkgs stable with nixlypkgs on top – exactly what the cache builds. nixlypkgs derivations
+            keep their three newest versions in the cache; the profile follows the revision under Settings.
           </p>
-          <p>Mangler et program, lag det under nixlypkgs → Ny pakke.</p>
+          <p>Missing a program? Add it under nixlypkgs → Add derivation.</p>
         </CardContent>
       </Card>
     </div>

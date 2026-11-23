@@ -33,8 +33,8 @@ const (
 
 var (
 	client        = &http.Client{Timeout: fetchTimeout}
-	errNotFound   = errors.New("fant ingen pakke med det navnet")
-	errTooLarge   = errors.New("pakkefilene er for store")
+	errNotFound   = errors.New("no package with that name")
+	errTooLarge   = errors.New("the package files are too large")
 	projectUnsafe = regexp.MustCompile(`[^a-zA-Z0-9_.-]`)
 	projectRuns   = regexp.MustCompile(`[_-]{2,}`)
 )
@@ -67,7 +67,7 @@ func Fetch(ctx context.Context, origin Origin, name string) (map[string][]byte, 
 		project := gitlabProject(found.Results[0].Pkgbase)
 		return snapshot(ctx, "https://gitlab.archlinux.org/archlinux/packaging/packages/"+project+"/-/archive/main/"+project+"-main.tar.gz")
 	}
-	return nil, fmt.Errorf("ukjent kilde %q", origin)
+	return nil, fmt.Errorf("unknown source %q", origin)
 }
 
 // gitlabProject follows pkgctl's project naming.

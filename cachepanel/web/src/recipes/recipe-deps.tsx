@@ -8,19 +8,19 @@ type ListKey = "nativeBuildInputs" | "buildInputs" | "depends" | "pythonDependen
 
 type Group = { key: ListKey; title: string; hint: string };
 
-const tools: Group = { key: "nativeBuildInputs", title: "Byggeverktøy", hint: "Verktøy bygget kjører, som cmake, cargo eller pkg-config." };
-const libraries: Group = { key: "buildInputs", title: "Biblioteker", hint: "Biblioteker programmet lenkes mot." };
+const tools: Group = { key: "nativeBuildInputs", title: "Build tools", hint: "Tools the build runs, such as cmake, cargo or pkg-config." };
+const libraries: Group = { key: "buildInputs", title: "Libraries", hint: "Libraries the program links against." };
 
 const groups: Partial<Record<Builder, Group[]>> = {
   makepkg: [
     tools,
-    { key: "depends", title: "Kjøretid", hint: "Det pakken trenger når den kjører (depends i PKGBUILD-en)." },
-    { key: "pythonDependencies", title: "Python-moduler", hint: "Moduler et Python-program importerer." },
-    { ...libraries, title: "Ekstra biblioteker", hint: "Biblioteker bare bygget trenger." },
+    { key: "depends", title: "Runtime", hint: "What the package needs when it runs (depends in the PKGBUILD)." },
+    { key: "pythonDependencies", title: "Python modules", hint: "Modules a Python program imports." },
+    { ...libraries, title: "Extra libraries", hint: "Libraries only the build needs." },
   ],
   python: [
-    { key: "buildSystem", title: "Byggesystem", hint: "Det pyproject.toml bygger med, som setuptools eller hatchling." },
-    { key: "pythonDependencies", title: "Python-moduler", hint: "Moduler programmet importerer." },
+    { key: "buildSystem", title: "Build system", hint: "What pyproject.toml builds with, such as setuptools or hatchling." },
+    { key: "pythonDependencies", title: "Python modules", hint: "Modules the program imports." },
     tools,
     libraries,
   ],
@@ -60,8 +60,8 @@ export function RecipeDeps({ spec, update }: RecipeDepsProps) {
         {flags && (
           <Card>
             <CardHeader>
-              <CardTitle>Byggeflagg</CardTitle>
-              <CardDescription>Ett flagg per linje.</CardDescription>
+              <CardTitle>Build flags</CardTitle>
+              <CardDescription>One flag per line.</CardDescription>
             </CardHeader>
             <CardContent>
               <Field>
@@ -76,12 +76,12 @@ export function RecipeDeps({ spec, update }: RecipeDepsProps) {
         {prebuilt.has(spec.builder) && (
           <Card>
             <CardHeader>
-              <CardTitle>Valgfrie biblioteker</CardTitle>
-              <CardDescription>Biblioteker programmet klarer seg uten, selv om filene ber om dem.</CardDescription>
+              <CardTitle>Optional libraries</CardTitle>
+              <CardDescription>Libraries the program manages without, even if its files ask for them.</CardDescription>
             </CardHeader>
             <CardContent>
               <Field>
-                <FieldLabel htmlFor="ignored">Ett filnavn per linje</FieldLabel>
+                <FieldLabel htmlFor="ignored">One file name per line</FieldLabel>
                 <Textarea
                   id="ignored"
                   rows={4}
@@ -90,7 +90,7 @@ export function RecipeDeps({ spec, update }: RecipeDepsProps) {
                   value={(spec.ignoredLibraries ?? []).join("\n")}
                   onChange={(event) => update({ ignoredLibraries: lines(event.target.value) })}
                 />
-                <FieldDescription>Testbygget legger til det som finnes i nixpkgs; resten kan listes her.</FieldDescription>
+                <FieldDescription>The test build adds what nixpkgs has; list the rest here.</FieldDescription>
               </Field>
             </CardContent>
           </Card>

@@ -25,8 +25,8 @@ const (
 )
 
 var (
-	errUnauthenticated = &rest.Error{Status: http.StatusUnauthorized, Code: "unauthenticated", Message: "Du må logge inn"}
-	errCSRF            = &rest.Error{Status: http.StatusForbidden, Code: "csrf", Message: "Ugyldig sikkerhetsnøkkel – last siden på nytt"}
+	errUnauthenticated = &rest.Error{Status: http.StatusUnauthorized, Code: "unauthenticated", Message: "Sign in first"}
+	errCSRF            = &rest.Error{Status: http.StatusForbidden, Code: "csrf", Message: "Invalid security token – reload the page"}
 )
 
 type User struct {

@@ -14,7 +14,7 @@ import (
 	"cachepanel/rest"
 )
 
-var errNotCached = rest.Conflict("not_cached", "Bare cachede versjoner kan velges")
+var errNotCached = rest.Conflict("not_cached", "Only cached versions can be selected")
 
 // Packages exposes cached attributes.
 type Packages struct {

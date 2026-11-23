@@ -12,10 +12,10 @@ import { login } from "./session";
 const route = getRouteApi("/login");
 
 const highlights = [
-  { icon: Boxes, text: "Binærcache med de tre siste versjonene av hver pakke" },
-  { icon: Layers, text: "Profiler bestemmer moduler, pakker og revisjon" },
-  { icon: ShieldCheck, text: "Alt testes på referansemaskiner før utrulling" },
-  { icon: Wand2, text: "Nye pakker fra kilde, lenke eller PKGBUILD – uten kode" },
+  { icon: Boxes, text: "Binary cache with the three newest versions of every derivation" },
+  { icon: Layers, text: "Profiles decide modules, packages and revision" },
+  { icon: ShieldCheck, text: "Everything is tested on reference machines, then approved" },
+  { icon: Wand2, text: "New derivations from source, link or PKGBUILD – no code" },
 ];
 
 export function LoginPage() {
@@ -43,7 +43,7 @@ export function LoginPage() {
           <span className="text-lg font-semibold tracking-tight">Nixly Panel</span>
         </div>
         <div className="relative mt-auto max-w-md space-y-8">
-          <h1 className="text-4xl leading-tight font-semibold tracking-tight">Hele NixlyOS-flåten, ett sted.</h1>
+          <h1 className="text-4xl leading-tight font-semibold tracking-tight">The whole NixlyOS fleet, in one place.</h1>
           <ul className="space-y-4">
             {highlights.map(({ icon: Icon, text }) => (
               <li key={text} className="flex items-center gap-3 text-white/85">
@@ -59,8 +59,8 @@ export function LoginPage() {
       <main className="flex items-center justify-center p-6 sm:p-12">
         <form onSubmit={submit} className="w-full max-w-sm space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold tracking-tight">Logg inn</h2>
-            <p className="text-sm text-muted-foreground">Kun for administratorer av nixlyOS.</p>
+            <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
+            <p className="text-sm text-muted-foreground">For NixlyOS administrators only.</p>
           </div>
           {signIn.error && (
             <Alert variant="destructive" className="animate-in fade-in">
@@ -70,11 +70,11 @@ export function LoginPage() {
           )}
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="username">Brukernavn</FieldLabel>
+              <FieldLabel htmlFor="username">Username</FieldLabel>
               <Input id="username" autoComplete="username" required value={username} onChange={(event) => setUsername(event.target.value)} />
             </Field>
             <Field>
-              <FieldLabel htmlFor="password">Passord</FieldLabel>
+              <FieldLabel htmlFor="password">Password</FieldLabel>
               <Input
                 id="password"
                 type="password"
@@ -87,7 +87,7 @@ export function LoginPage() {
           </FieldGroup>
           <Button type="submit" size="lg" className="w-full" disabled={signIn.isPending}>
             {signIn.isPending && <Spinner />}
-            Logg inn
+            Sign in
           </Button>
         </form>
       </main>

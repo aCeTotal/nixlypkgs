@@ -15,18 +15,18 @@ export function RecipeBuild({ recipe, dirty }: { recipe: RecipeDetail; dirty: bo
     <div className="grid gap-4 xl:grid-cols-[1fr_24rem]">
       <Card>
         <CardHeader>
-          <CardTitle>Testbygg</CardTitle>
-          <CardDescription>Bygger mot nixpkgs stable i sandkasse. Feil loggen forklarer, rettes automatisk og bygges på nytt.</CardDescription>
+          <CardTitle>Test build</CardTitle>
+          <CardDescription>Builds against nixpkgs stable in the sandbox. Errors the log explains are fixed automatically and rebuilt.</CardDescription>
           <CardAction>
             {building ? (
             <Button variant="outline" onClick={() => act.mutate("stop")}>
               <Square />
-              Stopp
+              Stop
             </Button>
           ) : (
             <Button onClick={() => act.mutate("build")} disabled={dirty || act.isPending}>
               <Hammer />
-              {dirty ? "Lagre først" : "Testbygg"}
+              {dirty ? "Save first" : "Test build"}
             </Button>
           )}
           </CardAction>
@@ -39,13 +39,13 @@ export function RecipeBuild({ recipe, dirty }: { recipe: RecipeDetail; dirty: bo
         {recipe.state === "ready" && recipe.output && (
           <Alert>
             <CircleCheck className="text-success" />
-            <AlertTitle>Bygget uten feil</AlertTitle>
+            <AlertTitle>Built without errors</AlertTitle>
             <AlertDescription className="font-mono text-xs break-all">{recipe.output}</AlertDescription>
           </Alert>
         )}
         {recipe.state === "failed" && recipe.error && (
           <Alert variant="destructive">
-            <AlertTitle>Bygget feilet</AlertTitle>
+            <AlertTitle>Build failed</AlertTitle>
             <AlertDescription>{recipe.error}</AlertDescription>
           </Alert>
         )}
@@ -54,7 +54,7 @@ export function RecipeBuild({ recipe, dirty }: { recipe: RecipeDetail; dirty: bo
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Lightbulb className="size-4 text-warning" />
-                Dette må du se på
+                Needs your attention
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -70,9 +70,9 @@ export function RecipeBuild({ recipe, dirty }: { recipe: RecipeDetail; dirty: bo
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Wrench className="size-4 text-primary" />
-              Rettet automatisk
+              Fixed automatically
             </CardTitle>
-            <CardDescription>{steps.length === 0 ? "Ingenting å rette ennå." : `${steps.length} rettelser i siste testbygg.`}</CardDescription>
+            <CardDescription>{steps.length === 0 ? "Nothing to fix yet." : `${steps.length} fixes in the latest test build.`}</CardDescription>
           </CardHeader>
           {steps.length > 0 && (
             <CardContent>

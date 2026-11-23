@@ -16,9 +16,9 @@ import (
 
 var (
 	slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
-	errSlug     = rest.Unprocessable("invalid_slug", "Filnavnet kan bare ha små bokstaver, tall og bindestrek")
-	errTitle    = rest.Unprocessable("invalid_title", "Tittel må ha 1–120 tegn")
-	errRequired = rest.Conflict("required", "Påkrevde moduler kan ikke slettes")
+	errSlug     = rest.Unprocessable("invalid_slug", "The file name may only contain lowercase letters, digits and hyphens")
+	errTitle    = rest.Unprocessable("invalid_title", "The title needs 1–120 characters")
+	errRequired = rest.Conflict("required", "Required modules cannot be deleted")
 )
 
 // Modules are the NixOS modules profiles import.

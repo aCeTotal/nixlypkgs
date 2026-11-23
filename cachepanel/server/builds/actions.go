@@ -18,10 +18,10 @@ const (
 )
 
 var (
-	errNotQueueable   = rest.Conflict("not_queueable", "Versjonen bygges eller er allerede cachet")
-	errNotCancellable = rest.Conflict("not_cancellable", "Versjonen står ikke i kø og bygges ikke")
-	errNotDroppable   = rest.Conflict("not_droppable", "Avbryt bygget før cachen slettes")
-	errSelected       = rest.Conflict("selected", "Versjonen er valgt – velg en annen først")
+	errNotQueueable   = rest.Conflict("not_queueable", "The version is building or already cached")
+	errNotCancellable = rest.Conflict("not_cancellable", "The version is neither queued nor building")
+	errNotDroppable   = rest.Conflict("not_droppable", "Cancel the build before deleting it from the cache")
+	errSelected       = rest.Conflict("selected", "The version is selected – choose another first")
 )
 
 // Queue builds a version first.
@@ -87,7 +87,7 @@ func (p *Pool) Drop(ctx context.Context, id int64) error {
 		return errNotDroppable
 	}
 	p.files.removeRoot(id)
-	p.gc.Request()
+	p.cache.Request()
 	p.announce(id, attr)
 	return nil
 }
@@ -99,7 +99,7 @@ func (p *Pool) Forget(evicted []versions.Evicted) {
 		p.files.Forget(version.ID)
 	}
 	if len(evicted) > 0 {
-		p.gc.Request()
+		p.cache.Request()
 	}
 }
 

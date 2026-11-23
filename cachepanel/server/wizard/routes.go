@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	errBusy      = rest.Conflict("recipe_busy", "Oppskriften importeres eller bygges nå")
-	errNotTested = rest.Conflict("not_tested", "Oppskriften må bygge uten feil før den publiseres")
-	errAttrTaken = rest.Conflict("attr_taken", "nixpkgs har allerede en pakke med dette navnet; velg et annet")
+	errBusy      = rest.Conflict("recipe_busy", "The recipe is being imported or built")
+	errNotTested = rest.Conflict("not_tested", "The recipe must build without errors before it is published")
+	errAttrTaken = rest.Conflict("attr_taken", "nixpkgs already has a package with this name; choose another")
 )
 
 func (s *Service) Mount(r chi.Router) {

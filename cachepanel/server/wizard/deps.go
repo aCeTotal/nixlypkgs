@@ -46,6 +46,6 @@ func guiHooks(inputs []string) []string {
 
 func (d *Draft) noteMissing(result depmap.Result) {
 	if result.Missing {
-		d.Notes = append(d.Notes, "Fant ingen nixpkgs-pakke for "+result.Name+"; legg den til selv om bygget trenger den")
+		d.Notes = append(d.Notes, "No nixpkgs package for "+result.Name+"; add one yourself if the build needs it")
 	}
 }

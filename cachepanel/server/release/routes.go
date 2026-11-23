@@ -15,6 +15,7 @@ var treePattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 func (r *Releases) Mount(router chi.Router) {
 	router.Get("/profiles", r.list)
 	router.Get("/profiles/{name}", r.pointer)
+	router.Get("/profiles/{name}/{branch}", r.pointer)
 	router.Get("/trees/{hash}.tar.gz", rest.Handle(r.tree))
 }
 
@@ -22,8 +23,13 @@ func (r *Releases) list(w http.ResponseWriter, req *http.Request) {
 	serve(w, req, r.current.Load().list)
 }
 
+// pointer defaults to stable for older machines.
 func (r *Releases) pointer(w http.ResponseWriter, req *http.Request) {
-	entry, found := r.Pointer(chi.URLParam(req, "name"))
+	branch := Branch(chi.URLParam(req, "branch"))
+	if branch == "" {
+		branch = Stable
+	}
+	entry, found := r.Pointer(chi.URLParam(req, "name"), branch)
 	if !found {
 		rest.WriteError(w, req, rest.NotFound())
 		return

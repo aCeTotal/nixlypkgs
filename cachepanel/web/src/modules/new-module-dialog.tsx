@@ -31,18 +31,18 @@ export function NewModuleDialog() {
       <DialogTrigger asChild>
         <Button>
           <Plus />
-          Ny modul
+          New module
         </Button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={submit} className="space-y-6">
           <DialogHeader>
-            <DialogTitle>Ny modul</DialogTitle>
-            <DialogDescription>En vanlig NixOS-modul. Velg den på profilene som skal bruke den.</DialogDescription>
+            <DialogTitle>New module</DialogTitle>
+            <DialogDescription>A plain NixOS module. Choose it on the profiles that should use it.</DialogDescription>
           </DialogHeader>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="new-module-title">Tittel</FieldLabel>
+              <FieldLabel htmlFor="new-module-title">Title</FieldLabel>
               <Input
                 id="new-module-title"
                 required
@@ -54,7 +54,7 @@ export function NewModuleDialog() {
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="new-module-slug">Filnavn</FieldLabel>
+              <FieldLabel htmlFor="new-module-slug">File name</FieldLabel>
               <Input id="new-module-slug" required className="font-mono" pattern="[a-z0-9][a-z0-9\-]{0,62}" value={slug} onChange={(event) => setSlug(event.target.value)} />
             </Field>
           </FieldGroup>

@@ -105,7 +105,7 @@ apply_event() {
     p) p_event "${@:2}" ;;
     start) name=${3##*/} name=${name:33} active[$2]=${name%.drv} begun[$2]=$now ;;
     stop) unset "active[$2]" "begun[$2]" ;;
-    failed) printf '%s\n' "$2" >> "$failed_file"; nfailed=$(( nfailed + 1 )) ;;
+    failed) nfailed=$(( nfailed + 1 )) ;;
   esac
 }
 
@@ -137,9 +137,9 @@ render_eval() {
   printf '\r\033[2K\033[?7h' >&2
 }
 
-# $1 failed drvs.
+# Live build view on stderr.
 render_progress() {
-  local failed_file=$1 shown=0 fr=0 last=0 status
+  local shown=0 fr=0 last=0 status
   local now t0 rate_t dl=0 dlexp=0 sd=0 se=0 bd=0 be=0 rate=0 rate_dl=0 sd_end="" nfailed=0
   local -a ev=() active=() begun=()
   now=${EPOCHREALTIME/[.,]/} t0=$now rate_t=$now

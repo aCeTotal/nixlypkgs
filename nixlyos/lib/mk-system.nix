@@ -76,9 +76,6 @@ let
     nixlypkgs = self;
   };
 
-  # Local pins win over profile pins.
-  pinsFiles = [ (profileTree + "/pins.nix") (dirOf hardwareDir + "/pins.nix") ];
-
   specialArgs = {
     # System inputs win name clashes.
     inputs = userInputs // moduleInputs;
@@ -104,7 +101,7 @@ nixpkgs.lib.nixosSystem {
     (hardwareDir + "/devices.nix")
 
     (profileTree + "/default.nix")
-    (import ./pins.nix pinsFiles)
+    (import ./pins.nix (profileTree + "/pins.nix"))
     inputs.home-manager.nixosModules.home-manager
     {
       home-manager = {

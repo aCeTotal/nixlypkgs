@@ -17,11 +17,22 @@ import (
 
 const reloadInterval = 30 * time.Second
 
+// Branch is a release channel.
+type Branch string
+
+const (
+	Stable  Branch = "stable"
+	Testing Branch = "testing"
+)
+
+var branches = []Branch{Stable, Testing}
+
 // Pointer tells machines what runs.
 type Pointer struct {
 	Profile   string    `json:"profile"`
 	Title     string    `json:"title"`
 	Platform  string    `json:"platform"`
+	Branch    Branch    `json:"branch"`
 	Rev       string    `json:"rev"`
 	Source    string    `json:"source"`
 	Tree      string    `json:"tree"`
@@ -34,8 +45,23 @@ type summary struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Platform    string `json:"platform"`
-	Published   bool   `json:"published"`
+	Stable      bool   `json:"stable"`
+	Testing     bool   `json:"testing"`
 }
+
+type pointerKey struct {
+	profile string
+	branch  Branch
+}
+
+// released is one branch's row.
+type released struct {
+	tree, rev string
+	at        time.Time
+	archive   []byte
+}
+
+func (rel released) live() bool { return rel.tree != "" && rel.rev != "" }
 
 // Entry is a pre-encoded response body.
 type Entry struct {
@@ -44,12 +70,12 @@ type Entry struct {
 }
 
 type state struct {
-	pointers map[string]Entry
+	pointers map[pointerKey]Entry
 	list     Entry
 	archives map[string][]byte
 }
 
-// Releases serves published profiles from memory.
+// Releases serves both branches from memory.
 type Releases struct {
 	db      *pgxpool.Pool
 	mirror  *repo.Mirror
@@ -59,7 +85,7 @@ type Releases struct {
 
 func New(db *pgxpool.Pool, mirror *repo.Mirror) *Releases {
 	r := &Releases{db: db, mirror: mirror, reload: make(chan struct{}, 1)}
-	r.current.Store(&state{pointers: map[string]Entry{}, archives: map[string][]byte{}})
+	r.current.Store(&state{pointers: map[pointerKey]Entry{}, archives: map[string][]byte{}})
 	return r
 }
 
@@ -84,36 +110,38 @@ func (r *Releases) Run(ctx context.Context) error {
 	}
 }
 
-func (r *Releases) Pointer(name string) (Entry, bool) {
-	entry, found := r.current.Load().pointers[name]
+func (r *Releases) Pointer(name string, branch Branch) (Entry, bool) {
+	entry, found := r.current.Load().pointers[pointerKey{name, branch}]
 	return entry, found
 }
 
 func (r *Releases) load(ctx context.Context) error {
 	rows, err := r.db.Query(ctx, `
-		SELECT p.name, p.title, p.description, p.platform, coalesce(p.published_tree, ''),
-			coalesce(p.published_rev, ''), coalesce(p.published_at, 'epoch'), tr.archive
-		FROM profiles p LEFT JOIN trees tr ON tr.hash = p.published_tree ORDER BY p.id`)
+		SELECT p.name, p.title, p.description, p.platform,
+			coalesce(p.stable_tree, ''), coalesce(p.stable_rev, ''), coalesce(p.stable_at, 'epoch'), st.archive,
+			coalesce(p.testing_tree, ''), coalesce(p.testing_rev, ''), coalesce(p.testing_at, 'epoch'), tt.archive
+		FROM profiles p
+			LEFT JOIN trees st ON st.hash = p.stable_tree
+			LEFT JOIN trees tt ON tt.hash = p.testing_tree
+		ORDER BY p.id`)
 	if err != nil {
 		return err
 	}
-	next := &state{pointers: map[string]Entry{}, archives: map[string][]byte{}}
+	next := &state{pointers: map[pointerKey]Entry{}, archives: map[string][]byte{}}
 	summaries := []summary{}
 	var s summary
-	var p Pointer
-	var archive []byte
-	_, err = pgx.ForEachRow(rows, []any{&s.Name, &s.Title, &s.Description, &s.Platform, &p.Tree, &p.Rev, &p.Published, &archive}, func() error {
-		s.Published = p.Tree != "" && p.Rev != ""
+	var rel [2]released
+	_, err = pgx.ForEachRow(rows, []any{&s.Name, &s.Title, &s.Description, &s.Platform,
+		&rel[0].tree, &rel[0].rev, &rel[0].at, &rel[0].archive,
+		&rel[1].tree, &rel[1].rev, &rel[1].at, &rel[1].archive}, func() error {
+		s.Stable, s.Testing = rel[0].live(), rel[1].live()
 		summaries = append(summaries, s)
-		if !s.Published {
-			return nil
+		for i, branch := range branches {
+			if err := next.add(s, branch, rel[i], r.mirror); err != nil {
+				return err
+			}
 		}
-		p.Profile, p.Title, p.Platform = s.Name, s.Title, s.Platform
-		p.Source, p.Path = r.mirror.Source(p.Rev), "/api/v1/trees/"+p.Tree+".tar.gz"
-		next.archives[p.Tree] = archive
-		entry, err := encode(p)
-		next.pointers[s.Name] = entry
-		return err
+		return nil
 	})
 	if err != nil {
 		return err
@@ -123,6 +151,21 @@ func (r *Releases) load(ctx context.Context) error {
 	}
 	r.current.Store(next)
 	return nil
+}
+
+// add serves one branch's release.
+func (s *state) add(profile summary, branch Branch, rel released, mirror *repo.Mirror) error {
+	if !rel.live() {
+		return nil
+	}
+	entry, err := encode(Pointer{
+		Profile: profile.Name, Title: profile.Title, Platform: profile.Platform, Branch: branch,
+		Rev: rel.rev, Source: mirror.Source(rel.rev), Tree: rel.tree, Path: "/api/v1/trees/" + rel.tree + ".tar.gz",
+		Published: rel.at,
+	})
+	s.pointers[pointerKey{profile.Name, branch}] = entry
+	s.archives[rel.tree] = rel.archive
+	return err
 }
 
 func encode(value any) (Entry, error) {

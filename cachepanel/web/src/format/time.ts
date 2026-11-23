@@ -1,5 +1,5 @@
-const relative = new Intl.RelativeTimeFormat("nb-NO", { numeric: "auto" });
-const absolute = new Intl.DateTimeFormat("nb-NO", { dateStyle: "medium", timeStyle: "short" });
+const relative = new Intl.RelativeTimeFormat("en-GB", { numeric: "auto" });
+const absolute = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
 
 const steps: [Intl.RelativeTimeFormatUnit, number][] = [
   ["second", 60],
@@ -11,7 +11,7 @@ const steps: [Intl.RelativeTimeFormatUnit, number][] = [
 ];
 
 export function timeAgo(iso: string | null | undefined) {
-  if (!iso) return "aldri";
+  if (!iso) return "never";
   let value = (new Date(iso).getTime() - Date.now()) / 1000;
   for (const [unit, size] of steps) {
     if (Math.abs(value) < size) return relative.format(Math.round(value), unit);

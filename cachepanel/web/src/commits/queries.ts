@@ -16,7 +16,8 @@ export type Commit = {
   attrs: number;
   failedAttrs: number;
   changed: number;
-  publishedFor: string[];
+  stableFor: string[];
+  testingFor: string[];
 };
 
 type Page = { items: Commit[]; next: number | null };

@@ -28,18 +28,18 @@ export function NewProfileDialog() {
       <DialogTrigger asChild>
         <Button>
           <Plus />
-          Ny profil
+          New profile
         </Button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={submit} className="space-y-6">
           <DialogHeader>
-            <DialogTitle>Ny profil</DialogTitle>
-            <DialogDescription>Starter med modulene plattformen har som standard. Juster moduler og pakker etterpå.</DialogDescription>
+            <DialogTitle>New profile</DialogTitle>
+            <DialogDescription>Starts with the platform's default modules. Adjust modules and packages afterwards.</DialogDescription>
           </DialogHeader>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="profile-title">Navn</FieldLabel>
+              <FieldLabel htmlFor="profile-title">Name</FieldLabel>
               <Input
                 id="profile-title"
                 required
@@ -51,11 +51,11 @@ export function NewProfileDialog() {
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="profile-name">ID (står i maskinenes konfig)</FieldLabel>
+              <FieldLabel htmlFor="profile-name">ID (written into machine configs)</FieldLabel>
               <Input id="profile-name" required pattern="[a-z0-9][a-z0-9\-]{0,31}" value={name} onChange={(event) => setName(event.target.value)} />
             </Field>
             <Field>
-              <FieldLabel>Plattform</FieldLabel>
+              <FieldLabel>Platform</FieldLabel>
               <Select value={platform} onValueChange={(value) => setPlatform(value as Platform)}>
                 <SelectTrigger>
                   <SelectValue />

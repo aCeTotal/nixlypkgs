@@ -3,12 +3,12 @@ import { cn } from "@/ui/cn";
 import type { RecipeState } from "./queries";
 
 const styles: Record<RecipeState, { label: string; icon: typeof CircleCheck; tone: string; spin?: boolean }> = {
-  importing: { label: "Analyserer", icon: ScanSearch, tone: "bg-info-soft text-info", spin: false },
-  draft: { label: "Utkast", icon: CircleDashed, tone: "bg-muted text-muted-foreground" },
-  building: { label: "Testbygger", icon: LoaderCircle, tone: "bg-info-soft text-info", spin: true },
-  ready: { label: "Klar til publisering", icon: CircleCheck, tone: "bg-success-soft text-success" },
-  failed: { label: "Feilet", icon: CircleX, tone: "bg-danger-soft text-destructive" },
-  published: { label: "Publisert", icon: Rocket, tone: "bg-primary/10 text-primary" },
+  importing: { label: "Analysing", icon: ScanSearch, tone: "bg-info-soft text-info", spin: false },
+  draft: { label: "Draft", icon: CircleDashed, tone: "bg-muted text-muted-foreground" },
+  building: { label: "Test building", icon: LoaderCircle, tone: "bg-info-soft text-info", spin: true },
+  ready: { label: "Ready to publish", icon: CircleCheck, tone: "bg-success-soft text-success" },
+  failed: { label: "Failed", icon: CircleX, tone: "bg-danger-soft text-destructive" },
+  published: { label: "Published", icon: Rocket, tone: "bg-primary/10 text-primary" },
 };
 
 export function RecipeStateBadge({ state, className }: { state: RecipeState; className?: string }) {

@@ -61,7 +61,7 @@ func validatePassword(password string) error {
 	length := utf8.RuneCountInString(password)
 	if length < minPasswordLength || length > maxPasswordLength {
 		return rest.Unprocessable("invalid_password_length",
-			fmt.Sprintf("Passordet må ha mellom %d og %d tegn", minPasswordLength, maxPasswordLength))
+			fmt.Sprintf("The password needs %d to %d characters", minPasswordLength, maxPasswordLength))
 	}
 	return nil
 }

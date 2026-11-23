@@ -26,7 +26,7 @@ const (
 )
 
 var (
-	errNoRemote = errors.New("publisering er ikke satt opp; angi publish.remote og publish.keyFile i modulen")
+	errNoRemote = errors.New("publishing is not set up; set publish.remote and publish.keyFile in the module")
 	listedAttr  = regexp.MustCompile(`"([A-Za-z0-9_-]+)"`)
 )
 

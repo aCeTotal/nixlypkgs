@@ -21,9 +21,9 @@ export function ProfileModules({ detail, draft, update }: ProfileModulesProps) {
     <div className="grid gap-4 xl:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle>Valgfrie moduler</CardTitle>
+          <CardTitle>Optional modules</CardTitle>
           <CardDescription>
-            {chosen} av {optional.length} valgt for {detail.profile.title}.
+            {chosen} of {optional.length} chosen for {detail.profile.title}.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-1">
@@ -35,8 +35,8 @@ export function ProfileModules({ detail, draft, update }: ProfileModulesProps) {
       <div className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle>Påkrevd</CardTitle>
-            <CardDescription>Med i alle profiler.</CardDescription>
+            <CardTitle>Required</CardTitle>
+            <CardDescription>In every profile.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1">
             {required.map((module) => (
@@ -48,8 +48,8 @@ export function ProfileModules({ detail, draft, update }: ProfileModulesProps) {
           <CardContent className="flex gap-3 text-sm text-muted-foreground">
             <Cpu className="mt-0.5 size-4 shrink-0 text-primary" />
             <p>
-              Maskinvaremodulen velger CPU-, GPU- og virtualiseringsoppsett på hver maskin ut fra nixlyos-detect-hw. Profilen
-              testes på alle referansemaskinene før den rulles ut.
+              The hardware module picks CPU, GPU and virtualisation setup on each machine from nixlyos-detect-hw. Every
+              profile is checked on all reference machines before it reaches testing.
             </p>
           </CardContent>
         </Card>
@@ -78,11 +78,11 @@ function ModuleRow({ module, checked, onChange }: { module: ProfileModule; check
       {module.required && (
         <Badge variant="secondary" className="gap-1">
           <Lock className="size-3" />
-          Påkrevd
+          Required
         </Badge>
       )}
       <Link to="/modules/$id" params={{ id: String(module.id) }} className="shrink-0 text-xs text-primary hover:underline">
-        Åpne
+        Open
       </Link>
     </div>
   );

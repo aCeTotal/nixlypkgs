@@ -37,7 +37,7 @@ func ParseEntry(line string) (Entry, error) {
 	}
 	for _, prefix := range foreignVCS {
 		if strings.HasPrefix(location, prefix) {
-			return Entry{}, fmt.Errorf("kilden %q bruker %s, bare git støttes", line, strings.TrimSuffix(prefix, "+"))
+			return Entry{}, fmt.Errorf("source %q uses %s; only git is supported", line, strings.TrimSuffix(prefix, "+"))
 		}
 	}
 	entry := Entry{}
@@ -57,7 +57,7 @@ func ParseEntry(line string) (Entry, error) {
 	}
 	parsed, err := url.Parse(location)
 	if err != nil {
-		return Entry{}, fmt.Errorf("ugyldig kilde %q: %w", line, err)
+		return Entry{}, fmt.Errorf("invalid source %q: %w", line, err)
 	}
 	entry.URL = parsed.String()
 	if !renamed {

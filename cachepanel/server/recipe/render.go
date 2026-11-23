@@ -36,7 +36,7 @@ var renderers = map[Builder]func(*writer, Spec){
 func Render(s Spec) (string, error) {
 	render, ok := renderers[s.Builder]
 	if !ok {
-		return "", fmt.Errorf("ukjent byggemetode %q", s.Builder)
+		return "", fmt.Errorf("unknown build method %q", s.Builder)
 	}
 	w := newWriter()
 	render(w, s)

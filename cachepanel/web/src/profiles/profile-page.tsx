@@ -52,7 +52,7 @@ function ProfileEditor({ detail }: { detail: ProfileDetail }) {
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link to="/profiles">
           <ArrowLeft />
-          Alle profiler
+          All profiles
         </Link>
       </Button>
       <PageHeader
@@ -62,11 +62,11 @@ function ProfileEditor({ detail }: { detail: ProfileDetail }) {
       />
       <Tabs defaultValue="modules">
         <TabsList>
-          <TabsTrigger value="modules">Moduler</TabsTrigger>
-          <TabsTrigger value="packages">Pakker</TabsTrigger>
-          <TabsTrigger value="settings">Innstillinger</TabsTrigger>
-          <TabsTrigger value="status">Test og utrulling</TabsTrigger>
-          <TabsTrigger value="files">Generert konfig</TabsTrigger>
+          <TabsTrigger value="modules">Modules</TabsTrigger>
+          <TabsTrigger value="packages">Packages</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="status">Checks and rollout</TabsTrigger>
+          <TabsTrigger value="files">Generated config</TabsTrigger>
         </TabsList>
         <TabsContent value="modules" className="pt-4">
           <ProfileModules detail={detail} draft={draft} update={update} />
@@ -87,14 +87,14 @@ function ProfileEditor({ detail }: { detail: ProfileDetail }) {
       {dirty && (
         <div className="fixed inset-x-0 bottom-0 z-30 flex justify-center p-4">
           <div className="flex items-center gap-3 rounded-xl border bg-popover/95 px-4 py-3 shadow-xl backdrop-blur animate-in slide-in-from-bottom-4">
-            <span className="text-sm">Ulagrede endringer – testes automatisk før utrulling.</span>
+            <span className="text-sm">Unsaved changes – checked automatically, then land in testing.</span>
             <Button variant="ghost" size="sm" onClick={() => setDraft(initial)}>
               <Undo2 />
-              Forkast
+              Discard
             </Button>
             <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
               <Save />
-              Lagre
+              Save
             </Button>
           </div>
         </div>

@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"cachepanel/cache"
 	"cachepanel/realtime"
 	"cachepanel/repo"
 )
@@ -18,15 +19,16 @@ type Rebuilder struct {
 	db        *pgxpool.Pool
 	hub       *realtime.Hub
 	mirror    *repo.Mirror
+	cache     *cache.Cache
 	checksDir string
 	published func()
 	trigger   chan struct{}
 	check     chan struct{}
 }
 
-func NewRebuilder(db *pgxpool.Pool, hub *realtime.Hub, mirror *repo.Mirror, checksDir string, published func()) *Rebuilder {
+func NewRebuilder(db *pgxpool.Pool, hub *realtime.Hub, mirror *repo.Mirror, store *cache.Cache, checksDir string, published func()) *Rebuilder {
 	return &Rebuilder{
-		db: db, hub: hub, mirror: mirror, checksDir: checksDir, published: published,
+		db: db, hub: hub, mirror: mirror, cache: store, checksDir: checksDir, published: published,
 		trigger: make(chan struct{}, 1),
 		check:   make(chan struct{}, 1),
 	}

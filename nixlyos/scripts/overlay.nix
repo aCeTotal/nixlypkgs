@@ -36,12 +36,13 @@ in
   # Setuid sudo from the system.
   nixlyos-update = writeShellApplication {
     name = "nixlyos-update";
-    runtimeInputs = with final; [ coreutils nix gnugrep gnused gawk jq git nixlyos-panel ];
+    runtimeInputs = with final; [ coreutils nix gnugrep gnused gawk jq nixlyos-panel ];
     text = ''
       export PATH=/run/wrappers/bin:$PATH
       PROGRESS_AWK=${./update-progress.awk}
       EVAL_NIX=${final.determinate-nix}/bin/nix
       EVAL_APPLY=${./update-eval.nix}
+      ${builtins.readFile ./cache-only.sh}
       ${builtins.readFile ./update-ui.sh}
       ${builtins.readFile ./update-progress.sh}
       ${builtins.readFile ./update-changes.sh}
@@ -52,8 +53,11 @@ in
 
   nixlyos-stage = writeShellApplication {
     name = "nixlyos-stage";
-    runtimeInputs = with final; [ coreutils nix gawk nixlyos-panel ];
-    text = builtins.readFile ./stage.sh;
+    runtimeInputs = with final; [ coreutils nix gawk jq nixlyos-panel ];
+    text = ''
+      ${builtins.readFile ./cache-only.sh}
+      ${builtins.readFile ./stage.sh}
+    '';
   };
 
   nixly-project-roots = writeShellApplication {

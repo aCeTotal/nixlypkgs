@@ -10,12 +10,12 @@ export function NotFound() {
         <EmptyMedia variant="icon">
           <Compass />
         </EmptyMedia>
-        <EmptyTitle>Fant ikke siden</EmptyTitle>
-        <EmptyDescription>Lenken kan være feil, eller siden er flyttet.</EmptyDescription>
+        <EmptyTitle>Page not found</EmptyTitle>
+        <EmptyDescription>The link may be wrong, or the page has moved.</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
         <Button asChild>
-          <Link to="/">Til oversikten</Link>
+          <Link to="/">Back to overview</Link>
         </Button>
       </EmptyContent>
     </Empty>

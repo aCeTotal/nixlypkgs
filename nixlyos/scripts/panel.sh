@@ -3,9 +3,11 @@ set -euo pipefail
 
 FLAKE="${NIXLYOS_DIR:-$HOME/.local/nixlyos}"
 PROFILE_FILE="$FLAKE/profile"
+BRANCH_FILE="$FLAKE/branch"
 SOURCE_PATTERN='^(github:[A-Za-z0-9._-]+/[A-Za-z0-9._-]+/[0-9a-f]{40}|git\+[a-z]+://[^"[:space:]]+\?rev=[0-9a-f]{40})$'
 TREE_PATTERN='^/api/v1/trees/[0-9a-f]{64}\.tar\.gz$'
 NAME_PATTERN='^[a-z0-9][a-z0-9-]{0,31}$'
+BRANCH_PATTERN='^(stable|testing)$'
 
 die() { echo "nixlyos-panel: $*" >&2; exit 1; }
 
@@ -14,11 +16,12 @@ fetch() { curl -fsS --max-time 30 --retry 3 --retry-delay 2 "$@"; }
 usage() {
   cat >&2 <<'USAGE'
 usage: nixlyos-panel <command>
-  profiles                  list published profiles
+  profiles                  list profiles and their branches
   flake <host> <user> <stateVersion> <profile>
                             write a panel-managed flake.nix
   pin [dir]                 lock flake.nix to the profile's release
   use <profile>             follow another profile from the next update
+  branch [stable|testing]   show or switch the release branch
   moved                     exit 0 when a newer release exists
   adopt                     move a pre-panel machine under the panel
 USAGE
@@ -32,8 +35,18 @@ profile() {
   echo "$name"
 }
 
+# Stable unless chosen otherwise.
+branch() {
+  local name=stable
+  [[ -f $BRANCH_FILE ]] && name=$(<"$BRANCH_FILE")
+  [[ $name =~ $BRANCH_PATTERN ]] || die "invalid branch: $name"
+  echo "$name"
+}
+
 cmd_profiles() {
-  fetch "$NIXLY_PANEL/api/v1/profiles" | jq -r '.[] | select(.published) | [.name, .title, .platform, .description] | @tsv'
+  fetch "$NIXLY_PANEL/api/v1/profiles" | jq -r '.[]
+    | [(if .stable then "stable" else empty end), (if .testing then "testing" else empty end)] as $branches
+    | select($branches | length > 0) | [.name, .title, .platform, ($branches | join(",")), .description] | @tsv'
 }
 
 # Writes, pins, then swaps in.
@@ -77,7 +90,7 @@ FLAKE
 }
 
 release() {
-  fetch "$NIXLY_PANEL/api/v1/profiles/$1"
+  fetch "$NIXLY_PANEL/api/v1/profiles/$1/$(branch)"
 }
 
 pin_file() {
@@ -109,8 +122,15 @@ cmd_moved() {
 cmd_use() {
   local name=${1:?profile}
   [[ $name =~ $NAME_PATTERN ]] || die "invalid profile name: $name"
-  release "$name" > /dev/null || die "no published profile: $name"
+  release "$name" > /dev/null || die "no $(branch) release of profile: $name"
   echo "$name" > "$PROFILE_FILE"
+}
+
+cmd_branch() {
+  [[ $# -eq 0 ]] && { branch; return; }
+  [[ $1 =~ $BRANCH_PATTERN ]] || die "branch must be stable or testing: $1"
+  fetch "$NIXLY_PANEL/api/v1/profiles/$(profile)/$1" > /dev/null || die "no $1 release of profile: $(profile)"
+  echo "$1" > "$BRANCH_FILE"
 }
 
 # Picks the profile today's setup matches.
@@ -134,6 +154,7 @@ case $command in
   flake) cmd_flake "$@" ;;
   pin) cmd_pin "$@" ;;
   use) cmd_use "$@" ;;
+  branch) cmd_branch "$@" ;;
   moved) cmd_moved ;;
   adopt) cmd_adopt ;;
   *) usage ;;

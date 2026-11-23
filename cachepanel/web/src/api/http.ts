@@ -17,7 +17,7 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
-const offline = new ApiError(0, "offline", "Får ikke kontakt med panelet");
+const offline = new ApiError(0, "offline", "Cannot reach the panel");
 
 let csrfToken = "";
 

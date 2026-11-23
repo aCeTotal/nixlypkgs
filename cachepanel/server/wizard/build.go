@@ -27,8 +27,8 @@ const (
 )
 
 var (
-	errBuildFailed = errors.New("testbygget feilet, og loggen pekte ikke på noe som kunne rettes automatisk")
-	errRounds      = errors.New("testbygget feilet etter for mange automatiske rettelser")
+	errBuildFailed = errors.New("the test build failed, and the log pointed at nothing that could be fixed automatically")
+	errRounds      = errors.New("the test build kept failing after too many automatic fixes")
 	uploadURL      = regexp.MustCompile(`/api/v1/sources/([0-9a-f]{64})/`)
 )
 

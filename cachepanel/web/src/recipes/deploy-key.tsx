@@ -14,29 +14,29 @@ export function DeployKey() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <KeyRound className="size-4 text-muted-foreground" />
-            Publisering er ikke satt opp
+            Publishing is not set up
           </CardTitle>
-          <CardDescription>Sett publish.remote i modulen for å la panelet pushe til nixlypkgs.</CardDescription>
+          <CardDescription>Set publish.remote in the module to let the panel push to nixlypkgs.</CardDescription>
         </CardHeader>
       </Card>
     );
   }
-  const copy = () => void navigator.clipboard.writeText(data.publicKey ?? "").then(() => toast.success("Nøkkelen er kopiert"));
+  const copy = () => void navigator.clipboard.writeText(data.publicKey ?? "").then(() => toast.success("Key copied"));
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <KeyRound className="size-4 text-primary" />
-          Deploy-nøkkel
+          Deploy key
         </CardTitle>
         <CardDescription>
-          Panelet pusher til <span className="font-mono text-foreground">{data.remote}</span>. Legg nøkkelen til under Settings → Deploy
-          keys på GitHub, med skrivetilgang.
+          The panel pushes to <span className="font-mono text-foreground">{data.remote}</span>. Add the key under Settings → Deploy
+          keys on GitHub, with write access.
         </CardDescription>
         <CardAction>
           <Button size="sm" variant="outline" onClick={copy}>
             <Copy />
-            Kopier
+            Copy
           </Button>
         </CardAction>
       </CardHeader>

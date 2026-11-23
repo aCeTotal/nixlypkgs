@@ -13,8 +13,8 @@ const originLabels: Record<RecipeSummary["origin"]["origin"], string> = {
   aur: "AUR",
   arch: "Arch Linux",
   pkgbuild: "PKGBUILD",
-  url: "Lenke",
-  upload: "Opplastet fil",
+  url: "Link",
+  upload: "Uploaded file",
   github: "GitHub",
 };
 
@@ -28,13 +28,13 @@ export function RecipesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Nye pakker"
-        description="Pakker til nixlypkgs fra en lenke, en fil, GitHub eller en PKGBUILD fra Arch og AUR."
+        title="Add derivation"
+        description="New nixlypkgs derivations from a link, a file, GitHub or a PKGBUILD from Arch and the AUR."
         actions={
           <Button asChild>
             <Link to="/recipes/new">
               <PackagePlus />
-              Ny pakke
+              New derivation
             </Link>
           </Button>
         }
@@ -43,18 +43,18 @@ export function RecipesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Pakke</TableHead>
-              <TableHead>Kilde</TableHead>
-              <TableHead>Byggemåte</TableHead>
+              <TableHead>Derivation</TableHead>
+              <TableHead>Source</TableHead>
+              <TableHead>Build method</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Endret</TableHead>
+              <TableHead className="text-right">Changed</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {recipes.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                  Ingen pakker under arbeid. Start med «Ny pakke».
+                  Nothing in progress. Start with “New derivation”.
                 </TableCell>
               </TableRow>
             )}
@@ -62,7 +62,7 @@ export function RecipesPage() {
               <TableRow key={recipe.id}>
                 <TableCell>
                   <Link to="/recipes/$id" params={{ id: String(recipe.id) }} className="font-medium hover:text-primary hover:underline">
-                    {recipe.attr ?? "Analyserer …"}
+                    {recipe.attr ?? "Analysing …"}
                   </Link>
                   {recipe.version && <span className="ml-2 font-mono text-xs text-muted-foreground">{recipe.version}</span>}
                   {recipe.description && <p className="max-w-md truncate text-xs text-muted-foreground">{recipe.description}</p>}

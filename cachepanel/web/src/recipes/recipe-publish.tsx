@@ -9,31 +9,31 @@ import { DeployKey } from "./deploy-key";
 import { publishRecipe, type RecipeDetail } from "./queries";
 
 const flow = [
-  "Commit til pkgs/<attr> i nixlypkgs",
-  "Panelet evaluerer og bygger den",
-  "De tre siste versjonene ligger i cachen",
-  "Legg pakken til en profil under Pakker",
+  "Commit to pkgs/<attr> in nixlypkgs",
+  "The panel evaluates and builds it",
+  "Its three newest versions stay in the cache",
+  "Add it to a profile under Packages",
 ];
 
 export function RecipePublish({ recipe, dirty }: { recipe: RecipeDetail; dirty: boolean }) {
   const publish = useMutation({
     mutationFn: () => publishRecipe(recipe.id),
-    onSuccess: ({ sha }) => toast.success(`Publisert som ${shortSha(sha)}`),
+    onSuccess: ({ sha }) => toast.success(`Published as ${shortSha(sha)}`),
   });
   const tested = recipe.state === "ready" || recipe.state === "published";
-  const files = recipe.files.map((file) => ({ path: file.name, content: file.text || `(binærfil, ${file.size} byte)` }));
+  const files = recipe.files.map((file) => ({ path: file.name, content: file.text || `(binary file, ${file.size} bytes)` }));
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Publiser til nixlypkgs</CardTitle>
+          <CardTitle>Publish to nixlypkgs</CardTitle>
           <CardDescription>
-              {tested ? "Testbygget gikk gjennom. Publiser når du er fornøyd." : "Publisering åpnes når et testbygg har gått gjennom."}
+              {tested ? "The test build passed. Publish when you are happy." : "Publishing opens once a test build has passed."}
             </CardDescription>
           <CardAction>
             <Button onClick={() => publish.mutate()} disabled={!tested || dirty || publish.isPending}>
             <Rocket />
-            {recipe.state === "published" ? "Publiser på nytt" : "Publiser"}
+            {recipe.state === "published" ? "Publish again" : "Publish"}
           </Button>
           </CardAction>
         </CardHeader>
@@ -49,7 +49,7 @@ export function RecipePublish({ recipe, dirty }: { recipe: RecipeDetail; dirty: 
           {recipe.publishedSha && (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <GitCommitVertical className="size-4" />
-              Siste publisering: <span className="font-mono text-foreground">{shortSha(recipe.publishedSha)}</span>
+              Last published: <span className="font-mono text-foreground">{shortSha(recipe.publishedSha)}</span>
             </p>
           )}
         </CardContent>

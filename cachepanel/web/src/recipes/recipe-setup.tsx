@@ -15,29 +15,29 @@ const licenses: Record<string, string> = {
   bsd3: "BSD 3-clause",
   bsd2: "BSD 2-clause",
   gpl2Only: "GPL 2.0",
-  gpl2Plus: "GPL 2.0 eller nyere",
+  gpl2Plus: "GPL 2.0 or later",
   gpl3Only: "GPL 3.0",
-  gpl3Plus: "GPL 3.0 eller nyere",
+  gpl3Plus: "GPL 3.0 or later",
   lgpl21Only: "LGPL 2.1",
-  lgpl21Plus: "LGPL 2.1 eller nyere",
+  lgpl21Plus: "LGPL 2.1 or later",
   lgpl3Only: "LGPL 3.0",
-  lgpl3Plus: "LGPL 3.0 eller nyere",
+  lgpl3Plus: "LGPL 3.0 or later",
   agpl3Only: "AGPL 3.0",
-  agpl3Plus: "AGPL 3.0 eller nyere",
+  agpl3Plus: "AGPL 3.0 or later",
   mpl20: "MPL 2.0",
   isc: "ISC",
   zlib: "zlib",
   unlicense: "Unlicense",
   cc0: "CC0",
   boost: "Boost",
-  free: "Annen fri lisens",
-  unfree: "Proprietær",
+  free: "Other free licence",
+  unfree: "Proprietary",
 };
 
 function describe(source: Source) {
   if (source.kind === "github") return `github:${source.owner}/${source.repo} @ ${source.rev}`;
   if (source.kind === "git") return `${source.url} @ ${source.rev}`;
-  if (source.kind === "file") return `${source.name} (fil i oppskriften)`;
+  if (source.kind === "file") return `${source.name} (file in the recipe)`;
   return source.url ?? source.name;
 }
 
@@ -49,26 +49,26 @@ export function RecipeSetup({ spec, update }: RecipeSetupProps) {
     <div className="grid gap-4 xl:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle>Pakken</CardTitle>
-          <CardDescription>Attributtet er navnet profiler og maskiner bruker.</CardDescription>
+          <CardTitle>Derivation</CardTitle>
+          <CardDescription>The attribute is the name profiles and machines use.</CardDescription>
         </CardHeader>
         <CardContent>
           <FieldGroup>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel htmlFor="attr">Attributt</FieldLabel>
+                <FieldLabel htmlFor="attr">Attribute</FieldLabel>
                 <Input id="attr" className="font-mono" value={spec.attr} onChange={(event) => update({ attr: event.target.value })} />
               </Field>
               <Field>
-                <FieldLabel htmlFor="pname">Navn</FieldLabel>
+                <FieldLabel htmlFor="pname">Name</FieldLabel>
                 <Input id="pname" className="font-mono" value={spec.pname} onChange={(event) => update({ pname: event.target.value })} />
               </Field>
               <Field>
-                <FieldLabel htmlFor="version">Versjon</FieldLabel>
+                <FieldLabel htmlFor="version">Version</FieldLabel>
                 <Input id="version" className="font-mono" value={spec.version} onChange={(event) => update({ version: event.target.value })} />
               </Field>
               <Field>
-                <FieldLabel>Byggemåte</FieldLabel>
+                <FieldLabel>Build method</FieldLabel>
                 <Select value={spec.builder} onValueChange={(value) => update({ builder: value as Builder })}>
                   <SelectTrigger>
                     <SelectValue />
@@ -84,28 +84,28 @@ export function RecipeSetup({ spec, update }: RecipeSetupProps) {
               </Field>
             </div>
             <Field>
-              <FieldLabel htmlFor="description">Beskrivelse</FieldLabel>
+              <FieldLabel htmlFor="description">Description</FieldLabel>
               <Textarea id="description" value={spec.meta.description} onChange={(event) => meta({ description: event.target.value })} />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel htmlFor="homepage">Hjemmeside</FieldLabel>
+                <FieldLabel htmlFor="homepage">Homepage</FieldLabel>
                 <Input id="homepage" type="url" value={spec.meta.homepage} onChange={(event) => meta({ homepage: event.target.value })} />
               </Field>
               <Field>
-                <FieldLabel htmlFor="program">Hovedprogram</FieldLabel>
+                <FieldLabel htmlFor="program">Main program</FieldLabel>
                 <Input id="program" className="font-mono" value={spec.meta.mainProgram} onChange={(event) => meta({ mainProgram: event.target.value })} />
-                <FieldDescription>Fylles ut etter første vellykkede bygg.</FieldDescription>
+                <FieldDescription>Filled in after the first successful build.</FieldDescription>
               </Field>
             </div>
             <Field>
-              <FieldLabel>Lisens</FieldLabel>
+              <FieldLabel>Licence</FieldLabel>
               <Select value={spec.meta.license || noLicense} onValueChange={(value) => meta({ license: value === noLicense ? "" : value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={noLicense}>Ikke oppgitt</SelectItem>
+                  <SelectItem value={noLicense}>Not stated</SelectItem>
                   {Object.entries(licenses).map(([value, label]) => (
                     <SelectItem key={value} value={value}>
                       {label}
@@ -119,8 +119,8 @@ export function RecipeSetup({ spec, update }: RecipeSetupProps) {
       </Card>
       <Card className="h-fit">
         <CardHeader>
-          <CardTitle>Kilder</CardTitle>
-          <CardDescription>Låst med sjekksum. Mangler en, finner testbygget den.</CardDescription>
+          <CardTitle>Sources</CardTitle>
+          <CardDescription>Pinned by checksum. If one is missing, the test build finds it.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
           {spec.sources.map((source) => (
@@ -132,19 +132,19 @@ export function RecipeSetup({ spec, update }: RecipeSetupProps) {
               )}
               <div className="min-w-0 flex-1">
                 <p className="truncate font-mono text-xs">{describe(source)}</p>
-                <p className="truncate font-mono text-[0.7rem] text-muted-foreground">{source.hash ?? "sjekksum hentes ved testbygg"}</p>
+                <p className="truncate font-mono text-[0.7rem] text-muted-foreground">{source.hash ?? "checksum fetched by the test build"}</p>
               </div>
               {source.history && (
                 <Badge variant="outline" className="gap-1">
                   <GitBranch className="size-3" />
-                  Med historikk
+                  With history
                 </Badge>
               )}
             </div>
           ))}
           {spec.split && (
             <p className="pt-2 text-sm text-muted-foreground">
-              Delt PKGBUILD – bygger <span className="font-mono text-foreground">package_{spec.split}</span>.
+              Split PKGBUILD – builds <span className="font-mono text-foreground">package_{spec.split}</span>.
             </p>
           )}
         </CardContent>

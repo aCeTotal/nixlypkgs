@@ -51,7 +51,7 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
   const valid = syntax.problem.error === "";
   const save = useMutation({
     mutationFn: () => saveModule(module.id, draft),
-    onSuccess: () => toast.success("Lagret – profilene som bruker modulen testes nå"),
+    onSuccess: () => toast.success("Saved – profiles using this module are being checked"),
   });
   const remove = useMutation({ mutationFn: () => deleteModule(module.id), onSuccess: () => navigate({ to: "/modules" }) });
   const restore = useMutation({
@@ -75,18 +75,18 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link to="/modules">
           <ArrowLeft />
-          Alle moduler
+          All modules
         </Link>
       </Button>
       <PageHeader
         title={module.title}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <span className="font-mono">{module.slug}.nix</span>· revisjon {module.revision} · endret {timeAgo(module.updatedAt)}
+            <span className="font-mono">{module.slug}.nix</span>· revision {module.revision} · changed {timeAgo(module.updatedAt)}
             {module.required && (
               <Badge variant="secondary" className="gap-1">
                 <Lock className="size-3" />
-                Påkrevd i alle profiler
+                Required in every profile
               </Badge>
             )}
           </span>
@@ -94,16 +94,16 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
         actions={
           <>
             <ConfirmButton
-              label="Slett"
+              label="Delete"
               icon={Trash2}
-              title={`Slette ${module.title}?`}
-              description="Bare moduler som ingen profil bruker kan slettes."
+              title={`Delete ${module.title}?`}
+              description="Only modules no profile uses can be deleted."
               onConfirm={() => remove.mutate()}
               disabled={module.required || module.usedBy.length > 0}
             />
             <Button onClick={trySave} disabled={!dirty || !valid || save.isPending}>
               <Save />
-              Lagre
+              Save
             </Button>
           </>
         }
@@ -138,15 +138,15 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
             <CardContent>
               <FieldGroup>
                 <Field>
-                  <FieldLabel htmlFor="module-title">Tittel</FieldLabel>
+                  <FieldLabel htmlFor="module-title">Title</FieldLabel>
                   <Input id="module-title" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="module-slug">Filnavn</FieldLabel>
+                  <FieldLabel htmlFor="module-slug">File name</FieldLabel>
                   <Input id="module-slug" className="font-mono" value={draft.slug} onChange={(event) => setDraft({ ...draft, slug: event.target.value })} />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="module-description">Beskrivelse</FieldLabel>
+                  <FieldLabel htmlFor="module-description">Description</FieldLabel>
                   <Input
                     id="module-description"
                     value={draft.description}
@@ -156,8 +156,8 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
                 <Field orientation="horizontal">
                   <Switch id="module-required" checked={draft.required} onCheckedChange={(required) => setDraft({ ...draft, required })} />
                   <FieldContent>
-                    <FieldLabel htmlFor="module-required">Påkrevd</FieldLabel>
-                    <FieldDescription>Med i alle profiler, kan ikke velges bort.</FieldDescription>
+                    <FieldLabel htmlFor="module-required">Required</FieldLabel>
+                    <FieldDescription>In every profile, cannot be deselected.</FieldDescription>
                   </FieldContent>
                 </Field>
               </FieldGroup>
@@ -165,10 +165,10 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Brukes av</CardTitle>
+              <CardTitle>Used by</CardTitle>
             </CardHeader>
             <CardContent className="space-y-1">
-              {module.usedBy.length === 0 && <p className="text-sm text-muted-foreground">Ingen profiler ennå.</p>}
+              {module.usedBy.length === 0 && <p className="text-sm text-muted-foreground">No profiles yet.</p>}
               {module.usedBy.map((profile) => (
                 <Link
                   key={profile.name}
@@ -197,7 +197,7 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
                   onClick={() => restore.mutate(revision.revision)}
                   className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
                 >
-                  <span>Revisjon {revision.revision}</span>
+                  <span>Revision {revision.revision}</span>
                   <span className="text-xs text-muted-foreground">{dateTime(revision.createdAt)}</span>
                 </button>
               ))}
@@ -221,22 +221,22 @@ function StatusBar({ syntax, dirty, onJump }: { syntax: SyntaxState; dirty: bool
     <div className="flex min-h-7 flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-muted-foreground">
       {syntax.checking && (
         <span className="flex items-center gap-1.5">
-          <Spinner className="size-3.5" /> Sjekker syntaks…
+          <Spinner className="size-3.5" /> Checking syntax…
         </span>
       )}
       {!syntax.checking && problem.error === "" && (
         <span className="flex items-center gap-1.5 text-success">
-          <CircleCheck className="size-3.5" /> Gyldig Nix
+          <CircleCheck className="size-3.5" /> Valid Nix
         </span>
       )}
       {!syntax.checking && problem.error !== "" && (
         <button type="button" onClick={() => problem.line && onJump(problem.line)} className="flex items-center gap-1.5 text-destructive hover:underline">
           <CircleX className="size-3.5" />
-          Syntaksfeil{problem.line ? ` på linje ${problem.line}` : ""}
+          Syntax error{problem.line ? ` on line ${problem.line}` : ""}
         </button>
       )}
-      <span>{dirty ? "Ulagrede endringer" : "Lagret"}</span>
-      <span className="ml-auto hidden sm:inline">Ctrl+S lagrer · Ctrl+F søker · Ctrl+Shift+[ bretter</span>
+      <span>{dirty ? "Unsaved changes" : "Saved"}</span>
+      <span className="ml-auto hidden sm:inline">Ctrl+S saves · Ctrl+F finds · Ctrl+Shift+[ folds</span>
     </div>
   );
 }

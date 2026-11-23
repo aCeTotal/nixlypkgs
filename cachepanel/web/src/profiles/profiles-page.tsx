@@ -5,18 +5,19 @@ import { shortSha } from "@/format/sha";
 import { timeAgo } from "@/format/time";
 import { PageHeader } from "@/shell/page-header";
 import { Badge } from "@/ui/badge";
+import { BranchBadge } from "./branch-badge";
 import { CheckBadge } from "./check-badge";
 import { NewProfileDialog } from "./new-profile-dialog";
 import { PlatformIcon } from "./platform-icon";
-import { platformLabels, profilesQuery } from "./queries";
+import { platformLabels, profilesQuery, testingAhead } from "./queries";
 
 export function ProfilesPage() {
   const { data: profiles } = useSuspenseQuery(profilesQuery);
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Profiler"
-        description="Et oppsett som Desktop, Laptop eller HTPC: valgte moduler, pakker og nixlypkgs-revisjon. Maskinvaremoduler velges automatisk på hver maskin."
+        title="Profiles"
+        description="A setup such as Desktop, Laptop or HTPC: chosen modules, packages and nixlypkgs revision. Everything new lands in testing and becomes stable once you approve it."
         actions={<NewProfileDialog />}
       />
       <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
@@ -45,19 +46,20 @@ export function ProfilesPage() {
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <Blocks className="size-3.5" />
-                  {profile.moduleCount} moduler
+                  {profile.moduleCount} modules
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Package className="size-3.5" />
-                  {profile.packageCount} pakker
+                  {profile.packageCount} packages
                 </span>
                 <span className="flex items-center gap-1.5">
                   <GitCommitVertical className="size-3.5" />
-                  {profile.publishedRev ? `${shortSha(profile.publishedRev)} · ${timeAgo(profile.publishedAt)}` : "ikke publisert"}
+                  {profile.stableRev ? `${shortSha(profile.stableRev)} · ${timeAgo(profile.stableAt)}` : "no stable yet"}
                 </span>
               </div>
-              <div className="border-t pt-3">
+              <div className="flex flex-wrap items-center gap-2 border-t pt-3">
                 <CheckBadge state={profile.checkState} />
+                {testingAhead(profile) && <BranchBadge branch="testing">Awaiting approval</BranchBadge>}
               </div>
             </div>
           </Link>

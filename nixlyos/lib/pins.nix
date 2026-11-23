@@ -1,11 +1,10 @@
-# Pin packages to cached store paths.
-pinsFiles:
+# Pin packages to the panel's cached store paths.
+pinsFile:
 
 { lib, ... }:
 
 let
-  # Later files win.
-  pins = builtins.foldl' (merged: file: merged // (if builtins.pathExists file then import file else { })) { } pinsFiles;
+  pins = import pinsFile;
 
   pin = prev: name: path:
     let

@@ -23,12 +23,12 @@ export function DropZone({ multiple, files, onFiles, hint }: DropZoneProps) {
         )}
       >
         <FileUp className="size-8 text-primary" />
-        <span className="font-medium">Slipp {multiple ? "filene" : "filen"} her, eller klikk for å velge</span>
+        <span className="font-medium">Drop {multiple ? "the files" : "the file"} here, or click to choose</span>
         <span className="text-sm text-muted-foreground">{hint}</span>
         <input
           type="file"
           multiple={multiple}
-          aria-label={multiple ? "Velg filer" : "Velg fil"}
+          aria-label={multiple ? "Choose files" : "Choose a file"}
           className="absolute inset-0 cursor-pointer opacity-0"
           onDragEnter={() => setOver(true)}
           onDragLeave={() => setOver(false)}
@@ -45,7 +45,7 @@ export function DropZone({ multiple, files, onFiles, hint }: DropZoneProps) {
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                aria-label={`Fjern ${file.name}`}
+                aria-label={`Remove ${file.name}`}
                 onClick={() => onFiles(files.filter((other) => other !== file))}
               >
                 <X />

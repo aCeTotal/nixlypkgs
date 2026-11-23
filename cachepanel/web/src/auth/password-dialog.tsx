@@ -19,7 +19,7 @@ export function PasswordDialog({ open, onOpenChange }: PasswordDialogProps) {
   const change = useMutation({
     mutationFn: () => changePassword(current, next),
     onSuccess: () => {
-      toast.success("Passordet er byttet – andre økter er logget ut");
+      toast.success("Password changed – other sessions are signed out");
       onOpenChange(false);
       setCurrent("");
       setNext("");
@@ -35,27 +35,27 @@ export function PasswordDialog({ open, onOpenChange }: PasswordDialogProps) {
       <DialogContent>
         <form onSubmit={submit} className="space-y-6">
           <DialogHeader>
-            <DialogTitle>Bytt passord</DialogTitle>
-            <DialogDescription>Minst {minLength} tegn. Alle andre innlogginger avsluttes.</DialogDescription>
+            <DialogTitle>Change password</DialogTitle>
+            <DialogDescription>At least {minLength} characters. Every other session is signed out.</DialogDescription>
           </DialogHeader>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="current-password">Nåværende passord</FieldLabel>
+              <FieldLabel htmlFor="current-password">Current password</FieldLabel>
               <Input id="current-password" type="password" autoComplete="current-password" required value={current} onChange={(event) => setCurrent(event.target.value)} />
             </Field>
             <Field>
-              <FieldLabel htmlFor="new-password">Nytt passord</FieldLabel>
+              <FieldLabel htmlFor="new-password">New password</FieldLabel>
               <Input id="new-password" type="password" autoComplete="new-password" minLength={minLength} required value={next} onChange={(event) => setNext(event.target.value)} />
             </Field>
             <Field data-invalid={mismatch}>
-              <FieldLabel htmlFor="repeat-password">Gjenta nytt passord</FieldLabel>
+              <FieldLabel htmlFor="repeat-password">Repeat new password</FieldLabel>
               <Input id="repeat-password" type="password" autoComplete="new-password" required aria-invalid={mismatch} value={repeat} onChange={(event) => setRepeat(event.target.value)} />
-              {mismatch && <FieldError>Passordene er ikke like</FieldError>}
+              {mismatch && <FieldError>The passwords differ</FieldError>}
             </Field>
           </FieldGroup>
           <DialogFooter>
             <Button type="submit" disabled={change.isPending || mismatch}>
-              Bytt passord
+              Change password
             </Button>
           </DialogFooter>
         </form>

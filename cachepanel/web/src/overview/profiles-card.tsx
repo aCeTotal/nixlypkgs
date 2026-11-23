@@ -3,9 +3,10 @@ import { Link } from "@tanstack/react-router";
 import { Layers } from "lucide-react";
 import { shortSha } from "@/format/sha";
 import { timeAgo } from "@/format/time";
+import { BranchBadge } from "@/profiles/branch-badge";
 import { CheckBadge } from "@/profiles/check-badge";
 import { PlatformIcon } from "@/profiles/platform-icon";
-import { profilesQuery } from "@/profiles/queries";
+import { profilesQuery, testingAhead } from "@/profiles/queries";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 
 export function ProfilesCard() {
@@ -15,9 +16,9 @@ export function ProfilesCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Layers className="size-4 text-primary" />
-          Profiler i drift
+          Profiles in service
         </CardTitle>
-        <CardDescription>Hva maskinene med hver profil får ved neste oppdatering.</CardDescription>
+        <CardDescription>What stable machines on each profile get on their next update.</CardDescription>
       </CardHeader>
       <CardContent className="divide-y">
         {profiles.map((profile) => (
@@ -33,9 +34,10 @@ export function ProfilesCard() {
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{profile.title}</p>
               <p className="truncate font-mono text-xs text-muted-foreground">
-                {profile.publishedRev ? `${shortSha(profile.publishedRev)} · ${timeAgo(profile.publishedAt)}` : "ikke publisert"}
+                {profile.stableRev ? `${shortSha(profile.stableRev)} · ${timeAgo(profile.stableAt)}` : "no stable yet"}
               </p>
             </div>
+            {testingAhead(profile) && <BranchBadge branch="testing">Awaiting</BranchBadge>}
             <CheckBadge state={profile.checkState} />
           </Link>
         ))}

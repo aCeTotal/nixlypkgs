@@ -21,8 +21,8 @@ const (
 )
 
 var (
-	errNoFile     = rest.BadRequest("no_file", "Forespørselen mangler en fil")
-	errFileEdited = rest.Unprocessable("invalid_file", "Ugyldig filnavn")
+	errNoFile     = rest.BadRequest("no_file", "The request has no file")
+	errFileEdited = rest.Unprocessable("invalid_file", "Invalid file name")
 )
 
 func describe(files map[string][]byte) []file {

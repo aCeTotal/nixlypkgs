@@ -15,7 +15,7 @@ import (
 
 const readTimeout = 3 * time.Minute
 
-var errNoName = errors.New("PKGBUILD-en mangler pkgname eller pkgver")
+var errNoName = errors.New("the PKGBUILD lacks pkgname or pkgver")
 
 // Sourced inside the build sandbox.
 const emitScript = `set +eu +o pipefail

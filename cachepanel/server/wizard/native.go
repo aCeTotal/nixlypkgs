@@ -52,7 +52,7 @@ func (l *Lab) fromFile(ctx context.Context, flake string, source recipe.Source, 
 		spec.Meta.MainProgram = pname
 		return Draft{Spec: spec}, nil
 	case analyse.Unknown:
-		return Draft{}, fmt.Errorf("kjenner ikke igjen filtypen til %s", source.Name)
+		return Draft{}, fmt.Errorf("unrecognised file type of %s", source.Name)
 	}
 	tree, err := analyse.Unpack(ctx, flake, fetched.Path, kind)
 	if err != nil {

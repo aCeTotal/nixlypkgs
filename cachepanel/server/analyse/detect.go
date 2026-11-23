@@ -9,7 +9,7 @@ import (
 	"cachepanel/recipe"
 )
 
-var errUnknown = errors.New("fant verken byggesystem eller programfiler i kilden")
+var errUnknown = errors.New("found neither a build system nor program files in the source")
 
 // Build markers, most specific first.
 var markers = []struct {

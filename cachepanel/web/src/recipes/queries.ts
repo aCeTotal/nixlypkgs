@@ -106,9 +106,9 @@ export const builderLabels: Record<Builder, string> = {
   python: "Python",
   npm: "Node (npm)",
   appimage: "AppImage",
-  deb: "Debian-pakke",
-  rpm: "RPM-pakke",
-  prebuilt: "Ferdigbygd",
+  deb: "Debian package",
+  rpm: "RPM package",
+  prebuilt: "Prebuilt",
 };
 
 export const recipesQuery = queryOptions({ queryKey: ["recipes"], queryFn: () => api<RecipeSummary[]>("/recipes") });

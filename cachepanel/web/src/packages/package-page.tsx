@@ -22,17 +22,17 @@ export function PackagePage() {
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link to="/packages">
           <ArrowLeft />
-          Alle pakker
+          All derivations
         </Link>
       </Button>
       <PageHeader
         title={pkg.attr}
-        description={pkg.present ? "packages.x86_64-linux i nixlypkgs" : "Finnes ikke lenger i nixlypkgs – cachen beholdes til du sletter den."}
-        actions={!pkg.present && <Badge variant="outline">Fjernet fra nixlypkgs</Badge>}
+        description={pkg.present ? "packages.x86_64-linux in nixlypkgs" : "Gone from nixlypkgs – the cache stays until you delete it."}
+        actions={!pkg.present && <Badge variant="outline">Removed from nixlypkgs</Badge>}
       />
       {pkg.evalError && (
         <Alert variant="destructive">
-          <AlertTitle>Evalueringsfeil i nyeste commit</AlertTitle>
+          <AlertTitle>Evaluation error in the newest commit</AlertTitle>
           <AlertDescription>
             <pre className="max-h-48 overflow-auto font-mono text-xs whitespace-pre-wrap">{pkg.evalError}</pre>
           </AlertDescription>
@@ -43,19 +43,19 @@ export function PackagePage() {
           <div className="flex items-center gap-3">
             <Switch id="auto-build" checked={pkg.autoBuild} onCheckedChange={(enabled) => toggle.mutate(enabled)} />
             <label htmlFor="auto-build">
-              <span className="block font-medium">Bygg automatisk</span>
-              <span className="block text-sm text-muted-foreground">Nye derivasjoner settes i kø med en gang.</span>
+              <span className="block font-medium">Build automatically</span>
+              <span className="block text-sm text-muted-foreground">New derivations are queued right away.</span>
             </label>
           </div>
           <div>
-            <p className="font-medium">Forventet byggetid</p>
+            <p className="font-medium">Expected build time</p>
             <p className="text-sm text-muted-foreground">{formatDuration(pkg.expectedSeconds)}</p>
           </div>
           <div className="flex max-w-md items-start gap-2 text-sm text-muted-foreground">
             <Info className="mt-0.5 size-4 shrink-0" />
             {pkg.pinnable
-              ? "Velg en cachet versjon for å låse den for alle profiler."
-              : "Pakken følger revisjonen til hver profil (kjerner, drivere og moduler kan ikke låses enkeltvis)."}
+              ? "Choose a cached version to pin it for every profile."
+              : "The derivation follows each profile's revision (kernels, drivers and modules cannot be pinned one by one)."}
           </div>
         </CardContent>
       </Card>

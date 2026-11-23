@@ -3,12 +3,12 @@ import type { BuildState } from "@/packages/queries";
 import { cn } from "@/ui/cn";
 
 export const stateStyles: Record<BuildState, { label: string; icon: typeof CircleCheck; tone: string; dot: string }> = {
-  cached: { label: "Cachet", icon: CircleCheck, tone: "bg-success-soft text-success", dot: "bg-success" },
-  building: { label: "Bygger", icon: LoaderCircle, tone: "bg-info-soft text-info", dot: "bg-info" },
-  queued: { label: "I kø", icon: Hourglass, tone: "bg-warning-soft text-warning-foreground", dot: "bg-warning" },
-  failed: { label: "Feilet", icon: CircleX, tone: "bg-danger-soft text-destructive", dot: "bg-destructive" },
-  cancelled: { label: "Avbrutt", icon: CircleSlash, tone: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
-  pending: { label: "Ikke cachet", icon: CircleDashed, tone: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/50" },
+  cached: { label: "Cached", icon: CircleCheck, tone: "bg-success-soft text-success", dot: "bg-success" },
+  building: { label: "Building", icon: LoaderCircle, tone: "bg-info-soft text-info", dot: "bg-info" },
+  queued: { label: "Queued", icon: Hourglass, tone: "bg-warning-soft text-warning-foreground", dot: "bg-warning" },
+  failed: { label: "Failed", icon: CircleX, tone: "bg-danger-soft text-destructive", dot: "bg-destructive" },
+  cancelled: { label: "Cancelled", icon: CircleSlash, tone: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
+  pending: { label: "Not cached", icon: CircleDashed, tone: "bg-muted text-muted-foreground", dot: "bg-muted-foreground/50" },
 };
 
 export function StateBadge({ state, className }: { state: BuildState; className?: string }) {

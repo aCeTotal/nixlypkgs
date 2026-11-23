@@ -37,7 +37,7 @@ export function ConfirmButton({ label, icon: Icon, title, description, onConfirm
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Avbryt</AlertDialogCancel>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction variant="destructive" onClick={onConfirm}>
             {label}
           </AlertDialogAction>

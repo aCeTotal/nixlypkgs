@@ -17,32 +17,32 @@ export function OverviewPage() {
   const passed = profiles.filter((profile) => profile.checkState === "passed" || profile.checkState === "skipped").length;
   return (
     <div className="space-y-6">
-      <PageHeader title="Oversikt" description="Cache, profiler og bygg i sanntid." />
+      <PageHeader title="Overview" description="Cache, profiles and builds, live." />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
-          label="Profiler klare"
+          label="Profiles ready"
           value={`${passed}/${profiles.length}`}
-          hint="testet og publisert"
+          hint="check passed"
           icon={Layers}
           tone={passed === profiles.length ? "success" : "warning"}
         />
         <StatTile
-          label="Bygg"
+          label="Builds"
           value={`${states.building ?? 0} / ${states.queued ?? 0}`}
-          hint="kjører / i kø"
+          hint="running / queued"
           icon={Hammer}
           tone="info"
         />
         <StatTile
-          label="Cachede versjoner"
+          label="Cached versions"
           value={states.cached ?? 0}
-          hint={`${data.cache.packages} pakker · ${formatBytes(data.cache.closureBytes)}`}
+          hint={`${data.cache.packages} derivations · ${formatBytes(data.cache.closureBytes)}`}
           icon={Database}
         />
         <StatTile
-          label="Ledig i /nix/store"
+          label="Free in cache"
           value={formatBytes(data.disk.free)}
-          hint={`${Math.round((usedDisk / data.disk.total) * 100)} % av ${formatBytes(data.disk.total)} brukt`}
+          hint={`${Math.round((usedDisk / data.disk.total) * 100)} % of ${formatBytes(data.disk.total)} used`}
           icon={HardDrive}
           tone={data.disk.free < data.disk.total * 0.1 ? "danger" : "primary"}
         />

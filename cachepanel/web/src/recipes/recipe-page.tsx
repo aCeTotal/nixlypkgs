@@ -18,7 +18,7 @@ import { RecipeStateBadge } from "./state-badge";
 
 const route = getRouteApi("/app/recipes/$id");
 
-const analysis = ["Henter kilden", "Pakker ut i sandkasse", "Finner byggemåte og metadata", "Slår opp avhengigheter i nixpkgs"];
+const analysis = ["Fetching the source", "Unpacking in the sandbox", "Finding the build method and metadata", "Looking up dependencies in nixpkgs"];
 
 export function RecipePage() {
   const { id } = route.useParams();
@@ -28,7 +28,7 @@ export function RecipePage() {
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link to="/recipes">
           <ArrowLeft />
-          Nye pakker
+          Add derivation
         </Link>
       </Button>
       {data.spec ? <RecipeEditor key={JSON.stringify(data.spec)} recipe={data} spec={data.spec} /> : <Unanalysed recipe={data} />}
@@ -41,10 +41,10 @@ function RemoveButton({ recipe }: { recipe: RecipeDetail }) {
   const remove = useMutation({ mutationFn: () => deleteRecipe(recipe.id), onSuccess: () => navigate({ to: "/recipes" }) });
   return (
     <ConfirmButton
-      label="Slett"
+      label="Delete"
       icon={Trash2}
-      title="Slette oppskriften?"
-      description="Oppskriften og testbyggene forsvinner fra panelet. En publisert pakke blir liggende i nixlypkgs."
+      title="Delete the recipe?"
+      description="The recipe and its test builds leave the panel. A published derivation stays in nixlypkgs."
       onConfirm={() => remove.mutate()}
     />
   );
@@ -59,8 +59,8 @@ function Unanalysed({ recipe }: { recipe: RecipeDetail }) {
             <ScanSearch className="size-7 animate-pulse" />
           </span>
           <div>
-            <h2 className="text-lg font-semibold">Analyserer kilden</h2>
-            <p className="text-sm text-muted-foreground">Store kilder kan ta et par minutter.</p>
+            <h2 className="text-lg font-semibold">Analysing the source</h2>
+            <p className="text-sm text-muted-foreground">Large sources can take a few minutes.</p>
           </div>
           <ol className="mx-auto w-fit space-y-2 text-left text-sm text-muted-foreground">
             {analysis.map((step) => (
@@ -77,12 +77,12 @@ function Unanalysed({ recipe }: { recipe: RecipeDetail }) {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <Alert variant="destructive">
-        <AlertTitle>Fikk ikke analysert kilden</AlertTitle>
+        <AlertTitle>Could not analyse the source</AlertTitle>
         <AlertDescription className="whitespace-pre-wrap">{recipe.error}</AlertDescription>
       </Alert>
       <div className="flex gap-2">
         <Button asChild>
-          <Link to="/recipes/new">Prøv en annen kilde</Link>
+          <Link to="/recipes/new">Try another source</Link>
         </Button>
         <RemoveButton recipe={recipe} />
       </div>
@@ -117,7 +117,7 @@ function RecipeEditor({ recipe, spec: saved }: { recipe: RecipeDetail; spec: Spe
       {notes.length > 0 && (
         <Alert>
           <Info className="text-primary" />
-          <AlertTitle>Fra analysen</AlertTitle>
+          <AlertTitle>From the analysis</AlertTitle>
           <AlertDescription>
             <ul className="list-disc space-y-1 pl-4">
               {notes.map((note) => (
@@ -129,10 +129,10 @@ function RecipeEditor({ recipe, spec: saved }: { recipe: RecipeDetail; spec: Spe
       )}
       <Tabs defaultValue={recipe.state === "draft" ? "setup" : "build"}>
         <TabsList>
-          <TabsTrigger value="setup">1 · Oppsett</TabsTrigger>
-          <TabsTrigger value="deps">2 · Avhengigheter</TabsTrigger>
-          <TabsTrigger value="build">3 · Testbygg</TabsTrigger>
-          <TabsTrigger value="publish">4 · Publiser</TabsTrigger>
+          <TabsTrigger value="setup">1 · Setup</TabsTrigger>
+          <TabsTrigger value="deps">2 · Dependencies</TabsTrigger>
+          <TabsTrigger value="build">3 · Test build</TabsTrigger>
+          <TabsTrigger value="publish">4 · Publish</TabsTrigger>
         </TabsList>
         <TabsContent value="setup" className="pt-4">
           <RecipeSetup spec={spec} update={update} />
@@ -150,14 +150,14 @@ function RecipeEditor({ recipe, spec: saved }: { recipe: RecipeDetail; spec: Spe
       {dirty && (
         <div className="fixed inset-x-0 bottom-0 z-30 flex justify-center p-4">
           <div className="flex items-center gap-3 rounded-xl border bg-popover/95 px-4 py-3 shadow-xl backdrop-blur animate-in slide-in-from-bottom-4">
-            <span className="text-sm">{save.error ? save.error.message : "Ulagrede endringer – testbygg på nytt etterpå."}</span>
+            <span className="text-sm">{save.error ? save.error.message : "Unsaved changes – test build again afterwards."}</span>
             <Button variant="ghost" size="sm" onClick={() => setSpec(saved)}>
               <Undo2 />
-              Forkast
+              Discard
             </Button>
             <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
               <Save />
-              Lagre
+              Save
             </Button>
           </div>
         </div>

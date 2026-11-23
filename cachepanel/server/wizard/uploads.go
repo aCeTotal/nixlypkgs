@@ -27,8 +27,8 @@ import (
 var (
 	hashPattern   = regexp.MustCompile(`^[0-9a-f]{64}$`)
 	uploadPattern = regexp.MustCompile(`^[A-Za-z0-9_+-][A-Za-z0-9._+-]*$`)
-	errNoUpload   = errors.New("fant ikke den opplastede filen")
-	errFileName   = errors.New("filnavnet kan bare ha bokstaver, tall og . _ + -")
+	errNoUpload   = errors.New("the uploaded file is missing")
+	errFileName   = errors.New("file names may only contain letters, digits and . _ + -")
 )
 
 // Uploads keeps uploaded sources by content hash.
@@ -103,7 +103,7 @@ func (u *Uploads) Seed(ctx context.Context, hash string) (analyse.Fetched, error
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		return analyse.Fetched{}, fmt.Errorf("legg i store: %w: %s", err, stderr.String())
+		return analyse.Fetched{}, fmt.Errorf("add to store: %w: %s", err, stderr.String())
 	}
 	raw, err := hex.DecodeString(hash)
 	if err != nil {

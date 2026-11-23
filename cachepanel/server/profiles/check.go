@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -92,13 +93,13 @@ func (b *Rebuilder) runCheck(ctx context.Context, next pendingCheck) {
 	}
 }
 
-// recordCheck publishes passing candidates still current.
+// recordCheck moves passes into testing.
 func (b *Rebuilder) recordCheck(ctx context.Context, next pendingCheck, state, message string) error {
 	tag, err := b.db.Exec(ctx, `
 		UPDATE profiles SET check_state = $4::check_state, check_error = nullif($5, ''), checked_at = now(),
-			published_tree = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN candidate_tree ELSE published_tree END,
-			published_rev = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN candidate_rev ELSE published_rev END,
-			published_at = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN now() ELSE published_at END
+			testing_tree = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN candidate_tree ELSE testing_tree END,
+			testing_rev = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN candidate_rev ELSE testing_rev END,
+			testing_at = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN now() ELSE testing_at END
 		WHERE id = $1 AND candidate_tree = $2 AND candidate_rev = $3 AND check_state = 'running'`,
 		next.id, next.tree, next.rev, state, message)
 	if err != nil || tag.RowsAffected() == 0 {
@@ -175,11 +176,28 @@ func (b *Rebuilder) verify(ctx context.Context, next pendingCheck) error {
 		drvPaths = append(drvPaths, drvPath)
 	}
 	roots := b.systemRoots(next.id)
-	if err := buildSystems(ctx, filepath.Join(roots, next.tree, "system"), drvPaths); err != nil {
-		_ = os.RemoveAll(filepath.Join(roots, next.tree))
+	key := releaseKey(next.tree, next.rev)
+	if err := b.cacheSystems(ctx, filepath.Join(roots, key), drvPaths); err != nil {
 		return err
 	}
-	return keepOnly(roots, next.tree)
+	released, err := b.released(ctx, next.id)
+	if err != nil {
+		return err
+	}
+	return keepOnly(roots, append(released, key))
+}
+
+func releaseKey(tree, rev string) string {
+	return tree + "-" + rev
+}
+
+// released names both branches' systems.
+func (b *Rebuilder) released(ctx context.Context, id int64) ([]string, error) {
+	var testingTree, testingRev, stableTree, stableRev string
+	err := b.db.QueryRow(ctx, `
+		SELECT coalesce(testing_tree, ''), coalesce(testing_rev, ''), coalesce(stable_tree, ''), coalesce(stable_rev, '')
+		FROM profiles WHERE id = $1`, id).Scan(&testingTree, &testingRev, &stableTree, &stableRev)
+	return []string{releaseKey(testingTree, testingRev), releaseKey(stableTree, stableRev)}, err
 }
 
 // systemRoots holds checked systems.
@@ -187,14 +205,14 @@ func (b *Rebuilder) systemRoots(id int64) string {
 	return filepath.Join(b.checksDir, "roots", strconv.FormatInt(id, 10))
 }
 
-// keepOnly unroots older checked systems.
-func keepOnly(dir, kept string) error {
+// keepOnly unroots unreleased checked systems.
+func keepOnly(dir string, kept []string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}
 	for _, entry := range entries {
-		if entry.Name() == kept {
+		if slices.Contains(kept, entry.Name()) {
 			continue
 		}
 		if err := os.RemoveAll(filepath.Join(dir, entry.Name())); err != nil {

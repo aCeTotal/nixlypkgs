@@ -11,8 +11,8 @@ export function RouteError({ error, reset }: ErrorComponentProps) {
         <EmptyMedia variant="icon">
           <TriangleAlert />
         </EmptyMedia>
-        <EmptyTitle>Noe gikk galt</EmptyTitle>
-        <EmptyDescription>{error instanceof Error ? error.message : "Ukjent feil"}</EmptyDescription>
+        <EmptyTitle>Something went wrong</EmptyTitle>
+        <EmptyDescription>{error instanceof Error ? error.message : "Unknown error"}</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
         <Button
@@ -21,7 +21,7 @@ export function RouteError({ error, reset }: ErrorComponentProps) {
             void router.invalidate();
           }}
         >
-          Prøv igjen
+          Try again
         </Button>
       </EmptyContent>
     </Empty>

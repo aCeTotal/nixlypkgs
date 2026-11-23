@@ -16,7 +16,7 @@ const (
 	maxPage     = 500
 )
 
-var errNotRetryable = rest.Conflict("not_retryable", "Bare den nyeste, feilede commiten kan evalueres på nytt")
+var errNotRetryable = rest.Conflict("not_retryable", "Only the newest, failed commit can be evaluated again")
 
 // Commits lists evaluated revisions.
 type Commits struct {
@@ -51,7 +51,8 @@ func (c *Commits) list(w http.ResponseWriter, r *http.Request) error {
 			SELECT sha, position, subject, author, committed_at AS "committedAt", eval_state AS "evalState",
 				eval_started_at AS "evalStartedAt", eval_finished_at AS "evalFinishedAt", eval_error AS "evalError",
 				attrs, failed_attrs AS "failedAttrs", changed,
-				(SELECT coalesce(json_agg(t.name ORDER BY t.name), '[]') FROM profiles t WHERE t.published_rev = commits.sha) AS "publishedFor"
+				(SELECT coalesce(json_agg(t.name ORDER BY t.name), '[]') FROM profiles t WHERE t.stable_rev = commits.sha) AS "stableFor",
+				(SELECT coalesce(json_agg(t.name ORDER BY t.name), '[]') FROM profiles t WHERE t.testing_rev = commits.sha) AS "testingFor"
 			FROM commits WHERE position < $1 ORDER BY position DESC LIMIT $2) c`, before, min(limit, maxPage))
 	if err != nil {
 		return err

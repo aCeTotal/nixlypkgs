@@ -17,23 +17,23 @@ export function ProfileActions({ profile }: { profile: ProfileSummary }) {
     <>
       <Button size="sm" variant="outline" onClick={() => act.mutate("check")} disabled={profile.checkState === "running"}>
         <FlaskConical />
-        Test på nytt
+        Check again
       </Button>
       {profile.checkState === "failed" && (
         <ConfirmButton
-          label="Publiser likevel"
+          label="Send to testing anyway"
           icon={Rocket}
-          title="Publisere uten bestått test?"
-          description="Maskinene får kandidaten selv om testen feilet. Bruk bare når feilen gjelder en referanseprofil ingen maskiner har."
+          title="Send to testing without a passing check?"
+          description="Testing machines get the candidate even though the check failed. Only do this when the failure is in a reference machine no real machine has."
           onConfirm={() => act.mutate("publish")}
         />
       )}
       <CloneDialog source={profile} />
       <ConfirmButton
-        label="Slett"
+        label="Delete"
         icon={Trash2}
-        title={`Slette profilen ${profile.title}?`}
-        description="Maskiner som bruker profilen beholder siste publiserte oppsett, men får ingen oppdateringer."
+        title={`Delete the ${profile.title} profile?`}
+        description="Machines on this profile keep what they run but get no more updates."
         onConfirm={() => remove.mutate()}
       />
     </>
@@ -57,17 +57,17 @@ function CloneDialog({ source }: { source: ProfileSummary }) {
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
           <Copy />
-          Klon
+          Clone
         </Button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={submit} className="space-y-6">
           <DialogHeader>
-            <DialogTitle>Klon {source.title}</DialogTitle>
+            <DialogTitle>Clone {source.title}</DialogTitle>
           </DialogHeader>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="clone-title">Navn</FieldLabel>
+              <FieldLabel htmlFor="clone-title">Name</FieldLabel>
               <Input id="clone-title" required value={title} onChange={(event) => setTitle(event.target.value)} />
             </Field>
             <Field>
@@ -77,7 +77,7 @@ function CloneDialog({ source }: { source: ProfileSummary }) {
           </FieldGroup>
           <DialogFooter>
             <Button type="submit" disabled={clone.isPending}>
-              Klon
+              Clone
             </Button>
           </DialogFooter>
         </form>

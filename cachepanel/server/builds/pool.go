@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"cachepanel/cache"
 	"cachepanel/realtime"
 )
 
@@ -49,7 +50,7 @@ type Pool struct {
 	db      *pgxpool.Pool
 	hub     *realtime.Hub
 	files   Files
-	gc      *collector
+	cache   *cache.Cache
 	changed func()
 	wake    chan struct{}
 	claimMu sync.Mutex
@@ -58,12 +59,12 @@ type Pool struct {
 	running map[int64]*job
 }
 
-func NewPool(db *pgxpool.Pool, hub *realtime.Hub, files Files, changed func()) *Pool {
+func NewPool(db *pgxpool.Pool, hub *realtime.Hub, files Files, store *cache.Cache, changed func()) *Pool {
 	return &Pool{
 		db:      db,
 		hub:     hub,
 		files:   files,
-		gc:      newCollector(),
+		cache:   store,
 		changed: changed,
 		wake:    make(chan struct{}, workers),
 		running: map[int64]*job{},
@@ -78,7 +79,6 @@ func (p *Pool) Run(ctx context.Context) error {
 	if err := p.files.prepare(); err != nil {
 		return err
 	}
-	go p.gc.run(ctx)
 	var group sync.WaitGroup
 	for range workers {
 		group.Go(func() { p.work(ctx) })

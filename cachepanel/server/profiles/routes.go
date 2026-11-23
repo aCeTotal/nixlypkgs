@@ -26,6 +26,8 @@ func (b *Rebuilder) Mount(r chi.Router) {
 	r.Post("/profiles/{name}/clone", rest.Handle(b.clone))
 	r.Post("/profiles/{name}/check", rest.Handle(b.recheck))
 	r.Post("/profiles/{name}/publish", rest.Handle(b.publish))
+	r.Get("/approval", rest.Handle(b.pending))
+	r.Post("/approval", rest.Handle(b.approve))
 }
 
 const summary = `
@@ -34,7 +36,8 @@ const summary = `
 	(SELECT count(*) FROM modules m WHERE m.required
 		OR EXISTS (SELECT 1 FROM profile_modules pm WHERE pm.profile_id = p.id AND pm.module_id = m.id)) AS "moduleCount",
 	p.candidate_tree AS "candidateTree", p.candidate_rev AS "candidateRev",
-	p.published_tree AS "publishedTree", p.published_rev AS "publishedRev", p.published_at AS "publishedAt",
+	p.testing_tree AS "testingTree", p.testing_rev AS "testingRev", p.testing_at AS "testingAt",
+	p.stable_tree AS "stableTree", p.stable_rev AS "stableRev", p.stable_at AS "stableAt",
 	p.check_state AS "checkState", p.check_error AS "checkError", p.checked_at AS "checkedAt", p.updated_at AS "updatedAt"`
 
 func (b *Rebuilder) list(w http.ResponseWriter, r *http.Request) error {
@@ -113,10 +116,10 @@ func (b *Rebuilder) recheck(w http.ResponseWriter, r *http.Request) error {
 	return rest.NoContent(w)
 }
 
-// publish ships an untested candidate.
+// publish skips the check.
 func (b *Rebuilder) publish(w http.ResponseWriter, r *http.Request) error {
 	if err := b.mutate(r, `
-		UPDATE profiles SET published_tree = candidate_tree, published_rev = candidate_rev, published_at = now()
+		UPDATE profiles SET testing_tree = candidate_tree, testing_rev = candidate_rev, testing_at = now()
 		WHERE name = $1 AND candidate_tree IS NOT NULL AND candidate_rev IS NOT NULL`); err != nil {
 		return err
 	}

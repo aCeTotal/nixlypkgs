@@ -144,12 +144,12 @@ var (
 	versionPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.+_~-]*$`)
 	filePattern    = regexp.MustCompile(`^[A-Za-z0-9_+-][A-Za-z0-9._+-]*$`)
 	licensePattern = regexp.MustCompile(`^[A-Za-z0-9_]*$`)
-	errAttr        = errors.New("attributtnavnet kan bare ha bokstaver, tall, - og _")
-	errVersion     = errors.New("versjonen kan bare ha bokstaver, tall og . + _ ~ -")
-	errInput       = errors.New("ugyldig avhengighet")
-	errSources     = errors.New("oppskriften trenger minst én kilde")
-	errFileName    = errors.New("lokale filer kan bare ha bokstaver, tall og . _ + -")
-	errLicense     = errors.New("ukjent lisens")
+	errAttr        = errors.New("the attribute may only contain letters, digits, - and _")
+	errVersion     = errors.New("the version may only contain letters, digits and . + _ ~ -")
+	errInput       = errors.New("invalid dependency")
+	errSources     = errors.New("the recipe needs at least one source")
+	errFileName    = errors.New("local files may only contain letters, digits and . _ + -")
+	errLicense     = errors.New("unknown licence")
 )
 
 func (s Spec) Validate() error {

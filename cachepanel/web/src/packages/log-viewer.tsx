@@ -8,7 +8,7 @@ export function LogViewer({ versionId, live }: { versionId: number; live: boolea
   return (
     <div className="max-h-96 overflow-auto rounded-lg border bg-sidebar p-3">
       <pre className="font-mono text-[0.72rem] leading-relaxed whitespace-pre-wrap text-sidebar-foreground">
-        {data || "Ingen logg ennå."}
+        {data || "No log yet."}
       </pre>
       <div key={data?.length} ref={(node) => node?.scrollIntoView({ block: "nearest" })} />
     </div>

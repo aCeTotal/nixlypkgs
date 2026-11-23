@@ -6,7 +6,7 @@ import { cn } from "@/ui/cn";
 export function FileBrowser({ files }: { files: { path: string; content: string }[] }) {
   const [current, setCurrent] = useState(files[0]?.path ?? "");
   const shown = files.find((file) => file.path === current);
-  if (files.length === 0) return <p className="text-sm text-muted-foreground">Ingen filer ennå.</p>;
+  if (files.length === 0) return <p className="text-sm text-muted-foreground">No files yet.</p>;
   return (
     <Card className="overflow-hidden py-0">
       <CardContent className="grid p-0 md:grid-cols-[16rem_1fr]">

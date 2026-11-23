@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"syscall"
 	"time"
 
@@ -24,7 +26,7 @@ const (
 	logBufferBytes = 64 << 10
 )
 
-var errTimeout = errors.New("bygget brukte mer enn 6 timer")
+var errTimeout = errors.New("the build took more than 6 hours")
 
 func (p *Pool) build(ctx context.Context, next claimed) {
 	buildCtx, cancel := context.WithTimeout(ctx, buildTimeout)
@@ -85,7 +87,7 @@ func (p *Pool) run(ctx context.Context, next claimed, j *job) (err error) {
 	if err := cmd.Wait(); err != nil {
 		return fmt.Errorf("%w\n%s", err, parse.errors.String())
 	}
-	return nil
+	return p.cache.Push(ctx, slices.Collect(maps.Values(next.Outputs))...)
 }
 
 // finish records surviving versions.
@@ -100,9 +102,8 @@ func (p *Pool) finish(ctx context.Context, next claimed, j *job, failure error, 
 	default:
 		closure = p.closureBytes(ctx, next)
 	}
-	if state != "cached" {
-		p.files.removeRoot(next.ID)
-	}
+	// The cache holds outputs now.
+	p.files.removeRoot(next.ID)
 	tag, err := p.db.Exec(ctx, `
 		UPDATE versions SET state = $2, finished_at = now(), error = nullif($3, ''), closure_bytes = nullif($4::bigint, 0)
 		WHERE id = $1 AND state = 'building'`, next.ID, state, message, closure)

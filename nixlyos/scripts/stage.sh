@@ -4,7 +4,7 @@ set -euo pipefail
 
 FLAKE="${NIXLYOS_DIR:-$HOME/.local/nixlyos}"
 STAGE="${XDG_STATE_HOME:-$HOME/.local/state}/nixlyos/stage"
-[[ -f "$FLAKE/flake.nix" ]] || exit 0
+[[ -f "$FLAKE/flake.nix" && -f "$FLAKE/profile" ]] || exit 0
 
 # Desktops have no online files.
 idle() {
@@ -31,29 +31,22 @@ cp -r "$FLAKE/hardware" "$STAGE/flake/hardware"
 if [[ -d "$FLAKE/custom" ]]; then cp -r "$FLAKE/custom" "$STAGE/flake/custom"; fi
 
 # Same locking as nixlyos-update.
-if [[ -f "$FLAKE/profile" ]]; then
-  { nixlyos-panel pin "$STAGE/flake" && (cd "$STAGE/flake" && nix flake lock); } >/dev/null 2>&1 || exit 0
-else
-  (cd "$STAGE/flake" && nix flake lock &&
-   nix flake update nixlypkgs/nixos-stable nixlypkgs/home-manager) >/dev/null 2>&1 || exit 0
-fi
+{ nixlyos-panel pin "$STAGE/flake" && (cd "$STAGE/flake" && nix flake lock); } >/dev/null 2>&1 || exit 0
 
 # Big heap, fewer GC cycles.
 export GC_INITIAL_HEAP_SIZE=2G
 
 # Same file list as update.sh's tree_key.
-key=$(cat "$STAGE/flake"/flake.nix "$STAGE/flake"/flake.lock "$STAGE/flake"/local.nix "$STAGE/flake"/pins.nix "$STAGE/flake"/custom/* "$STAGE/flake"/hardware/* 2>/dev/null | sha1sum | cut -d' ' -f1)
+key=$(cat "$STAGE/flake"/flake.nix "$STAGE/flake"/flake.lock "$STAGE/flake"/local.nix "$STAGE/flake"/custom/* "$STAGE/flake"/hardware/* 2>/dev/null | sha1sum | cut -d' ' -f1)
 if [[ -f "$STAGE/key" && "$(<"$STAGE/key")" == "$key" && -e "$STAGE/result" ]]; then
   exit 0
 fi
 
+drv=$(nix eval --raw "$STAGE/flake#nixosConfigurations.nixlyos.config.system.build.toplevel.drvPath" 2>/dev/null) || exit 0
+# Retried once the cache has it.
+[[ -z "$(uncached "$drv")" ]] || exit 0
+
 # The out-link is the GC root.
-nix build --keep-going --out-link "$STAGE/result" \
-  --option extra-substituters https://cache.aceclan.no \
-  --option extra-trusted-public-keys cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak= \
-  --option connect-timeout 3 \
-  --option fallback true \
-  "$STAGE/flake#nixosConfigurations.nixlyos.config.system.build.toplevel" \
-  >/dev/null 2>&1 || exit 0
+nix build --keep-going --out-link "$STAGE/result" "${CACHE_OPTS[@]}" "$drv^*" >/dev/null 2>&1 || exit 0
 
 printf '%s\n' "$key" > "$STAGE/key"

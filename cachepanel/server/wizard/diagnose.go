@@ -68,11 +68,11 @@ func hashFix(log string, spec recipe.Spec) []Fix {
 	specified, got := match[1], match[2]
 	for i, source := range spec.Sources {
 		if source.Hash == specified || source.Hash == "" && recipe.Placeholder(i+1) == specified {
-			return []Fix{{Text: "Fant sjekksummen til kilden " + firstOf(source.Name, source.Repo, source.URL), apply: func(s *recipe.Spec) { s.Sources[i].Hash = got }}}
+			return []Fix{{Text: "Found the checksum of source " + firstOf(source.Name, source.Repo, source.URL), apply: func(s *recipe.Spec) { s.Sources[i].Hash = got }}}
 		}
 	}
 	if spec.VendorHash == specified || spec.VendorHash == "" && recipe.Placeholder(recipe.VendorSlot) == specified {
-		return []Fix{{Text: "Fant sjekksummen til de nedlastede avhengighetene", apply: func(s *recipe.Spec) { s.VendorHash = got }}}
+		return []Fix{{Text: "Found the checksum of the downloaded dependencies", apply: func(s *recipe.Spec) { s.VendorHash = got }}}
 	}
 	return nil
 }
@@ -80,16 +80,16 @@ func hashFix(log string, spec recipe.Spec) []Fix {
 // layoutFixes handle vendoring surprises.
 func layoutFixes(log string, spec recipe.Spec) []Fix {
 	if pypaMissing.MatchString(log) && spec.Builder == recipe.Python && !slices.Contains(spec.Flags, skipDependencyCheck) {
-		return []Fix{{Text: "Byggesystemet ber om versjoner nixpkgs ikke har; bygger uten den sjekken", apply: func(s *recipe.Spec) { s.Flags = appendNew(s.Flags, skipDependencyCheck) }}}
+		return []Fix{{Text: "The build system asks for versions nixpkgs lacks; building without that check", apply: func(s *recipe.Spec) { s.Flags = appendNew(s.Flags, skipDependencyCheck) }}}
 	}
 	if goVendored.MatchString(log) && !spec.Vendored {
-		return []Fix{{Text: "Kilden har vendor/, bruker den", apply: func(s *recipe.Spec) { s.Vendored, s.VendorHash = true, "" }}}
+		return []Fix{{Text: "The source ships vendor/; using it", apply: func(s *recipe.Spec) { s.Vendored, s.VendorHash = true, "" }}}
 	}
 	if oldCMake.MatchString(log) && spec.Builder == recipe.CMake {
-		return []Fix{{Text: "Bygger med CMake-kompatibilitet for eldre prosjekter", apply: func(s *recipe.Spec) { s.Flags = appendNew(s.Flags, "-DCMAKE_POLICY_VERSION_MINIMUM=3.5") }}}
+		return []Fix{{Text: "Building with CMake compatibility for older projects", apply: func(s *recipe.Spec) { s.Flags = appendNew(s.Flags, "-DCMAKE_POLICY_VERSION_MINIMUM=3.5") }}}
 	}
 	if noLockfile.MatchString(log) && spec.Vendor == recipe.NpmVendor {
-		return []Fix{{Text: "Kilden har ingen package-lock.json, bygger uten npm-hurtiglager", apply: func(s *recipe.Spec) { s.Vendor, s.VendorHash = recipe.NoVendor, "" }}}
+		return []Fix{{Text: "The source has no package-lock.json; building without the npm cache", apply: func(s *recipe.Spec) { s.Vendor, s.VendorHash = recipe.NoVendor, "" }}}
 	}
 	return nil
 }
@@ -118,12 +118,12 @@ func dependencyFixes(spec recipe.Spec, wants []wanted, results []depmap.Result) 
 	native := map[string]bool{}
 	for i, result := range results {
 		if result.Missing || len(result.Attrs) == 0 {
-			hints = append(hints, "Bygget mangler "+result.Name+", og ingen nixpkgs-pakke passer automatisk")
+			hints = append(hints, "The build lacks "+result.Name+", and no nixpkgs package fits automatically")
 			continue
 		}
 		fresh := slices.DeleteFunc(slices.Clone(result.Attrs), func(attr string) bool { return present(spec, attr) })
 		if len(fresh) == 0 {
-			hints = append(hints, "Bygget mangler "+result.Name+" selv om "+strings.Join(result.Attrs, ", ")+" er med")
+			hints = append(hints, "The build lacks "+result.Name+" even though "+strings.Join(result.Attrs, ", ")+" is included")
 			continue
 		}
 		for _, attr := range fresh {
@@ -136,7 +136,7 @@ func dependencyFixes(spec recipe.Spec, wants []wanted, results []depmap.Result) 
 	}
 	fixes := make([]Fix, len(order))
 	for i, attr := range order {
-		fixes[i] = Fix{Text: "La til " + attr + " for " + strings.Join(reasons[attr], ", "), apply: func(s *recipe.Spec) {
+		fixes[i] = Fix{Text: "Added " + attr + " for " + strings.Join(reasons[attr], ", "), apply: func(s *recipe.Spec) {
 			addDependency(s, []string{attr}, native[attr])
 		}}
 	}
@@ -171,16 +171,16 @@ func present(spec recipe.Spec, attr string) bool {
 func knownLimits(log string) []string {
 	var hints []string
 	if match := rustTooOld.FindStringSubmatch(log); match != nil {
-		hints = append(hints, "Kilden krever nyere Rust enn "+match[1]+" som nixpkgs stable har; velg en eldre versjon")
+		hints = append(hints, "The source needs a newer Rust than nixpkgs stable's "+match[1]+"; choose an older version")
 	}
 	if match := unknownHook.FindStringSubmatch(log); match != nil {
-		hints = append(hints, "Kilden bruker byggekroken "+match[1]+", som nixpkgs ikke har")
+		hints = append(hints, "The source uses the build hook "+match[1]+", which nixpkgs lacks")
 	}
 	if badObject.MatchString(log) {
-		hints = append(hints, "PKGBUILD-en henter git-commits som ikke ligger i kildens historikk")
+		hints = append(hints, "The PKGBUILD fetches git commits missing from the source history")
 	}
 	if lockDrift.MatchString(log) {
-		hints = append(hints, "package-lock.json er ute av takt med package.json i kilden; velg en annen versjon")
+		hints = append(hints, "package-lock.json is out of sync with package.json in the source; choose another version")
 	}
 	return hints
 }
@@ -200,7 +200,7 @@ func toolchainFixes(log string, spec recipe.Spec) []Fix {
 		if !slices.Contains(spec.Native, release) {
 			continue
 		}
-		return []Fix{{Text: "Kilden passer ikke med " + release + ", prøver " + older, apply: func(s *recipe.Spec) {
+		return []Fix{{Text: "The source does not fit " + release + "; trying " + older, apply: func(s *recipe.Spec) {
 			s.Native[slices.Index(s.Native, release)] = older
 		}}}
 	}

@@ -56,7 +56,7 @@ type Lab struct {
 var (
 	githubRepo = regexp.MustCompile(`^https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?(?:/(?:tree|releases/tag)/([^?#]+))?/?$`)
 	invalidPid = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
-	errOrigin  = errors.New("ukjent importtype")
+	errOrigin  = errors.New("unknown import type")
 )
 
 // ownSuffix keeps nixpkgs names free.
@@ -71,7 +71,7 @@ func (l *Lab) Import(ctx context.Context, req Request) (Draft, error) {
 	taken, err := l.Taken(ctx, draft.Spec.Attr)
 	if taken {
 		draft.Spec.Attr += ownSuffix
-		draft.Notes = append(draft.Notes, "nixpkgs har allerede "+strings.TrimSuffix(draft.Spec.Attr, ownSuffix)+", så pakken heter "+draft.Spec.Attr+" her")
+		draft.Notes = append(draft.Notes, "nixpkgs already has "+strings.TrimSuffix(draft.Spec.Attr, ownSuffix)+", so this derivation is called "+draft.Spec.Attr)
 	}
 	return draft, err
 }
@@ -97,7 +97,7 @@ func (l *Lab) analyse(ctx context.Context, req Request) (Draft, error) {
 	case FromGitHub:
 		match := githubRepo.FindStringSubmatch(req.URL)
 		if match == nil {
-			return Draft{}, fmt.Errorf("%q er ikke et GitHub-repo", req.URL)
+			return Draft{}, fmt.Errorf("%q is not a GitHub repository", req.URL)
 		}
 		return l.fromGitHub(ctx, flake, match[1], match[2], firstOf(req.Ref, match[3]))
 	}

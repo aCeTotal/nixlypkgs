@@ -15,6 +15,7 @@ import (
 
 	"cachepanel/auth"
 	"cachepanel/builds"
+	"cachepanel/cache"
 	"cachepanel/client"
 	"cachepanel/commits"
 	"cachepanel/config"
@@ -50,6 +51,7 @@ type app struct {
 	watcher   *watcher.Watcher
 	recipes   *wizard.Service
 	uploads   *wizard.Uploads
+	cache     *cache.Cache
 }
 
 func (a *app) routes() http.Handler {
@@ -63,13 +65,14 @@ func (a *app) routes() http.Handler {
 	// Large downloads outlive the machine timeout.
 	r.Get("/api/v1/sources/{hash}/{name}", a.uploads.Serve)
 	r.With(a.auth.Authenticate).Get("/api/ws", a.hub.ServeWS)
+	a.cache.Mount(r)
 
 	compressed := r.With(middleware.Compress(compressionLevel))
 	compressed.With(logWrites).Mount("/api/auth", a.auth.Routes())
 	compressed.Route("/api", func(api chi.Router) {
 		api.Use(a.auth.Authenticate, logWrites)
 		api.NotFound(rest.Handle(func(http.ResponseWriter, *http.Request) error { return rest.NotFound() }))
-		overview.New(a.db, a.watcher, a.pool).Mount(api)
+		overview.New(a.db, a.watcher, a.pool, a.cfg.CacheDir).Mount(api)
 		packages.New(a.db, a.hub, a.pool, a.rebuilder.Trigger).Mount(api)
 		commits.New(a.db, a.watcher.Poke).Mount(api)
 		modules.New(a.db, a.hub, a.rebuilder.Trigger).Mount(api)
@@ -85,7 +88,7 @@ func (a *app) routes() http.Handler {
 
 func (a *app) health(w http.ResponseWriter, r *http.Request) error {
 	if err := a.db.Ping(r.Context()); err != nil {
-		return &rest.Error{Status: http.StatusServiceUnavailable, Code: "database_unavailable", Message: "Databasen svarer ikke"}
+		return &rest.Error{Status: http.StatusServiceUnavailable, Code: "database_unavailable", Message: "The database is not responding"}
 	}
 	return rest.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }

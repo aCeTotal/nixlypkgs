@@ -25,7 +25,7 @@ func TestParserTracksProgress(t *testing.T) {
 	if got.Builds != (Counter{Done: 1, Expected: 3, Running: 1}) || got.Paths != (Counter{Done: 5, Expected: 9, Running: 2}) {
 		t.Errorf("counters: %+v %+v", got.Builds, got.Paths)
 	}
-	if got.Activity != "Bygger hello-2.12" || got.Phase != "buildPhase" || got.Line != "compiling main.c" {
+	if got.Activity != "Building hello-2.12" || got.Phase != "buildPhase" || got.Line != "compiling main.c" {
 		t.Errorf("activity: %+v", got)
 	}
 	if p.errors.String() != "error: builder failed" {

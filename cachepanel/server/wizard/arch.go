@@ -31,7 +31,7 @@ var gitHistory = regexp.MustCompile(`\bgit\s+(?:-C\s+\S+\s+)?(?:show|log|rev-lis
 func (l *Lab) fromRepository(ctx context.Context, flake string, origin Origin, name string) (Draft, error) {
 	files, err := pkgbuild.Fetch(ctx, pkgbuild.Origin(origin), name)
 	if err != nil {
-		return Draft{}, fmt.Errorf("hent %s: %w", name, err)
+		return Draft{}, fmt.Errorf("fetch %s: %w", name, err)
 	}
 	return l.fromPkgbuild(ctx, flake, files, name)
 }
@@ -39,7 +39,7 @@ func (l *Lab) fromRepository(ctx context.Context, flake string, origin Origin, n
 // fromPkgbuild picks split want, else first.
 func (l *Lab) fromPkgbuild(ctx context.Context, flake string, files map[string][]byte, want string) (Draft, error) {
 	if files["PKGBUILD"] == nil {
-		return Draft{}, fmt.Errorf("fant ingen PKGBUILD")
+		return Draft{}, fmt.Errorf("no PKGBUILD found")
 	}
 	dir, err := os.MkdirTemp("", "pkgbuild-")
 	if err != nil {
@@ -96,7 +96,7 @@ func (l *Lab) archSources(ctx context.Context, info pkgbuild.Info, files map[str
 		}
 		if entry.Local {
 			if files[entry.Name] == nil {
-				return fmt.Errorf("PKGBUILD-en viser til %s, som mangler", entry.Name)
+				return fmt.Errorf("the PKGBUILD references %s, which is missing", entry.Name)
 			}
 			draft.Files[entry.Name] = files[entry.Name]
 			spec.Sources = append(spec.Sources, recipe.Source{Kind: recipe.File, Name: entry.Name})
@@ -110,7 +110,7 @@ func (l *Lab) archSources(ctx context.Context, info pkgbuild.Info, files map[str
 		spec.Sources = append(spec.Sources, source)
 		if info.Has("pkgver") && !fetched.Modified.IsZero() {
 			spec.Version = dateVersion(fetched.Modified)
-			draft.Notes = append(draft.Notes, "Git-kilden er låst til "+fetched.Rev[:12]+", versjonen er commit-datoen")
+			draft.Notes = append(draft.Notes, "The git source is pinned to "+fetched.Rev[:12]+"; the version is the commit date")
 		}
 	}
 	return nil

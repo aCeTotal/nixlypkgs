@@ -13,11 +13,11 @@ import { packagesQuery, setAutoBuild, type PackageSummary } from "./queries";
 import { VersionPills } from "./version-pills";
 
 const filters = {
-  all: { label: "Alle", test: () => true },
-  building: { label: "Bygger", test: (p: PackageSummary) => p.versions.some((v) => v.state === "building" || v.state === "queued") },
-  failed: { label: "Feilet", test: (p: PackageSummary) => p.versions.some((v) => v.state === "failed") || p.evalError !== null },
-  pinned: { label: "Låst", test: (p: PackageSummary) => p.selectedVersionId !== null },
-  manual: { label: "Manuell", test: (p: PackageSummary) => !p.autoBuild },
+  all: { label: "All", test: () => true },
+  building: { label: "Building", test: (p: PackageSummary) => p.versions.some((v) => v.state === "building" || v.state === "queued") },
+  failed: { label: "Failed", test: (p: PackageSummary) => p.versions.some((v) => v.state === "failed") || p.evalError !== null },
+  pinned: { label: "Pinned", test: (p: PackageSummary) => p.selectedVersionId !== null },
+  manual: { label: "Manual", test: (p: PackageSummary) => !p.autoBuild },
 } as const;
 
 type Filter = keyof typeof filters;
@@ -32,13 +32,13 @@ export function PackagesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Pakker"
-        description="Hver pakke beholder sine tre siste derivasjoner i cachen. Nye commits bygges automatisk."
+        title="Derivations"
+        description="Every derivation keeps its three newest versions in the cache. New commits build automatically."
       />
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-full max-w-xs">
           <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Søk etter pakke" className="pl-8" />
+          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search derivations" className="pl-8" />
         </div>
         <ToggleGroup type="single" variant="outline" value={filter} onValueChange={(value) => value && setFilter(value as Filter)}>
           {Object.entries(filters).map(([key, { label }]) => (
@@ -47,16 +47,16 @@ export function PackagesPage() {
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        <span className="ml-auto text-sm text-muted-foreground">{shown.length} pakker</span>
+        <span className="ml-auto text-sm text-muted-foreground">{shown.length} derivations</span>
       </div>
       <div className="overflow-hidden rounded-xl border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Pakke</TableHead>
-              <TableHead>Versjoner</TableHead>
-              <TableHead>Valg</TableHead>
-              <TableHead className="text-right">Byggetid</TableHead>
+              <TableHead>Derivation</TableHead>
+              <TableHead>Versions</TableHead>
+              <TableHead>Selection</TableHead>
+              <TableHead className="text-right">Build time</TableHead>
               <TableHead className="text-right">Auto</TableHead>
             </TableRow>
           </TableHeader>
@@ -67,7 +67,7 @@ export function PackagesPage() {
                   <Link to="/packages/$attr" params={{ attr: pkg.attr }} className="font-medium hover:text-primary hover:underline">
                     {pkg.attr}
                   </Link>
-                  <p className="truncate text-xs text-muted-foreground">{pkg.versions[0]?.name ?? "Ingen versjoner"}</p>
+                  <p className="truncate text-xs text-muted-foreground">{pkg.versions[0]?.name ?? "No versions"}</p>
                 </TableCell>
                 <TableCell>
                   <VersionPills versions={pkg.versions} selected={pkg.selectedVersionId} />
@@ -76,18 +76,18 @@ export function PackagesPage() {
                   {pkg.selectedVersionId !== null ? (
                     <Badge variant="secondary">
                       <Lock />
-                      Låst
+                      Pinned
                     </Badge>
                   ) : (
-                    <span className="text-sm text-muted-foreground">Følger systemet</span>
+                    <span className="text-sm text-muted-foreground">Follows the system</span>
                   )}
-                  {!pkg.present && <Badge variant="outline" className="ml-1.5">Fjernet</Badge>}
-                  {pkg.evalError && <Badge variant="destructive" className="ml-1.5">Evalueringsfeil</Badge>}
+                  {!pkg.present && <Badge variant="outline" className="ml-1.5">Removed</Badge>}
+                  {pkg.evalError && <Badge variant="destructive" className="ml-1.5">Evaluation error</Badge>}
                 </TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground tabular-nums">{formatDuration(pkg.expectedSeconds)}</TableCell>
                 <TableCell className="text-right">
                   <Switch
-                    aria-label={`Bygg ${pkg.attr} automatisk`}
+                    aria-label={`Build ${pkg.attr} automatically`}
                     checked={pkg.autoBuild}
                     onCheckedChange={(enabled) => toggle.mutate({ attr: pkg.attr, enabled })}
                   />

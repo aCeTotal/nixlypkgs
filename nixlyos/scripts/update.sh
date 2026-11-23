@@ -1,4 +1,4 @@
-# NixlyOS update: newest first, else last working.
+# NixlyOS update: the panel's release, from cache only.
 set -euo pipefail
 
 FLAKE="${NIXLYOS_DIR:-$HOME/.local/nixlyos}"
@@ -8,7 +8,6 @@ STATE="${XDG_STATE_HOME:-$HOME/.local/state}/nixlyos"
 STAMP="$STATE/last-build"
 STAGEDIR="$STATE/stage"
 EVAL_TIME="$STATE/eval-us"
-PINS="$FLAKE/pins.nix"
 CONFIG="$FLAKE#nixosConfigurations.nixlyos.config"
 MIN_FREE_KIB=$((50 * 1024 * 1024))
 KEEP_GENERATIONS=3d
@@ -25,7 +24,7 @@ trap 'spin_stop; [ -z "$keepalive" ] || kill "$keepalive" 2>/dev/null || :; [ -z
 
 # Same file list as stage.sh.
 tree_key() {
-  cat "$FLAKE"/flake.nix "$FLAKE"/flake.lock "$FLAKE"/local.nix "$FLAKE"/pins.nix \
+  cat "$FLAKE"/flake.nix "$FLAKE"/flake.lock "$FLAKE"/local.nix \
     "$FLAKE"/custom/* "$FLAKE"/hardware/* 2>/dev/null | sha1sum | cut -d' ' -f1
 }
 
@@ -48,31 +47,6 @@ validate_config() {
   wait "$hw"
   cat "$tmp/hw.log" "$tmp/uc.log" >>"$log"
   tick "Konfigurasjon sjekket"
-}
-
-# One parallel ls-remote per moving input.
-remote_moved() {
-  local specs repo ref rev n=0 j pids=()
-  specs=$(jq -r '
-    .nodes | to_entries[]
-    | select(.key == "nixlypkgs" or .key == "nixos-stable" or .key == "home-manager")
-    | select(.value.original.type? == "github")
-    | "\(.value.original.owner)/\(.value.original.repo)\t\(.value.original.ref // "HEAD")\t\(.value.locked.rev)"
-  ' "$FLAKE/flake.lock" 2>/dev/null) || return 0
-  [ "$(grep -c . <<< "$specs")" -eq 3 ] || return 0
-  while IFS=$'\t' read -r repo ref rev; do
-    printf '%s' "$rev" > "$tmp/want.$n"
-    [ "$ref" = HEAD ] || ref="refs/heads/$ref"
-    { git ls-remote "https://github.com/$repo" "$ref" 2>/dev/null | cut -f1 | head -1 > "$tmp/head.$n"; } &
-    pids+=($!)
-    n=$((n + 1))
-  done <<< "$specs"
-  wait "${pids[@]}" 2>/dev/null || :
-  for (( j = 0; j < n; j++ )); do
-    [ -s "$tmp/head.$j" ] || return 0
-    [ "$(tr -d '\n' < "$tmp/head.$j")" = "$(<"$tmp/want.$j")" ] || return 0
-  done
-  return 1
 }
 
 stamp_matches() {
@@ -120,23 +94,6 @@ free_disk() {
   tick "Diskplass frigjort"
 }
 
-# Tested nixlypkgs pin, then stable/HM heads.
-lock_newest() {
-  spin_start "Henter nyeste versjoner"
-  cp "$FLAKE/flake.lock" "$tmp/old.lock" 2>/dev/null || : > "$tmp/old.lock"
-  rm -f "$FLAKE/flake.lock"
-  if ! (cd "$FLAKE" && nix flake lock --refresh) >>"$log" 2>&1; then
-    spin_stop
-    cp "$tmp/old.lock" "$FLAKE/flake.lock"
-    tail -20 "$log" | error_block "Kunne ikke hente nye versjoner"
-    exit 1
-  fi
-  cp "$FLAKE/flake.lock" "$tmp/tested.lock"
-  (cd "$FLAKE" && nix flake update --refresh nixlypkgs/nixos-stable nixlypkgs/home-manager) >>"$log" 2>&1 ||
-    cp "$tmp/tested.lock" "$FLAKE/flake.lock"
-  tick "Nyeste versjoner hentet"
-}
-
 staged_sys() {
   [[ -f "$STAGEDIR/key" && -e "$STAGEDIR/result" ]] || return 1
   [[ "$(<"$STAGEDIR/key")" == "$(tree_key)" ]] || return 1
@@ -174,11 +131,18 @@ eval_wait() {
   step_done "System evaluert" "$took"
 }
 
-# No pins; staged build, else eval.
-fresh_start() {
-  rm -f "$PINS"
-  : > "$tmp/pinned"
-  staged=$(staged_sys) || eval_start
+# Missing cache entries abort untouched.
+cache_check() {
+  local missing
+  spin_start "Sjekker at alt finnes i cachen"
+  missing=$(uncached "$1")
+  if [ -n "$missing" ]; then
+    spin_stop
+    cp "$tmp/old.lock" "$FLAKE/flake.lock"
+    { head -10 <<< "$missing"; echo "Panelet har ikke bygget dette ennå, prøv igjen senere."; } | error_block "Ikke i cachen ennå"
+    exit 1
+  fi
+  tick "Alt finnes i cachen"
 }
 
 # Every core, wide substitution fan-out.
@@ -188,71 +152,22 @@ build_sys() {
     step_done "Ferdig bygget i bakgrunnen"
     return 0
   fi
-  : > "$tmp/failed"
   eval_wait || return
+  cache_check "$(<"$tmp/drv")"
   local rc=0
   # Braces put view pid in $!.
   {
     nix build --no-link --print-out-paths --keep-going "$(<"$tmp/drv")^*" \
       --max-jobs "$(nproc)" --cores 0 \
-      --option substituters 'https://cache.aceclan.no?priority=5 https://cache.nixos.org' \
-      --option extra-trusted-public-keys cache.aceclan.no-1:qfGAXabgsofKSAqId9sqqbPlQic4l7gOGeWPrqUg3ak= \
+      "${CACHE_OPTS[@]}" \
       --option max-substitution-jobs 128 \
       --option http-connections 128 \
-      --option connect-timeout 3 \
       --option download-buffer-size 536870912 \
-      --option fallback true \
       --log-format internal-json \
       >"$tmp/out"
-  } 2> >(LC_ALL=C awk -f "$PROGRESS_AWK" 2>>"$log" | render_progress "$tmp/failed") || rc=$?
+  } 2> >(LC_ALL=C awk -f "$PROGRESS_AWK" 2>>"$log" | render_progress) || rc=$?
   wait $! 2>/dev/null || :
   return "$rc"
-}
-
-# Running closure's path and version of $1.
-last_working() {
-  awk -v n="$1" 'index(substr($0, 45), n "-") == 1 {
-    v = substr($0, 46 + length(n))
-    if (v ~ /^[0-9]/ && v !~ /-[a-zA-Z][a-zA-Z0-9]*$/) { print $0 "\t" v; exit }
-  }' "$tmp/old.paths"
-}
-
-# Failed packages back to their running build.
-pin_failed() {
-  local name ver old oldver
-  [ -s "$tmp/failed" ] || return 1
-  while IFS=$'\t' read -r name ver; do
-    IFS=$'\t' read -r old oldver < <(last_working "$name") || return 1
-    printf '%s\t%s\t%s\t%s\n' "$name" "$oldver" "$ver" "$old" >> "$tmp/pinned"
-  done < <(sed 's/\.drv$//' "$tmp/failed" | split_names | sort -u)
-  [ "$(wc -l < "$tmp/pinned")" -eq "$(sort -u "$tmp/failed" | wc -l)" ] || return 1
-  awk -F '\t' 'BEGIN { print "{" } { printf "  \"%s\" = \"%s\";\n", $1, $4 } END { print "}" }' \
-    "$tmp/pinned" > "$PINS"
-  warn "$(cut -f1 "$tmp/pinned" | paste -sd' ') feilet, prøver forrige versjon"
-}
-
-# Newest build, failures pinned.
-attempt() {
-  build_sys && return 0
-  pin_failed && eval_start && build_sys
-}
-
-# YYYYMMDD of $1's nixos-stable.
-stable_day() {
-  jq -r '.nodes as $n | $n[$n[$n.root.inputs.nixlypkgs].inputs["nixos-stable"]].locked.lastModified
-    | strftime("%Y%m%d")' "$1"
-}
-
-# Tested stable/HM, never a downgrade.
-attempt_tested() {
-  local day
-  cmp -s "$tmp/tested.lock" "$FLAKE/flake.lock" && return 1
-  IFS=. read -r _ _ day _ < "$running/nixos-version"
-  (( $(stable_day "$tmp/tested.lock") >= day )) || return 1
-  cp "$tmp/tested.lock" "$FLAKE/flake.lock"
-  warn "Nyeste nixos-stable/home-manager feilet, prøver testet versjon"
-  fresh_start
-  attempt
 }
 
 # Root causes, deduplicated.
@@ -269,7 +184,6 @@ nix_errors() {
 
 fail() {
   cp "$tmp/old.lock" "$FLAKE/flake.lock"
-  rm -f "$PINS"
   { nix_errors; echo "${DIM}Logg: ${log/#"$HOME"/\~}${RST}"; } | error_block "Oppdatering feilet"
   exit 1
 }
@@ -295,19 +209,19 @@ needs_reboot() {
 started=${EPOCHREALTIME/[.,]/}
 header
 validate_config
-panel_adopt
+panel_join
 running=$(readlink -f /run/current-system)
 check_remote
 nix path-info -r "$running" > "$tmp/old.paths" &
 paths_pid=$!
-if panel_managed; then lock_panel; else lock_newest; fi
+lock_panel
 stamp_matches && up_to_date
 sudo_start
 free_disk
-fresh_start
+staged=$(staged_sys) || eval_start
 wait "$paths_pid"
 
-attempt || attempt_tested || fail
+build_sys || fail
 sys=$(<"$tmp/out")
 [ "$sys" = "$running" ] && up_to_date
 

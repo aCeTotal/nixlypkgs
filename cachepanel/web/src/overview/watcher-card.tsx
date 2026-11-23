@@ -8,11 +8,11 @@ import { cn } from "@/ui/cn";
 import { watcherAction, type WatcherPhase, type WatcherStatus } from "./queries";
 
 const phases: Record<WatcherPhase, { label: string; tone: string }> = {
-  idle: { label: "Venter på nye commits", tone: "bg-success" },
-  fetching: { label: "Henter fra git", tone: "bg-info" },
-  evaluating: { label: "Evaluerer commit", tone: "bg-info" },
-  backfilling: { label: "Går gjennom historikk", tone: "bg-chart-5" },
-  paused: { label: "Pauset", tone: "bg-warning" },
+  idle: { label: "Waiting for new commits", tone: "bg-success" },
+  fetching: { label: "Fetching from git", tone: "bg-info" },
+  evaluating: { label: "Evaluating commit", tone: "bg-info" },
+  backfilling: { label: "Walking history", tone: "bg-chart-5" },
+  paused: { label: "Paused", tone: "bg-warning" },
 };
 
 export function WatcherCard({ watcher }: { watcher: WatcherStatus }) {
@@ -25,18 +25,18 @@ export function WatcherCard({ watcher }: { watcher: WatcherStatus }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <GitBranch className="size-4 text-primary" />
-          Overvåker
+          Watcher
         </CardTitle>
-        <CardDescription>Evaluerer hver commit og legger nye derivasjoner i byggekøen.</CardDescription>
+        <CardDescription>Evaluates every commit and queues new derivations.</CardDescription>
         <CardAction className="flex gap-1.5">
           <Button size="sm" variant="outline" onClick={() => act.mutate("poll")} disabled={act.isPending}>
             <RefreshCw />
-            Sjekk nå
+            Check now
           </Button>
           {watcher.phase === "paused" ? (
             <Button size="sm" onClick={() => act.mutate("resume")} disabled={act.isPending}>
               <Play />
-              Gjenoppta
+              Resume
             </Button>
           ) : (
             <Button size="sm" variant="outline" onClick={() => act.mutate("pause")} disabled={act.isPending}>
@@ -63,11 +63,11 @@ export function WatcherCard({ watcher }: { watcher: WatcherStatus }) {
         </div>
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div>
-            <dt className="text-muted-foreground">Siste branch-hode</dt>
+            <dt className="text-muted-foreground">Branch head</dt>
             <dd className="font-mono">{shortSha(watcher.head)}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Sist sjekket</dt>
+            <dt className="text-muted-foreground">Last checked</dt>
             <dd>{timeAgo(watcher.lastPoll)}</dd>
           </div>
         </dl>
@@ -75,10 +75,10 @@ export function WatcherCard({ watcher }: { watcher: WatcherStatus }) {
           <div className="flex items-center justify-between text-sm">
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <History className="size-3.5" />
-              Historikk for siste versjoner
+              History for recent versions
             </span>
             <span className="tabular-nums">
-              {watcher.backfillDone ? "Ferdig" : `${watcher.backfillSteps}/${watcher.backfillLimit}`}
+              {watcher.backfillDone ? "Done" : `${watcher.backfillSteps}/${watcher.backfillLimit}`}
             </span>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -87,7 +87,7 @@ export function WatcherCard({ watcher }: { watcher: WatcherStatus }) {
           {watcher.backfillDone && (
             <Button size="xs" variant="ghost" onClick={() => act.mutate("backfill")} disabled={act.isPending}>
               <Search />
-              Søk lenger tilbake
+              Look further back
             </Button>
           )}
         </div>

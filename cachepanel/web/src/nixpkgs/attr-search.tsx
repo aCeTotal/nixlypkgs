@@ -53,7 +53,7 @@ export function AttrSearch({ label, placeholder, exclude, onPick }: AttrSearchPr
       </div>
       <Button type="submit" variant="outline" disabled={!valid}>
         <Plus />
-        Legg til
+        Add
       </Button>
     </form>
   );

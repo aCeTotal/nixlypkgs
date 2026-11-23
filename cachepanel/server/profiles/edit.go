@@ -17,11 +17,11 @@ var (
 	namePattern  = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
 	attrPattern  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_'-]*(\.[A-Za-z_][A-Za-z0-9_'-]*)*$`)
 	platforms    = map[string]bool{"desktop": true, "htpc": true}
-	errName      = rest.Unprocessable("invalid_name", "ID kan bare ha små bokstaver, tall og bindestrek (maks 32)")
-	errTitle     = rest.Unprocessable("invalid_title", "Navnet må ha 1–80 tegn")
-	errPlatform  = rest.Unprocessable("invalid_platform", "Ukjent plattform")
-	errPackage   = rest.Unprocessable("invalid_package", "Ugyldig pakke – bruk f.eks. blender eller python3Packages.numpy")
-	errPinnedRev = rest.Unprocessable("invalid_revision", "Revisjonen er ikke evaluert")
+	errName      = rest.Unprocessable("invalid_name", "The ID may only contain lowercase letters, digits and hyphens (max 32)")
+	errTitle     = rest.Unprocessable("invalid_title", "The name needs 1–80 characters")
+	errPlatform  = rest.Unprocessable("invalid_platform", "Unknown platform")
+	errPackage   = rest.Unprocessable("invalid_package", "Invalid package – use e.g. blender or python3Packages.numpy")
+	errPinnedRev = rest.Unprocessable("invalid_revision", "That revision is not evaluated")
 )
 
 type identity struct {

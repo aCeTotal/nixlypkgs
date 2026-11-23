@@ -19,20 +19,20 @@ export function ModulesPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Moduler"
-        description="Alt systemene er bygget av. Påkrevde moduler er med i alle profiler; de valgfrie velges per profil. Rekkefølgen er importrekkefølgen."
+        title="Modules"
+        description="Everything the systems are built from. Required modules are in every profile; optional ones are chosen per profile. The order is the import order."
         actions={<NewModuleDialog />}
       />
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatTile label="Moduler" value={modules.length} hint={`${lines.toLocaleString("nb-NO")} linjer Nix`} icon={Blocks} />
-        <StatTile label="Påkrevd" value={required.length} hint="Med i alle profiler" icon={ShieldCheck} tone="info" />
-        <StatTile label="Profiler" value={profiles.length} hint="Testes før utrulling" icon={FileCode} tone="success" />
+        <StatTile label="Modules" value={modules.length} hint={`${lines.toLocaleString("en-GB")} lines of Nix`} icon={Blocks} />
+        <StatTile label="Required" value={required.length} hint="In every profile" icon={ShieldCheck} tone="info" />
+        <StatTile label="Profiles" value={profiles.length} hint="Checked before rollout" icon={FileCode} tone="success" />
       </div>
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-full min-w-72">Modul</TableHead>
+              <TableHead className="w-full min-w-72">Module</TableHead>
               {profiles.map((profile) => (
                 <TableHead key={profile.id} className="px-3 text-center">
                   <Link
@@ -45,13 +45,13 @@ export function ModulesPage() {
                   </Link>
                 </TableHead>
               ))}
-              <TableHead className="text-right">Linjer</TableHead>
-              <TableHead className="text-right whitespace-nowrap">Endret</TableHead>
+              <TableHead className="text-right">Lines</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Changed</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            <Group title="Påkrevd" modules={required} profiles={profiles} />
-            <Group title="Valgfrie" modules={optional} profiles={profiles} />
+            <Group title="Required" modules={required} profiles={profiles} />
+            <Group title="Optional" modules={optional} profiles={profiles} />
           </TableBody>
         </Table>
       </div>
@@ -103,16 +103,16 @@ function Group({ title, modules, profiles }: { title: string; modules: ModuleSum
 function Usage({ module, profile }: { module: ModuleSummary; profile: ProfileSummary }) {
   if (module.required) {
     return (
-      <span title="Påkrevd" className="inline-grid size-6 place-items-center rounded-full bg-info-soft text-info">
+      <span title="Required" className="inline-grid size-6 place-items-center rounded-full bg-info-soft text-info">
         <Lock className="size-3.5" />
       </span>
     );
   }
   if (!module.usedBy.some((user) => user.name === profile.name)) {
-    return <span className="inline-block size-1.5 rounded-full bg-border" aria-label="Ikke valgt" />;
+    return <span className="inline-block size-1.5 rounded-full bg-border" aria-label="Not chosen" />;
   }
   return (
-    <span title="Valgt" className="inline-grid size-6 place-items-center rounded-full bg-success-soft text-success">
+    <span title="Chosen" className="inline-grid size-6 place-items-center rounded-full bg-success-soft text-success">
       <Check className="size-3.5" />
     </span>
   );

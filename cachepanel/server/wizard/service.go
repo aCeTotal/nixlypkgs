@@ -150,7 +150,7 @@ func (s *Service) runBuild(ctx context.Context, id int64) error {
 		state, message = Failed, buildErr.Error()
 	}
 	if errors.Is(buildErr, context.Canceled) {
-		message = "Bygget ble stoppet"
+		message = "The build was stopped"
 	}
 	_, err = s.db.Exec(context.WithoutCancel(ctx), `
 		UPDATE recipes SET spec = $2, report = $3, state = $4, error = $5, output = nullif($6, ''), updated_at = now()
@@ -164,7 +164,7 @@ func (s *Service) saveDraft(ctx context.Context, id int64, draft Draft) error {
 			UPDATE recipes SET attr = $2, spec = $3, report = $4, state = 'draft', error = NULL, updated_at = now()
 			WHERE id = $1`, id, draft.Spec.Attr, draft.Spec, report{Notes: draft.Notes}); err != nil {
 			if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == uniqueViolation {
-				return fmt.Errorf("det finnes allerede en oppskrift for %s; rediger den i stedet", draft.Spec.Attr)
+				return fmt.Errorf("a recipe for %s already exists; edit that one instead", draft.Spec.Attr)
 			}
 			return err
 		}

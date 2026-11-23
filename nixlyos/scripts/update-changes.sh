@@ -27,13 +27,13 @@ installed() {
     split_names | cut -f1
 }
 
-# $1: dir with old.paths, new.paths, pinned; $2, $3: systems.
+# $1: dir with old.paths and new.paths; $2, $3: systems.
 print_changes() {
   versions "$1/old.paths" > "$1/old.tsv"
   versions "$1/new.paths" > "$1/new.tsv"
   { installed "$2" "$1/old.paths"; installed "$3" "$1/new.paths"; } > "$1/installed"
   LC_ALL=C join -t $'\t' -a1 -a2 -e '' -o 0,1.2,2.2 "$1/old.tsv" "$1/new.tsv" |
-    awk -F '\t' -v top="$1/installed" -v pinned="$1/pinned" \
+    awk -F '\t' -v top="$1/installed" \
       -v G="$GRN" -v Y="$YLW" -v D="$DIM" -v B="$BLD" -v N="$RST" '
       function vcmp(a, b,   x, y, n, i) {
         n = split(a, x, /[^0-9]+/); i = split(b, y, /[^0-9]+/); if (i > n) n = i
@@ -66,19 +66,14 @@ print_changes() {
         }
       }
       BEGIN {
-        split("up down new gone kept", order, " ")
+        split("up down new gone", order, " ")
         sym["up"] = G "↑" N; from["up"] = D; to["up"] = D "→ " N G
         sym["down"] = Y "↓" N; from["down"] = D; to["down"] = D "→ " N Y
         sym["new"] = G "+" N; from["new"] = G
         sym["gone"] = D "−" N; from["gone"] = D
-        sym["kept"] = Y "!" N; to["kept"] = D
         while ((getline l < top) > 0) user[l] = 1
-        while ((getline l < pinned) > 0) {
-          split(l, f, "\t"); kept[f[1]] = 1
-          add("kept", f[1], f[2], f[3] " feilet")
-        }
       }
-      $2 == $3 || ($1 in kept) || $1 ~ /^nixos-system-/ { next }
+      $2 == $3 || $1 ~ /^nixos-system-/ { next }
       !($1 in user) { deps++; next }
       {
         gone = only($2, $3); was = top
@@ -91,7 +86,7 @@ print_changes() {
       END {
         if (w == 0 && deps == 0) exit
         printf "\n  %sEndringer%s\n", B, N
-        for (i = 1; i <= 5; i++) show(order[i])
+        for (i = 1; i <= 4; i++) show(order[i])
         if (deps) printf "    %s· %d %s endret%s\n", D, deps, deps == 1 ? "avhengighet" : "avhengigheter", N
         print ""
       }'

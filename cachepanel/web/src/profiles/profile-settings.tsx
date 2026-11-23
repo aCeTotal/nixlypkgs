@@ -19,13 +19,13 @@ export function ProfileSettingsForm({ draft, update }: ProfileSettingsFormProps)
     <div className="grid gap-4 xl:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle>Identitet</CardTitle>
-          <CardDescription>ID-en står i maskinenes konfig; endres den, følger maskinene med.</CardDescription>
+          <CardTitle>Identity</CardTitle>
+          <CardDescription>The ID is written into machine configs; machines follow if it changes.</CardDescription>
         </CardHeader>
         <CardContent>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="title">Navn</FieldLabel>
+              <FieldLabel htmlFor="title">Name</FieldLabel>
               <Input id="title" value={draft.title} onChange={(event) => update({ title: event.target.value })} />
             </Field>
             <Field>
@@ -33,11 +33,11 @@ export function ProfileSettingsForm({ draft, update }: ProfileSettingsFormProps)
               <Input id="name" className="font-mono" value={draft.name} onChange={(event) => update({ name: event.target.value })} />
             </Field>
             <Field>
-              <FieldLabel htmlFor="description">Beskrivelse</FieldLabel>
+              <FieldLabel htmlFor="description">Description</FieldLabel>
               <Textarea id="description" value={draft.description} onChange={(event) => update({ description: event.target.value })} />
             </Field>
             <Field>
-              <FieldLabel>Plattform</FieldLabel>
+              <FieldLabel>Platform</FieldLabel>
               <Select value={draft.platform} onValueChange={(value) => update({ platform: value as Platform })}>
                 <SelectTrigger>
                   <SelectValue />
@@ -50,25 +50,25 @@ export function ProfileSettingsForm({ draft, update }: ProfileSettingsFormProps)
                   ))}
                 </SelectContent>
               </Select>
-              <FieldDescription>Plattformen styrer systemmodus og hvilke moduler som foreslås.</FieldDescription>
+              <FieldDescription>The platform sets the system mode and which modules are suggested.</FieldDescription>
             </Field>
           </FieldGroup>
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Revisjon av nixlypkgs</CardTitle>
-          <CardDescription>Hvilken commit av nixlypkgs (og dermed nixpkgs stable) profilen kjører.</CardDescription>
+          <CardTitle>nixlypkgs revision</CardTitle>
+          <CardDescription>Which nixlypkgs commit (and so which nixpkgs stable) the profile runs.</CardDescription>
         </CardHeader>
         <CardContent>
           <Field>
-            <FieldLabel>Lås til commit</FieldLabel>
+            <FieldLabel>Pin to commit</FieldLabel>
             <Select value={draft.pinnedSha ?? automatic} onValueChange={(value) => update({ pinnedSha: value === automatic ? null : value })}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={automatic}>Automatisk – nyeste commit der alt er bygget</SelectItem>
+                <SelectItem value={automatic}>Automatic – newest commit with everything built</SelectItem>
                 {draft.pinnedSha && !commits.some((commit) => commit.sha === draft.pinnedSha) && (
                   <SelectItem value={draft.pinnedSha}>{shortSha(draft.pinnedSha)}</SelectItem>
                 )}
@@ -79,7 +79,7 @@ export function ProfileSettingsForm({ draft, update }: ProfileSettingsFormProps)
                 ))}
               </SelectContent>
             </Select>
-            <FieldDescription>En låst commit beholder sine bygg i cachen til låsen fjernes.</FieldDescription>
+            <FieldDescription>A pinned commit keeps its builds in the cache until unpinned.</FieldDescription>
           </Field>
         </CardContent>
       </Card>

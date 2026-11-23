@@ -25,9 +25,9 @@ export function RunningBuilds() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Hammer className="size-4 text-info" />
-          Bygger nå
+          Building now
         </CardTitle>
-        <CardDescription>{running.length === 0 ? "Ingen bygg kjører." : `${running.length} samtidige bygg`}</CardDescription>
+        <CardDescription>{running.length === 0 ? "Nothing is building." : `${running.length} concurrent builds`}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {running.map((progress) => (
@@ -50,9 +50,9 @@ export function QueueCard({ queue }: { queue: QueuedBuild[] }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Hourglass className="size-4 text-warning-foreground" />
-          Neste i kø
+          Up next
         </CardTitle>
-        <CardDescription>{queue.length === 0 ? "Køen er tom." : "Nyeste commit først, manuelle bygg forrest."}</CardDescription>
+        <CardDescription>{queue.length === 0 ? "The queue is empty." : "Newest commit first, manual builds ahead."}</CardDescription>
       </CardHeader>
       <CardContent className="divide-y">
         {queue.map((item) => (
@@ -62,7 +62,7 @@ export function QueueCard({ queue }: { queue: QueuedBuild[] }) {
               <p className="truncate text-xs text-muted-foreground">{item.name}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {item.priority && <Badge variant="secondary">Manuell</Badge>}
+              {item.priority && <Badge variant="secondary">Manual</Badge>}
               <span className="font-mono text-xs text-muted-foreground">{shortSha(item.commit)}</span>
             </div>
           </div>
@@ -78,9 +78,9 @@ export function RecentCard({ recent }: { recent: FinishedBuild[] }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ListChecks className="size-4 text-success" />
-          Siste bygg
+          Recent builds
         </CardTitle>
-        <CardDescription>Ferdige, feilede og avbrutte bygg.</CardDescription>
+        <CardDescription>Finished, failed and cancelled builds.</CardDescription>
       </CardHeader>
       <CardContent className="divide-y">
         {recent.map((item) => (

@@ -28,7 +28,7 @@ const (
 
 var ansi = regexp.MustCompile(`\x1b\[[0-9;]*[A-Za-z]`)
 
-var verbs = map[int]string{actBuild: "Bygger ", actSubstitute: "Henter "}
+var verbs = map[int]string{actBuild: "Building ", actSubstitute: "Fetching "}
 
 type Counter struct {
 	Done     int64 `json:"done"`

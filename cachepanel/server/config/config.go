@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"regexp"
 )
 
@@ -21,6 +22,9 @@ type Config struct {
 	// PublishRemote takes recipe commits over SSH.
 	PublishRemote string
 	PublishKey    string
+	// CacheDir holds the signed binary cache.
+	CacheDir string
+	CacheKey string
 }
 
 var branchPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
@@ -38,6 +42,11 @@ func Load() (Config, error) {
 		PublicURL:     envOr("CACHEPANEL_PUBLIC_URL", "http://127.0.0.1:8686"),
 		PublishRemote: os.Getenv("CACHEPANEL_PUBLISH_REMOTE"),
 		PublishKey:    os.Getenv("CACHEPANEL_PUBLISH_KEY"),
+		CacheDir:      os.Getenv("CACHEPANEL_CACHE_DIR"),
+		CacheKey:      os.Getenv("CACHEPANEL_CACHE_KEY"),
+	}
+	if cfg.CacheDir == "" && cfg.StateDir != "" {
+		cfg.CacheDir = filepath.Join(cfg.StateDir, "cache")
 	}
 	var problems []error
 	if cfg.DatabaseURL == "" {

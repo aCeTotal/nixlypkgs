@@ -35,7 +35,7 @@ func BadRequest(code, message string) *Error {
 }
 
 func NotFound() *Error {
-	return &Error{Status: http.StatusNotFound, Code: "not_found", Message: "Fant ikke ressursen"}
+	return &Error{Status: http.StatusNotFound, Code: "not_found", Message: "Not found"}
 }
 
 func Conflict(code, message string) *Error {
@@ -47,8 +47,8 @@ func Unprocessable(code, message string) *Error {
 }
 
 var (
-	errInvalidBody = BadRequest("invalid_body", "Ugyldig forespørsel")
-	errInternal    = &Error{Status: http.StatusInternalServerError, Code: "internal", Message: "Noe gikk galt. Prøv igjen."}
+	errInvalidBody = BadRequest("invalid_body", "Invalid request")
+	errInternal    = &Error{Status: http.StatusInternalServerError, Code: "internal", Message: "Something went wrong. Try again."}
 )
 
 // Handle adapts an error-returning endpoint.
@@ -99,11 +99,11 @@ func classify(err error) *Error {
 	}
 	switch pgErr.Code {
 	case pgUniqueViolation:
-		return Conflict("already_exists", "Finnes allerede")
+		return Conflict("already_exists", "Already exists")
 	case pgForeignKeyViolation:
-		return Conflict("in_use", "Er i bruk og kan ikke endres slik")
+		return Conflict("in_use", "In use and cannot be changed like that")
 	case pgCheckViolation:
-		return Unprocessable("invalid_value", "Ugyldig verdi")
+		return Unprocessable("invalid_value", "Invalid value")
 	}
 	return errInternal
 }

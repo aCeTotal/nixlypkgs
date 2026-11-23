@@ -74,7 +74,7 @@ function DialogContent({
             >
               <XIcon
               />
-              <span className="sr-only">Lukk</span>
+              <span className="sr-only">Close</span>
             </Button>
           </DialogPrimitive.Close>
         )}
@@ -113,7 +113,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Lukk</Button>
+          <Button variant="outline">Close</Button>
         </DialogPrimitive.Close>
       )}
     </div>

@@ -15,6 +15,7 @@ import (
 
 	"cachepanel/auth"
 	"cachepanel/builds"
+	"cachepanel/cache"
 	"cachepanel/config"
 	"cachepanel/database"
 	"cachepanel/profiles"
@@ -25,7 +26,7 @@ import (
 	"cachepanel/wizard"
 )
 
-var errNoCommit = errors.New("panelet har ikke evaluert noen commit ennå")
+var errNoCommit = errors.New("the panel has not evaluated any commit yet")
 
 const (
 	readHeaderTimeout = 10 * time.Second
@@ -52,9 +53,13 @@ func Run(ctx context.Context, cfg config.Config) error {
 	}
 	hub := realtime.NewHub()
 	releases := release.New(db, mirror)
-	rebuilder := profiles.NewRebuilder(db, hub, mirror, filepath.Join(cfg.StateDir, "checks"), releases.Trigger)
+	store, err := cache.Open(cfg.CacheDir, cfg.CacheKey)
+	if err != nil {
+		return err
+	}
+	rebuilder := profiles.NewRebuilder(db, hub, mirror, store, filepath.Join(cfg.StateDir, "checks"), releases.Trigger)
 	files := builds.NewFiles(cfg.StateDir)
-	pool := builds.NewPool(db, hub, files, rebuilder.Trigger)
+	pool := builds.NewPool(db, hub, files, store, rebuilder.Trigger)
 	follow := watcher.New(db, hub, mirror, pool, files, rebuilder.Trigger)
 	lab := &wizard.Lab{Flake: headFlake(db, mirror), Uploads: wizard.NewUploads(filepath.Join(cfg.StateDir, "sources"), cfg.PublicURL)}
 	publisher := &wizard.Publisher{Mirror: mirror, Remote: cfg.PublishRemote, Key: cfg.PublishKey, Branch: cfg.Branch,
@@ -65,7 +70,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 	}
 	panel := &app{
 		cfg: cfg, db: db, hub: hub, auth: auth.NewService(db), mirror: mirror, releases: releases, rebuilder: rebuilder,
-		pool: pool, watcher: follow, recipes: recipes, uploads: lab.Uploads,
+		pool: pool, watcher: follow, recipes: recipes, uploads: lab.Uploads, cache: store,
 	}
 
 	group, ctx := errgroup.WithContext(ctx)
@@ -77,6 +82,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 			workers.Go(func() error { return pool.Run(ctx) })
 			workers.Go(func() error { return follow.Run(ctx) })
 			workers.Go(func() error { return rebuilder.Run(ctx) })
+			workers.Go(func() error { return store.Run(ctx, liveRoots(pool, rebuilder)) })
 			return workers.Wait()
 		})
 	})
@@ -102,6 +108,18 @@ func listen(ctx context.Context, addr string, handler http.Handler) error {
 		return fmt.Errorf("listen on %s: %w", addr, err)
 	}
 	return nil
+}
+
+// liveRoots is everything the cache serves.
+func liveRoots(pool *builds.Pool, rebuilder *profiles.Rebuilder) cache.Roots {
+	return func(ctx context.Context) ([]string, error) {
+		versions, err := pool.Roots(ctx)
+		if err != nil {
+			return nil, err
+		}
+		systems, err := rebuilder.Released()
+		return append(versions, systems...), err
+	}
 }
 
 // headFlake picks the newest evaluated commit.

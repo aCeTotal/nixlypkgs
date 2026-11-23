@@ -42,10 +42,10 @@ export function ModuleOutline({ items, active, onSelect }: OutlineProps) {
     <div className="flex h-full min-h-0 flex-col gap-2">
       <div className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-        <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Finn i modulen" className="h-8 pl-8 text-sm" />
+        <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find in module" className="h-8 pl-8 text-sm" />
       </div>
       <nav className="min-h-0 flex-1 overflow-y-auto pr-1" aria-label="Disposisjon">
-        {shown.length === 0 && <p className="px-2 py-4 text-sm text-muted-foreground">Ingen treff.</p>}
+        {shown.length === 0 && <p className="px-2 py-4 text-sm text-muted-foreground">No matches.</p>}
         <Branch items={shown} depth={0} active={active} expandAll={needle !== ""} toggled={toggled} onToggle={toggle} onSelect={onSelect} />
       </nav>
     </div>
@@ -81,7 +81,7 @@ const Branch = memo(function Branch({ items, depth, active, expandAll, toggled, 
             >
               <button
                 type="button"
-                aria-label={open ? "Lukk" : "Åpne"}
+                aria-label={open ? "Collapse" : "Expand"}
                 onClick={() => onToggle(item.key, open)}
                 className={cn("grid size-5 shrink-0 place-items-center rounded text-muted-foreground", item.children.length === 0 && "invisible")}
               >

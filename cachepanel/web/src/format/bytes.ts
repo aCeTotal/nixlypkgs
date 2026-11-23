@@ -9,5 +9,5 @@ export function formatBytes(bytes: number | null | undefined) {
     value /= step;
     unit++;
   }
-  return `${value.toLocaleString("nb-NO", { maximumFractionDigits: value < 10 ? 1 : 0 })} ${units[unit]}`;
+  return `${value.toLocaleString("en-GB", { maximumFractionDigits: value < 10 ? 1 : 0 })} ${units[unit]}`;
 }
