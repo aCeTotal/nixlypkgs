@@ -39,6 +39,14 @@ release and fetch every package from the cache. If anything would need a
 source build, the update stops before touching the machine; only
 machine-specific glue (initrd, units, config files) is built locally.
 
+## Boot chain
+
+The panel signs every release with its NixlyOS CA: kernel, modules and
+systemd-boot. Kernels load only modules that CA signed and run in lockdown.
+With the firmware in setup mode, `sudo nixlyos-secureboot enroll` makes the CA
+the machine's platform key; after a CA rotation `nixlyos-secureboot update`
+moves the keys. Machines never hold a signing key.
+
 ## Staged updates
 
 A systemd timer (`nixlyos-stage`, hourly, idle priority, skipped under load
@@ -60,9 +68,10 @@ the release itself, so the fast path can never activate a stale system.
 
 ```
 lib/mk-system.nix   mkNixlySystem: machine data + profile tree -> complete NixOS system
+lib/signing.nix     applies the panel's signatures to modules, kernel and systemd-boot
 reference/          hardware profiles every profile is tested on
-scripts/            detect-hw, update, stage, panel and user-config, packaged as
-                    nixlyos-* commands by scripts/overlay.nix; bump-inputs (maintainer)
+scripts/            detect-hw, update, stage, panel, secureboot, user-config:
+                    nixlyos-* commands via scripts/overlay.nix; bump-inputs (maintainer)
 pkgs/               brave and polkit-gnome overlays local to NixlyOS
 install.sh          installer: partitioning, LUKS2, ~/.local/nixlyos, nixos-install
 ```

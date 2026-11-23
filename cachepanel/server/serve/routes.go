@@ -27,6 +27,7 @@ import (
 	"cachepanel/release"
 	"cachepanel/repo"
 	"cachepanel/rest"
+	"cachepanel/signing"
 	"cachepanel/watcher"
 	"cachepanel/wizard"
 )
@@ -52,6 +53,7 @@ type app struct {
 	recipes   *wizard.Service
 	uploads   *wizard.Uploads
 	cache     *cache.Cache
+	trust     *signing.Routes
 }
 
 func (a *app) routes() http.Handler {
@@ -61,6 +63,7 @@ func (a *app) routes() http.Handler {
 	r.Route("/api/v1", func(machine chi.Router) {
 		machine.Use(middleware.Timeout(machineTimeout))
 		a.releases.Mount(machine)
+		a.trust.MountMachine(machine)
 	})
 	// Large downloads outlive the machine timeout.
 	r.Get("/api/v1/sources/{hash}/{name}", a.uploads.Serve)
@@ -79,6 +82,7 @@ func (a *app) routes() http.Handler {
 		a.rebuilder.Mount(api)
 		a.watcher.Mount(api)
 		a.recipes.Mount(api)
+		a.trust.Mount(api)
 	})
 	if a.cfg.WebRoot != "" {
 		compressed.Handle("/*", spa(a.cfg.WebRoot))

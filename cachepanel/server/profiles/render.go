@@ -14,6 +14,7 @@ type Spec struct {
 	ID       int64
 	Name     string
 	Platform string
+	Kernel   string
 	Pinned   string
 	Packages []string
 	Modules  []Module
@@ -48,7 +49,7 @@ func defaultNix(spec Spec) string {
 	for _, module := range spec.Modules {
 		fmt.Fprintf(&b, "    ./modules/%s.nix\n", module.Slug)
 	}
-	fmt.Fprintf(&b, "  ];\n\n  nixlyos.mode = lib.mkForce %s;\n", nixexpr.String(spec.Platform))
+	fmt.Fprintf(&b, "  ];\n\n  nixlyos.mode = lib.mkForce %s;\n  nixlyos.kernel = lib.mkForce %s;\n", nixexpr.String(spec.Platform), nixexpr.String(spec.Kernel))
 	b.WriteString("\n  environment.systemPackages = map (path: lib.getAttrFromPath path pkgs) [\n")
 	for _, pkg := range spec.Packages {
 		b.WriteString("    [")

@@ -7,16 +7,19 @@ the package wizard. The panel knows profiles, never individual machines.
   a signed file cache the panel serves itself (`cache.dir`, put it on a big disk); the Nix store is only
   build space. Older versions are garbage collected. Any version can be selected, rebuilt, cancelled or
   deleted, with live progress and logs.
-- **Profiles** – Desktop, Laptop, HTPC and your own. A profile is the required modules plus its chosen
-  ones, packages from nixpkgs stable (nixlypkgs on top) and a nixlypkgs revision. The hardware module
-  picks drivers on each machine. Machines pull their profile's release with ETags; trees are
-  content-addressed and CDN-cacheable.
+- **Profiles** – Desktop, HTPC, Server and your own. A profile is the required modules plus its chosen
+  ones, packages from nixpkgs stable (nixlypkgs on top), a nixlypkgs revision and its kernel: performance
+  or enterprise. The hardware module picks drivers on each machine. Machines pull their profile's
+  release with ETags; trees are content-addressed and CDN-cacheable.
 - **Modules** – every NixlyOS module lives in the database with its revisions: a matrix shows which
   profile uses what, and the editor has an outline of each module's sections, search, folding and
   inline syntax errors.
-- **Trust** – every change to a profile is evaluated *and built* on all reference hardware before it
+- **Testing** – every change to a profile is evaluated *and built* on all reference hardware before it
   reaches the **testing** branch. **Stable**, which machines follow by default, moves only when you
   approve testing on its own page, for every profile at once. Machines only ever receive tested releases.
+- **Trust** – the NixlyOS CA lives on the server, its key readable by the panel alone. Releases that pass
+  are signed (kernels, modules, systemd-boot), firmware key updates come signed from the panel, and the
+  Easy Anti-Cheat bundle holds the CA and the policy Epic reviews.
 - **Package wizard** – new nixlypkgs packages from a link, an upload, a GitHub repo or a PKGBUILD from
   Arch or the AUR. It finds the build system and dependencies, test-builds in the sandbox, fixes what
   the log explains (hashes, missing libraries, tools, headers, toolchains) and commits the result to

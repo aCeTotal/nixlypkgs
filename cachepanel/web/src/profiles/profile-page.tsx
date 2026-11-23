@@ -22,6 +22,7 @@ function settingsOf({ profile, modules, packages }: ProfileDetail): ProfileSetti
     title: profile.title,
     description: profile.description,
     platform: profile.platform,
+    kernel: profile.kernel,
     pinnedSha: profile.pinnedSha,
     modules: modules.filter((module) => module.selected && !module.required).map((module) => module.id),
     packages,

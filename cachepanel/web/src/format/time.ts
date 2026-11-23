@@ -23,3 +23,9 @@ export function timeAgo(iso: string | null | undefined) {
 export function dateTime(iso: string | null | undefined) {
   return iso ? absolute.format(new Date(iso)) : "–";
 }
+
+const dayMs = 86_400_000;
+
+export function daysUntil(iso: string) {
+  return Math.floor((new Date(iso).getTime() - Date.now()) / dayMs);
+}

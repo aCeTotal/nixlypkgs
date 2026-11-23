@@ -20,6 +20,8 @@ import { NewRecipePage } from "@/recipes/new-recipe-page";
 import { recipeQuery, recipesQuery } from "@/recipes/queries";
 import { RecipePage } from "@/recipes/recipe-page";
 import { RecipesPage } from "@/recipes/recipes-page";
+import { trustQuery } from "@/trust/queries";
+import { TrustPage } from "@/trust/trust-page";
 
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -38,6 +40,7 @@ const routeTree = rootRoute.addChildren([
     page("/", "Overview", OverviewPage, () => queryClient.ensureQueryData(overviewQuery)),
     page("/profiles", "Profiles", ProfilesPage, () => queryClient.ensureQueryData(profilesQuery)),
     page("/testing", "Testing", TestingPage, () => queryClient.ensureQueryData(approvalQuery)),
+    page("/trust", "Trust", TrustPage, () => queryClient.ensureQueryData(trustQuery)),
     createRoute({
       getParentRoute: () => appRoute,
       path: "/profiles/$name",

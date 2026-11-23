@@ -131,7 +131,7 @@ in
         wants = [ "network-online.target" ];
         requires = [ "postgresql.service" "nixly-cache-keygen.service" ];
         unitConfig.RequiresMountsFor = [ cfg.cache.dir ];
-        path = [ config.nix.package ];
+        path = [ config.nix.package pkgs.openssl pkgs.sbsigntool pkgs.efitools ];
         environment = {
           CACHEPANEL_DATABASE_URL = "postgres:///cachepanel?host=/run/postgresql";
           CACHEPANEL_STATE_DIR = stateDir;
@@ -145,6 +145,7 @@ in
           CACHEPANEL_PUBLISH_KEY = lib.mkIf publishing "%d/publish-key";
           CACHEPANEL_CACHE_DIR = cfg.cache.dir;
           CACHEPANEL_CACHE_KEY = "%d/cache-key";
+          CACHEPANEL_MICROSOFT_CERTS = "${pkgs.sbctl.src}/certs/microsoft";
           HOME = stateDir;
           NIX_REMOTE = "daemon";
           NIX_SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";

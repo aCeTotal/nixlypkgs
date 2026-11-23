@@ -51,7 +51,7 @@ has_flag() { [[ $cpu_flags == *" $1 "* ]]; }
 cpu_level=1
 if has_flag sse4_2 && has_flag popcnt && has_flag cx16; then cpu_level=2; fi
 if (( cpu_level == 2 )) && has_flag avx2 && has_flag bmi2 && has_flag fma; then cpu_level=3; fi
-if (( cpu_level == 3 )) && has_flag avx512f && has_flag avx512vl; then cpu_level=4; fi
+if (( cpu_level == 3 )) && has_flag avx512f && has_flag avx512bw && has_flag avx512cd && has_flag avx512dq && has_flag avx512vl; then cpu_level=4; fi
 
 mem_gib=0
 while IFS= read -r line; do

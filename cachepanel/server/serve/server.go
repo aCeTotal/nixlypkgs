@@ -22,6 +22,7 @@ import (
 	"cachepanel/realtime"
 	"cachepanel/release"
 	"cachepanel/repo"
+	"cachepanel/signing"
 	"cachepanel/watcher"
 	"cachepanel/wizard"
 )
@@ -57,7 +58,11 @@ func Run(ctx context.Context, cfg config.Config) error {
 	if err != nil {
 		return err
 	}
-	rebuilder := profiles.NewRebuilder(db, hub, mirror, store, filepath.Join(cfg.StateDir, "checks"), releases.Trigger)
+	signer := signing.NewStore(db, filepath.Join(cfg.StateDir, "signing"), cfg.MicrosoftCerts)
+	rebuilder := profiles.NewRebuilder(profiles.Deps{
+		DB: db, Hub: hub, Mirror: mirror, Cache: store, Signer: signer,
+		ChecksDir: filepath.Join(cfg.StateDir, "checks"), PublicURL: cfg.PublicURL, Published: releases.Trigger,
+	})
 	files := builds.NewFiles(cfg.StateDir)
 	pool := builds.NewPool(db, hub, files, store, rebuilder.Trigger)
 	follow := watcher.New(db, hub, mirror, pool, files, rebuilder.Trigger)
@@ -71,6 +76,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 	panel := &app{
 		cfg: cfg, db: db, hub: hub, auth: auth.NewService(db), mirror: mirror, releases: releases, rebuilder: rebuilder,
 		pool: pool, watcher: follow, recipes: recipes, uploads: lab.Uploads, cache: store,
+		trust: &signing.Routes{Store: signer, Hub: hub},
 	}
 
 	group, ctx := errgroup.WithContext(ctx)

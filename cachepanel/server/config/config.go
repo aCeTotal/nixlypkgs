@@ -25,25 +25,28 @@ type Config struct {
 	// CacheDir holds the signed binary cache.
 	CacheDir string
 	CacheKey string
+	// MicrosoftCerts keeps option ROMs booting.
+	MicrosoftCerts string
 }
 
 var branchPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
 
 func Load() (Config, error) {
 	cfg := Config{
-		HTTPAddr:      envOr("CACHEPANEL_HTTP_ADDR", "127.0.0.1:8686"),
-		DatabaseURL:   os.Getenv("CACHEPANEL_DATABASE_URL"),
-		StateDir:      os.Getenv("CACHEPANEL_STATE_DIR"),
-		Repository:    envOr("CACHEPANEL_REPOSITORY", "https://github.com/aCeTotal/nixlypkgs"),
-		Branch:        envOr("CACHEPANEL_BRANCH", "main"),
-		WebRoot:       os.Getenv("CACHEPANEL_WEB_ROOT"),
-		AdminUser:     os.Getenv("CACHEPANEL_ADMIN_USER"),
-		AdminHash:     os.Getenv("CACHEPANEL_ADMIN_PASSWORD_HASH"),
-		PublicURL:     envOr("CACHEPANEL_PUBLIC_URL", "http://127.0.0.1:8686"),
-		PublishRemote: os.Getenv("CACHEPANEL_PUBLISH_REMOTE"),
-		PublishKey:    os.Getenv("CACHEPANEL_PUBLISH_KEY"),
-		CacheDir:      os.Getenv("CACHEPANEL_CACHE_DIR"),
-		CacheKey:      os.Getenv("CACHEPANEL_CACHE_KEY"),
+		HTTPAddr:       envOr("CACHEPANEL_HTTP_ADDR", "127.0.0.1:8686"),
+		DatabaseURL:    os.Getenv("CACHEPANEL_DATABASE_URL"),
+		StateDir:       os.Getenv("CACHEPANEL_STATE_DIR"),
+		Repository:     envOr("CACHEPANEL_REPOSITORY", "https://github.com/aCeTotal/nixlypkgs"),
+		Branch:         envOr("CACHEPANEL_BRANCH", "main"),
+		WebRoot:        os.Getenv("CACHEPANEL_WEB_ROOT"),
+		AdminUser:      os.Getenv("CACHEPANEL_ADMIN_USER"),
+		AdminHash:      os.Getenv("CACHEPANEL_ADMIN_PASSWORD_HASH"),
+		PublicURL:      envOr("CACHEPANEL_PUBLIC_URL", "http://127.0.0.1:8686"),
+		PublishRemote:  os.Getenv("CACHEPANEL_PUBLISH_REMOTE"),
+		PublishKey:     os.Getenv("CACHEPANEL_PUBLISH_KEY"),
+		CacheDir:       os.Getenv("CACHEPANEL_CACHE_DIR"),
+		CacheKey:       os.Getenv("CACHEPANEL_CACHE_KEY"),
+		MicrosoftCerts: os.Getenv("CACHEPANEL_MICROSOFT_CERTS"),
 	}
 	if cfg.CacheDir == "" && cfg.StateDir != "" {
 		cfg.CacheDir = filepath.Join(cfg.StateDir, "cache")

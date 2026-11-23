@@ -55,7 +55,7 @@ func (b *Rebuilder) runChecks(ctx context.Context) {
 
 func (b *Rebuilder) nextCheck(ctx context.Context) (pendingCheck, bool, error) {
 	var next pendingCheck
-	err := b.db.QueryRow(ctx, `
+	err := b.DB.QueryRow(ctx, `
 		UPDATE profiles t SET check_state = 'running'
 		FROM trees tr
 		WHERE tr.hash = t.candidate_tree AND t.id = (
@@ -73,8 +73,8 @@ func (b *Rebuilder) nextCheck(ctx context.Context) (pendingCheck, bool, error) {
 }
 
 func (b *Rebuilder) runCheck(ctx context.Context, next pendingCheck) {
-	b.hub.Publish(realtime.ProfileChanged, map[string]int64{"id": next.id})
-	err := b.verify(ctx, next)
+	b.Hub.Publish(realtime.ProfileChanged, map[string]int64{"id": next.id})
+	tree, err := b.verify(ctx, next)
 	if ctx.Err() != nil {
 		return
 	}
@@ -88,25 +88,25 @@ func (b *Rebuilder) runCheck(ctx context.Context, next pendingCheck) {
 	if len(message) > maxCheckError {
 		message = message[len(message)-maxCheckError:]
 	}
-	if err := b.recordCheck(ctx, next, state, message); err != nil {
+	if err := b.recordCheck(ctx, next, tree, state, message); err != nil {
 		slog.Error("record type check", "type", next.id, "error", err)
 	}
 }
 
-// recordCheck moves passes into testing.
-func (b *Rebuilder) recordCheck(ctx context.Context, next pendingCheck, state, message string) error {
-	tag, err := b.db.Exec(ctx, `
+// recordCheck promotes signed trees.
+func (b *Rebuilder) recordCheck(ctx context.Context, next pendingCheck, tree, state, message string) error {
+	tag, err := b.DB.Exec(ctx, `
 		UPDATE profiles SET check_state = $4::check_state, check_error = nullif($5, ''), checked_at = now(),
-			testing_tree = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN candidate_tree ELSE testing_tree END,
+			testing_tree = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN $6 ELSE testing_tree END,
 			testing_rev = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN candidate_rev ELSE testing_rev END,
 			testing_at = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN now() ELSE testing_at END
 		WHERE id = $1 AND candidate_tree = $2 AND candidate_rev = $3 AND check_state = 'running'`,
-		next.id, next.tree, next.rev, state, message)
+		next.id, next.tree, next.rev, state, message, tree)
 	if err != nil || tag.RowsAffected() == 0 {
 		return err
 	}
-	b.hub.Publish(realtime.ProfileChanged, map[string]int64{"id": next.id})
-	b.published()
+	b.Hub.Publish(realtime.ProfileChanged, map[string]int64{"id": next.id})
+	b.Published()
 	return nil
 }
 
@@ -154,37 +154,57 @@ func extract(root *os.Root, reader io.Reader, header *tar.Header) error {
 	return errors.Join(err, file.Close())
 }
 
-// verify evaluates then builds references.
-func (b *Rebuilder) verify(ctx context.Context, next pendingCheck) error {
-	dir := filepath.Join(b.checksDir, next.tree)
-	defer func() { _ = os.RemoveAll(dir) }()
-	if err := unpack(next.archive, dir); err != nil {
-		return err
-	}
-	flakeRef := b.mirror.FlakeRef(next.rev)
+// verify builds, signs and rebuilds.
+func (b *Rebuilder) verify(ctx context.Context, next pendingCheck) (string, error) {
+	work := filepath.Join(b.ChecksDir, next.tree)
+	defer func() { _ = os.RemoveAll(work) }()
+	flakeRef := b.Mirror.FlakeRef(next.rev)
 	hardware, err := evaluate.References(ctx, flakeRef)
 	if err != nil {
-		return err
+		return next.tree, err
+	}
+	drvPaths, err := evaluateTree(ctx, next.archive, filepath.Join(work, "unsigned"), flakeRef, hardware)
+	if err != nil {
+		return "", err
+	}
+	unsigned, err := buildSystems(ctx, filepath.Join(work, "roots", "system"), drvPaths)
+	if err != nil {
+		return "", err
+	}
+	tree, archive, err := b.signTree(ctx, next.archive, unsigned)
+	if err != nil {
+		return "", err
+	}
+	drvPaths, err = evaluateTree(ctx, archive, filepath.Join(work, "signed"), flakeRef, hardware)
+	if err != nil {
+		return "", err
+	}
+	roots := b.systemRoots(next.id)
+	key := releaseKey(tree, next.rev)
+	if err := b.cacheSystems(ctx, filepath.Join(roots, key), drvPaths); err != nil {
+		return "", err
+	}
+	released, err := b.released(ctx, next.id)
+	if err != nil {
+		return "", err
+	}
+	return tree, keepOnly(roots, append(released, key))
+}
+
+func evaluateTree(ctx context.Context, archive []byte, dir, flakeRef string, hardware []string) ([]string, error) {
+	if err := unpack(archive, dir); err != nil {
+		return nil, err
 	}
 	tree := filepath.Join(dir, strings.TrimSuffix(treeRoot, "/"))
 	drvPaths := make([]string, 0, len(hardware))
 	for _, reference := range hardware {
 		drvPath, err := evaluate.System(ctx, flakeRef, reference, tree)
 		if err != nil {
-			return fmt.Errorf("%s: %w", reference, err)
+			return nil, fmt.Errorf("%s: %w", reference, err)
 		}
 		drvPaths = append(drvPaths, drvPath)
 	}
-	roots := b.systemRoots(next.id)
-	key := releaseKey(next.tree, next.rev)
-	if err := b.cacheSystems(ctx, filepath.Join(roots, key), drvPaths); err != nil {
-		return err
-	}
-	released, err := b.released(ctx, next.id)
-	if err != nil {
-		return err
-	}
-	return keepOnly(roots, append(released, key))
+	return drvPaths, nil
 }
 
 func releaseKey(tree, rev string) string {
@@ -194,7 +214,7 @@ func releaseKey(tree, rev string) string {
 // released names both branches' systems.
 func (b *Rebuilder) released(ctx context.Context, id int64) ([]string, error) {
 	var testingTree, testingRev, stableTree, stableRev string
-	err := b.db.QueryRow(ctx, `
+	err := b.DB.QueryRow(ctx, `
 		SELECT coalesce(testing_tree, ''), coalesce(testing_rev, ''), coalesce(stable_tree, ''), coalesce(stable_rev, '')
 		FROM profiles WHERE id = $1`, id).Scan(&testingTree, &testingRev, &stableTree, &stableRev)
 	return []string{releaseKey(testingTree, testingRev), releaseKey(stableTree, stableRev)}, err
@@ -202,7 +222,7 @@ func (b *Rebuilder) released(ctx context.Context, id int64) ([]string, error) {
 
 // systemRoots holds checked systems.
 func (b *Rebuilder) systemRoots(id int64) string {
-	return filepath.Join(b.checksDir, "roots", strconv.FormatInt(id, 10))
+	return filepath.Join(b.ChecksDir, "roots", strconv.FormatInt(id, 10))
 }
 
 // keepOnly unroots unreleased checked systems.

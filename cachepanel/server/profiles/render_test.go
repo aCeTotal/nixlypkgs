@@ -8,6 +8,7 @@ import (
 var spec = Spec{
 	Name:     "desktop",
 	Platform: "desktop",
+	Kernel:   "enterprise",
 	Packages: []string{"blender", "python3Packages.numpy"},
 	Modules:  []Module{{Slug: "system", Source: "{ ... }: { }"}, {Slug: "motd", Source: "{ ... }: { }"}},
 }
@@ -17,6 +18,7 @@ func TestDefaultNix(t *testing.T) {
 	for _, want := range []string{
 		"./modules/system.nix\n    ./modules/motd.nix",
 		`nixlyos.mode = lib.mkForce "desktop";`,
+		`nixlyos.kernel = lib.mkForce "enterprise";`,
 		`[ "blender" ]`,
 		`[ "python3Packages" "numpy" ]`,
 	} {

@@ -1,6 +1,7 @@
 inputs: final: prev:
 let
   callPackage = final.callPackage;
+  kernels = import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; };
 in {
   speedtree = callPackage ../pkgs/speedtree { };
   nixlytile = callPackage ../pkgs/nixlytile { };
@@ -51,10 +52,15 @@ in {
   buildArchPackage = callPackage ../pkgs/build-arch-package { };
   determinate-nix = (inputs.determinate-nix.overlays.internal final prev).nixComponents2.nix-cli;
 
-  linux-nixlyos = (import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; }).generic;
-  linux-nixlyos-v3 = (import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; }).v3;
+  linux-nixlyos = kernels.generic;
+  linux-nixlyos-v3 = kernels.v3;
+  linux-nixlyos-v4 = kernels.v4;
+  linux-nixlyos-enterprise = kernels.enterprise;
   linuxPackages_nixlyos = import ./nvidia-latest.nix inputs final final.linux-nixlyos;
   linuxPackages_nixlyos_v3 = import ./nvidia-latest.nix inputs final final.linux-nixlyos-v3;
+  linuxPackages_nixlyos_v4 = import ./nvidia-latest.nix inputs final final.linux-nixlyos-v4;
+  # In-tree drivers only.
+  linuxPackages_nixlyos_enterprise = final.linuxPackagesFor final.linux-nixlyos-enterprise;
   linux-nixlyserver = import ../pkgs/linux-nixlyserver { inherit (final) lib linux; };
   linuxPackages_nixlyserver = final.linuxPackagesFor final.linux-nixlyserver;
 

@@ -1,33 +1,24 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Copy, FlaskConical, Rocket, Trash2 } from "lucide-react";
+import { Copy, FlaskConical, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { ConfirmButton } from "@/shell/confirm-button";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { cloneProfile, deleteProfile, profileAction, type ProfileSummary } from "./queries";
+import { cloneProfile, deleteProfile, recheckProfile, type ProfileSummary } from "./queries";
 
 export function ProfileActions({ profile }: { profile: ProfileSummary }) {
   const navigate = useNavigate();
-  const act = useMutation({ mutationFn: (action: "check" | "publish") => profileAction(profile.name, action) });
+  const recheck = useMutation({ mutationFn: () => recheckProfile(profile.name) });
   const remove = useMutation({ mutationFn: () => deleteProfile(profile.name), onSuccess: () => navigate({ to: "/profiles" }) });
   return (
     <>
-      <Button size="sm" variant="outline" onClick={() => act.mutate("check")} disabled={profile.checkState === "running"}>
+      <Button size="sm" variant="outline" onClick={() => recheck.mutate()} disabled={profile.checkState === "running"}>
         <FlaskConical />
         Check again
       </Button>
-      {profile.checkState === "failed" && (
-        <ConfirmButton
-          label="Send to testing anyway"
-          icon={Rocket}
-          title="Send to testing without a passing check?"
-          description="Testing machines get the candidate even though the check failed. Only do this when the failure is in a reference machine no real machine has."
-          onConfirm={() => act.mutate("publish")}
-        />
-      )}
       <CloneDialog source={profile} />
       <ConfirmButton
         label="Delete"

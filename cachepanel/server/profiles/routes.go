@@ -25,13 +25,12 @@ func (b *Rebuilder) Mount(r chi.Router) {
 	r.Delete("/profiles/{name}", rest.Handle(b.remove))
 	r.Post("/profiles/{name}/clone", rest.Handle(b.clone))
 	r.Post("/profiles/{name}/check", rest.Handle(b.recheck))
-	r.Post("/profiles/{name}/publish", rest.Handle(b.publish))
 	r.Get("/approval", rest.Handle(b.pending))
 	r.Post("/approval", rest.Handle(b.approve))
 }
 
 const summary = `
-	p.id, p.name, p.title, p.description, p.platform, p.pinned_sha AS "pinnedSha",
+	p.id, p.name, p.title, p.description, p.platform, p.kernel, p.pinned_sha AS "pinnedSha",
 	cardinality(p.packages) AS "packageCount",
 	(SELECT count(*) FROM modules m WHERE m.required
 		OR EXISTS (SELECT 1 FROM profile_modules pm WHERE pm.profile_id = p.id AND pm.module_id = m.id)) AS "moduleCount",
@@ -41,7 +40,7 @@ const summary = `
 	p.check_state AS "checkState", p.check_error AS "checkError", p.checked_at AS "checkedAt", p.updated_at AS "updatedAt"`
 
 func (b *Rebuilder) list(w http.ResponseWriter, r *http.Request) error {
-	body, err := database.JSON(r.Context(), b.db, `
+	body, err := database.JSON(r.Context(), b.DB, `
 		SELECT coalesce(json_agg(row_to_json(p) ORDER BY p.id), '[]') FROM (SELECT `+summary+` FROM profiles p) p`)
 	if err != nil {
 		return err
@@ -57,7 +56,7 @@ func (b *Rebuilder) get(w http.ResponseWriter, r *http.Request) error {
 		Files   []File         `json:"files"`
 	}
 	var archive []byte
-	err := b.db.QueryRow(r.Context(), `
+	err := b.DB.QueryRow(r.Context(), `
 		SELECT row_to_json(s), p.packages,
 			coalesce((SELECT json_agg(json_build_object('id', m.id, 'slug', m.slug, 'title', m.title,
 				'description', m.description, 'required', m.required,
@@ -116,26 +115,15 @@ func (b *Rebuilder) recheck(w http.ResponseWriter, r *http.Request) error {
 	return rest.NoContent(w)
 }
 
-// publish skips the check.
-func (b *Rebuilder) publish(w http.ResponseWriter, r *http.Request) error {
-	if err := b.mutate(r, `
-		UPDATE profiles SET testing_tree = candidate_tree, testing_rev = candidate_rev, testing_at = now()
-		WHERE name = $1 AND candidate_tree IS NOT NULL AND candidate_rev IS NOT NULL`); err != nil {
-		return err
-	}
-	b.published()
-	return rest.NoContent(w)
-}
-
 // mutate updates by name.
 func (b *Rebuilder) mutate(r *http.Request, query string) error {
-	tag, err := b.db.Exec(r.Context(), query, chi.URLParam(r, "name"))
+	tag, err := b.DB.Exec(r.Context(), query, chi.URLParam(r, "name"))
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
 		return pgx.ErrNoRows
 	}
-	b.hub.Publish(realtime.ProfileChanged, map[string]string{"name": chi.URLParam(r, "name")})
+	b.Hub.Publish(realtime.ProfileChanged, map[string]string{"name": chi.URLParam(r, "name")})
 	return nil
 }

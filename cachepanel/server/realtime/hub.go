@@ -28,6 +28,7 @@ const (
 	CommitChanged  Event = "commit.changed"
 	WatcherChanged Event = "watcher.changed"
 	ProfileChanged Event = "profile.changed"
+	TrustChanged   Event = "trust.changed"
 	ModuleChanged  Event = "module.changed"
 	RecipeChanged  Event = "recipe.changed"
 )

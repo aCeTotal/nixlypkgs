@@ -10,28 +10,33 @@ import (
 	"cachepanel/cache"
 	"cachepanel/realtime"
 	"cachepanel/repo"
+	"cachepanel/signing"
 )
 
 const settle = time.Second
 
 // Rebuilder recomputes profile trees.
 type Rebuilder struct {
-	db        *pgxpool.Pool
-	hub       *realtime.Hub
-	mirror    *repo.Mirror
-	cache     *cache.Cache
-	checksDir string
-	published func()
-	trigger   chan struct{}
-	check     chan struct{}
+	Deps
+	trigger chan struct{}
+	check   chan struct{}
 }
 
-func NewRebuilder(db *pgxpool.Pool, hub *realtime.Hub, mirror *repo.Mirror, store *cache.Cache, checksDir string, published func()) *Rebuilder {
-	return &Rebuilder{
-		db: db, hub: hub, mirror: mirror, cache: store, checksDir: checksDir, published: published,
-		trigger: make(chan struct{}, 1),
-		check:   make(chan struct{}, 1),
-	}
+// Deps wires a Rebuilder.
+type Deps struct {
+	DB        *pgxpool.Pool
+	Hub       *realtime.Hub
+	Mirror    *repo.Mirror
+	Cache     *cache.Cache
+	Signer    *signing.Store
+	ChecksDir string
+	// PublicURL serves signature bundles to machines.
+	PublicURL string
+	Published func()
+}
+
+func NewRebuilder(deps Deps) *Rebuilder {
+	return &Rebuilder{Deps: deps, trigger: make(chan struct{}, 1), check: make(chan struct{}, 1)}
 }
 
 // Trigger schedules a rebuild.
@@ -43,7 +48,7 @@ func (b *Rebuilder) Trigger() {
 }
 
 func (b *Rebuilder) Run(ctx context.Context) error {
-	if _, err := b.db.Exec(ctx, `UPDATE profiles SET check_state = 'pending' WHERE check_state = 'running'`); err != nil {
+	if _, err := b.DB.Exec(ctx, `UPDATE profiles SET check_state = 'pending' WHERE check_state = 'running'`); err != nil {
 		return err
 	}
 	go b.runChecks(ctx)
@@ -66,15 +71,15 @@ func (b *Rebuilder) Run(ctx context.Context) error {
 }
 
 func (b *Rebuilder) rebuild(ctx context.Context) error {
-	specs, err := loadSpecs(ctx, b.db)
+	specs, err := loadSpecs(ctx, b.DB)
 	if err != nil {
 		return err
 	}
-	ready, err := loadReady(ctx, b.db)
+	ready, err := loadReady(ctx, b.DB)
 	if err != nil {
 		return err
 	}
-	pins, err := loadPins(ctx, b.db)
+	pins, err := loadPins(ctx, b.DB)
 	if err != nil {
 		return err
 	}
@@ -91,7 +96,7 @@ func (b *Rebuilder) rebuild(ctx context.Context) error {
 		changed = changed || moved
 	}
 	if changed {
-		b.hub.Publish(realtime.ProfileChanged, map[string]string{})
+		b.Hub.Publish(realtime.ProfileChanged, map[string]string{})
 		b.wakeChecks()
 	}
 	return nil
@@ -106,10 +111,10 @@ func (b *Rebuilder) candidate(ctx context.Context, spec Spec, rev string, pins m
 	if err != nil {
 		return false, err
 	}
-	if _, err := b.db.Exec(ctx, `INSERT INTO trees (hash, archive) VALUES ($1, $2) ON CONFLICT DO NOTHING`, hash, archive); err != nil {
+	if _, err := b.DB.Exec(ctx, `INSERT INTO trees (hash, archive) VALUES ($1, $2) ON CONFLICT DO NOTHING`, hash, archive); err != nil {
 		return false, err
 	}
-	tag, err := b.db.Exec(ctx, `
+	tag, err := b.DB.Exec(ctx, `
 		UPDATE profiles SET candidate_tree = $2, candidate_rev = $3, check_state = 'pending', check_error = NULL
 		WHERE id = $1 AND (candidate_tree IS DISTINCT FROM $2 OR candidate_rev IS DISTINCT FROM $3)`, spec.ID, hash, rev)
 	return tag.RowsAffected() > 0, err

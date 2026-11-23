@@ -6,6 +6,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Textarea } from "@/ui/textarea";
+import { KernelChoice } from "./kernel-choice";
 import { platformLabels, type Platform, type ProfileSettings } from "./queries";
 
 const automatic = "auto";
@@ -83,6 +84,7 @@ export function ProfileSettingsForm({ draft, update }: ProfileSettingsFormProps)
           </Field>
         </CardContent>
       </Card>
+      <KernelChoice kernel={draft.kernel} onChange={(kernel) => update({ kernel })} />
     </div>
   );
 }

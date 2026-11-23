@@ -89,10 +89,9 @@
               {
                 nvidia-modules = kp.nvidiaPackages.latest.mod;
                 nvidia-modules-previous = kp.nvidiaPackages.previous.mod;
-                inherit (kp) xpadneo xone xpad-noone msi-ec;
               };
         in {
-          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer nixly-vrs proton-nixlyos proton-nixlyos-generic linux-nixlyos linux-nixlyos-v3 flycast claude citrix-workspace-nixly nixly-mic nixly-gate nixly_kalk nixly_pdf nixly_voice meshy freecad-mcp codeindexcache determinate-nix nixlyos-panel;
+          inherit (stable) speedtree nixlytile nixlycc nixly_launcher nixly_lockscreen nixlymediaserver nixlymedia Blender_bin_lts Unreal_editor gaea low-latency-layer nixly-vrs proton-nixlyos proton-nixlyos-generic flycast claude citrix-workspace-nixly nixly-mic nixly-gate nixly_kalk nixly_pdf nixly_voice meshy freecad-mcp codeindexcache determinate-nix nixlyos-panel;
 
           # Layer for 32-bit games.
           nixly-vrs-i686 = stable.pkgsi686Linux.nixly-vrs;
@@ -102,11 +101,6 @@
             inherit system inputs;
           };
 
-          # Kernel outputs besides out.
-          linux-nixlyos-modules = stable.linux-nixlyos.modules;
-          linux-nixlyos-dev = stable.linux-nixlyos.dev;
-          linux-nixlyos-v3-modules = stable.linux-nixlyos-v3.modules;
-          linux-nixlyos-v3-dev = stable.linux-nixlyos-v3.dev;
           inherit (stable) linux-nixlyserver;
           linux-nixlyserver-modules = stable.linux-nixlyserver.modules;
           linux-nixlyserver-dev = stable.linux-nixlyserver.dev;
@@ -125,6 +119,10 @@
         }
         // kernelModules "" stable.linuxPackages_nixlyos
         // kernelModules "-v3" stable.linuxPackages_nixlyos_v3
+        // kernelModules "-v4" stable.linuxPackages_nixlyos_v4
+        # Every output of the nixlyos kernels.
+        // nixpkgs.lib.concatMapAttrs (name: kernel: { ${name} = kernel; "${name}-modules" = kernel.modules; "${name}-dev" = kernel.dev; })
+          { inherit (stable) linux-nixlyos linux-nixlyos-v3 linux-nixlyos-v4 linux-nixlyos-enterprise; }
         // nixpkgs.lib.genAttrs (import ./pkgs/recipes.nix) (name: stable.${name}));
 
       nixosModules = {

@@ -8,7 +8,8 @@ const invalidations: Record<string, (data: Record<string, unknown>) => unknown[]
   "package.changed": (data) => [["overview"], ["packages"], ["package", data.attr], ["profiles"]],
   "commit.changed": () => [["commits"], ["overview"]],
   "watcher.changed": () => [["overview"]],
-  "profile.changed": () => [["profiles"], ["profile"], ["commits"]],
+  "profile.changed": () => [["profiles"], ["profile"], ["commits"], ["trust"]],
+  "trust.changed": () => [["trust"]],
   "module.changed": () => [["modules"], ["module"], ["profile"]],
   "recipe.changed": (data) => [["recipes"], ["recipe", data.id]],
 };

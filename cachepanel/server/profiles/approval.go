@@ -75,7 +75,7 @@ func (b *Rebuilder) pending(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (b *Rebuilder) awaiting(ctx context.Context) ([]awaiting, error) {
-	rows, err := b.db.Query(ctx, `
+	rows, err := b.DB.Query(ctx, `
 		SELECT p.id, p.name, p.title, p.platform, p.testing_tree, p.testing_rev, p.testing_at, p.stable_rev, tt.archive, st.archive
 		FROM profiles p
 			JOIN trees tt ON tt.hash = p.testing_tree
@@ -131,7 +131,7 @@ func changes(stable, testing []byte) ([]changedFile, error) {
 
 // newCommits spans every pending range.
 func (b *Rebuilder) newCommits(ctx context.Context) ([]newCommit, error) {
-	rows, err := b.db.Query(ctx, `
+	rows, err := b.DB.Query(ctx, `
 		WITH span AS (
 			SELECT min(s.position) AS low, max(t.position) AS high
 			FROM profiles p
@@ -160,7 +160,7 @@ func (b *Rebuilder) approve(w http.ResponseWriter, r *http.Request) error {
 	for i, profile := range req.Profiles {
 		ids[i], trees[i], revs[i] = profile.ID, profile.Tree, profile.Rev
 	}
-	err := pgx.BeginFunc(r.Context(), b.db, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(r.Context(), b.DB, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(r.Context(), `
 			UPDATE profiles p SET stable_tree = p.testing_tree, stable_rev = p.testing_rev, stable_at = now()
 			FROM unnest($1::bigint[], $2::text[], $3::text[]) AS a(id, tree, rev)
@@ -180,7 +180,7 @@ func (b *Rebuilder) approve(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	b.hub.Publish(realtime.ProfileChanged, map[string]string{})
-	b.published()
+	b.Hub.Publish(realtime.ProfileChanged, map[string]string{})
+	b.Published()
 	return rest.NoContent(w)
 }

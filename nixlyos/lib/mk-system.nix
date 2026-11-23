@@ -102,6 +102,7 @@ nixpkgs.lib.nixosSystem {
 
     (profileTree + "/default.nix")
     (import ./pins.nix (profileTree + "/pins.nix"))
+    (import ./signing.nix (profileTree + "/signing.nix"))
     inputs.home-manager.nixosModules.home-manager
     {
       home-manager = {

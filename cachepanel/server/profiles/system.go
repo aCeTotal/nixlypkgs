@@ -57,12 +57,12 @@ func (b *Rebuilder) cacheSystems(ctx context.Context, dir string, drvPaths []str
 	if err := os.WriteFile(filepath.Join(dir, systemsFile), []byte(strings.Join(toplevels, "\n")), 0o640); err != nil {
 		return err
 	}
-	return b.cache.Push(ctx, toplevels...)
+	return b.Cache.Push(ctx, toplevels...)
 }
 
 // Released lists systems the cache keeps.
 func (b *Rebuilder) Released() ([]string, error) {
-	files, err := filepath.Glob(filepath.Join(b.checksDir, "roots", "*", "*", systemsFile))
+	files, err := filepath.Glob(filepath.Join(b.ChecksDir, "roots", "*", "*", systemsFile))
 	if err != nil {
 		return nil, err
 	}

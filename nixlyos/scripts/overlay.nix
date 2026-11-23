@@ -14,6 +14,16 @@ in
     '';
   };
 
+  # Firmware keys signed by the panel.
+  nixlyos-secureboot = writeShellApplication {
+    name = "nixlyos-secureboot";
+    runtimeInputs = with final; [ coreutils curl openssl efitools ];
+    text = ''
+      export NIXLY_PANEL=''${NIXLY_PANEL:-${(import ../lib/panel.nix).url}}
+      ${builtins.readFile ./secureboot.sh}
+    '';
+  };
+
   # Reads /sys only.
   nixlyos-detect-hw = writeShellApplication {
     name = "nixlyos-detect-hw";

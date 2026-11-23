@@ -21,7 +21,7 @@ in
       experimental-features = [ "nix-command" "flakes" ];
     };
 
-    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.gnutar pkgs.gzip ];
+    environment.systemPackages = [ pkgs.curl pkgs.git pkgs.gnutar pkgs.gzip pkgs.openssl pkgs.unzip ];
 
     systemd.services.demo-repo = {
       wantedBy = [ "multi-user.target" ];
@@ -111,6 +111,10 @@ in
         assert [m["slug"] for m in modules] == ["system", "security", "network", "session", "audio", "user",
                                                 "gaming", "apps", "desktop", "htpc", "server", "hardware"], modules
         assert {m["slug"] for m in modules if m["required"]} == {"system", "security", "network", "user", "hardware"}
+        sources = {m["slug"]: get(f"/modules/{m['id']}")["source"] for m in modules}
+        assert "options.nixlyos.kernel" in sources["system"] and "nixly-module-lock" in sources["system"]
+        assert "lanzaboote" not in sources["security"] and "nixlyos-secureboot" in sources["security"]
+        assert "hardware.xpadneo.enable" not in sources["gaming"] and "msi-ec-autoload" not in sources["hardware"]
         problem = json.loads(send("/modules/validate", json.dumps({"source": "{ a = ; }"})))
         assert problem["line"] == 1 and problem["column"] == 7, problem
 
@@ -189,6 +193,31 @@ in
         assert status(f"{panel}/api/v1/profiles/desktop/nightly") == "404"
         branches = {p["name"]: (p["stable"], p["testing"]) for p in json.loads(server.succeed(f"curl -fsS {panel}/api/v1/profiles"))}
         assert branches["desktop"] == (True, True), branches
+
+    with subtest("the NixlyOS CA anchors module signing and the Secure Boot chain"):
+        assert status(f"{panel}/api/v1/ca.pem") == "404" and get("/trust")["active"] is None
+        ca = json.loads(send("/trust/ca"))
+        server.succeed(f"curl -fsS -o /tmp/ca.der {panel}/api/v1/ca.der")
+        server.succeed(f"sha256sum /tmp/ca.der | grep -q {ca['fingerprint']}")
+        server.succeed(f"curl -fsS {panel}/api/v1/ca.pem | openssl x509 -noout -ext extendedKeyUsage | grep -q 'Code Signing'")
+        server.succeed(f"stat -c '%a %U' /var/lib/cachepanel/signing/{ca['fingerprint']}.key | grep -qx '600 cachepanel'")
+        server.succeed(f"curl -fsS -b /tmp/jar -o /tmp/epic.zip {panel}/api/trust/epic.zip")
+        server.succeed("unzip -l /tmp/epic.zip | grep -q policy.json")
+        firmware = get("/trust")["firmware"]
+        assert [d["variable"] for d in firmware] == ["PK", "KEK", "db"], firmware
+        assert [c["owner"] for c in firmware[0]["certs"]] == ["NixlyOS"], firmware
+        assert sum(c["owner"] == "Microsoft" for c in firmware[2]["certs"]) == 5, firmware
+        for variable in ["PK", "KEK", "db"]:
+            server.succeed(f"curl -fsS -o /tmp/{variable}.auth {panel}/api/v1/secureboot/setup/{variable}.auth")
+        server.succeed("tail -c $(stat -c %s /tmp/ca.der) /tmp/PK.auth | cmp - /tmp/ca.der")
+        assert status(f"{panel}/api/v1/secureboot/setup/dbx.auth") == "404"
+        assert status(f"{panel}/api/v1/secureboot/{'0' * 64}/PK.auth") == "404"
+        send("/trust/ca")
+        server.succeed(f"curl -fsS -o /tmp/rotate.auth {panel}/api/v1/secureboot/{ca['fingerprint']}/PK.auth")
+        server.fail("tail -c $(stat -c %s /tmp/ca.der) /tmp/rotate.auth | cmp -s - /tmp/ca.der")
+        trust = get("/trust")
+        assert trust["active"]["fingerprint"] != ca["fingerprint"] and len(trust["history"]) == 2, trust
+        assert sum(c["owner"] == "NixlyOS" for c in trust["firmware"][2]["certs"]) == 2, trust["firmware"]
 
     with subtest("uploaded sources are served to machines and analysed"):
         server.succeed("head -c 4096 /dev/urandom > /tmp/blob.bin")

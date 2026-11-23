@@ -17,9 +17,11 @@ var (
 	namePattern  = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
 	attrPattern  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_'-]*(\.[A-Za-z_][A-Za-z0-9_'-]*)*$`)
 	platforms    = map[string]bool{"desktop": true, "htpc": true, "server": true}
+	kernels      = map[string]bool{"performance": true, "enterprise": true}
 	errName      = rest.Unprocessable("invalid_name", "The ID may only contain lowercase letters, digits and hyphens (max 32)")
 	errTitle     = rest.Unprocessable("invalid_title", "The name needs 1–80 characters")
 	errPlatform  = rest.Unprocessable("invalid_platform", "Unknown platform")
+	errKernel    = rest.Unprocessable("invalid_kernel", "Unknown kernel")
 	errPackage   = rest.Unprocessable("invalid_package", "Invalid package – use e.g. blender or python3Packages.numpy")
 	errPinnedRev = rest.Unprocessable("invalid_revision", "That revision is not evaluated")
 )
@@ -51,7 +53,7 @@ func (b *Rebuilder) create(w http.ResponseWriter, r *http.Request) error {
 	if err := req.validate(); err != nil {
 		return err
 	}
-	if _, err := b.db.Exec(r.Context(), `INSERT INTO profiles (name, title, description, platform) VALUES ($1, $2, $3, $4)`,
+	if _, err := b.DB.Exec(r.Context(), `INSERT INTO profiles (name, title, description, platform) VALUES ($1, $2, $3, $4)`,
 		req.Name, req.Title, req.Description, req.Platform); err != nil {
 		return err
 	}
@@ -61,6 +63,7 @@ func (b *Rebuilder) create(w http.ResponseWriter, r *http.Request) error {
 
 type settings struct {
 	identity
+	Kernel   string   `json:"kernel"`
 	Pinned   *string  `json:"pinnedSha"`
 	Modules  []int64  `json:"modules"`
 	Packages []string `json:"packages"`
@@ -69,6 +72,9 @@ type settings struct {
 func (s settings) validate() error {
 	if err := s.identity.validate(); err != nil {
 		return err
+	}
+	if !kernels[s.Kernel] {
+		return errKernel
 	}
 	for _, pkg := range s.Packages {
 		if !attrPattern.MatchString(pkg) {
@@ -86,7 +92,7 @@ func (b *Rebuilder) update(w http.ResponseWriter, r *http.Request) error {
 	if err := req.validate(); err != nil {
 		return err
 	}
-	err := pgx.BeginFunc(r.Context(), b.db, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(r.Context(), b.DB, func(tx pgx.Tx) error {
 		return save(r.Context(), tx, chi.URLParam(r, "name"), req)
 	})
 	if err != nil {
@@ -107,9 +113,9 @@ func save(ctx context.Context, tx pgx.Tx, current string, req settings) error {
 	var id int64
 	err := tx.QueryRow(ctx, `
 		UPDATE profiles SET name = $2, title = $3, description = $4, platform = $5, pinned_sha = $6,
-			packages = $7, updated_at = now()
+			packages = $7, kernel = $8, updated_at = now()
 		WHERE name = $1 RETURNING id`,
-		current, req.Name, req.Title, req.Description, req.Platform, req.Pinned, uniq(req.Packages)).Scan(&id)
+		current, req.Name, req.Title, req.Description, req.Platform, req.Pinned, uniq(req.Packages), req.Kernel).Scan(&id)
 	if err != nil {
 		return err
 	}
@@ -134,11 +140,11 @@ func (b *Rebuilder) clone(w http.ResponseWriter, r *http.Request) error {
 	if err := (identity{Name: req.Name, Title: req.Title, Platform: "desktop"}).validate(); err != nil {
 		return err
 	}
-	err := pgx.BeginFunc(r.Context(), b.db, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(r.Context(), b.DB, func(tx pgx.Tx) error {
 		var id int64
 		err := tx.QueryRow(r.Context(), `
-			INSERT INTO profiles (name, title, description, platform, pinned_sha, packages)
-			SELECT $2, $3, description, platform, pinned_sha, packages FROM profiles WHERE name = $1
+			INSERT INTO profiles (name, title, description, platform, pinned_sha, packages, kernel)
+			SELECT $2, $3, description, platform, pinned_sha, packages, kernel FROM profiles WHERE name = $1
 			RETURNING id`, chi.URLParam(r, "name"), req.Name, req.Title).Scan(&id)
 		if err != nil {
 			return err
@@ -158,19 +164,19 @@ func (b *Rebuilder) clone(w http.ResponseWriter, r *http.Request) error {
 
 func (b *Rebuilder) remove(w http.ResponseWriter, r *http.Request) error {
 	var id int64
-	if err := b.db.QueryRow(r.Context(), `DELETE FROM profiles WHERE name = $1 RETURNING id`, chi.URLParam(r, "name")).Scan(&id); err != nil {
+	if err := b.DB.QueryRow(r.Context(), `DELETE FROM profiles WHERE name = $1 RETURNING id`, chi.URLParam(r, "name")).Scan(&id); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(b.systemRoots(id)); err != nil {
 		return err
 	}
 	b.changed(chi.URLParam(r, "name"))
-	b.published()
+	b.Published()
 	return rest.NoContent(w)
 }
 
 func (b *Rebuilder) changed(name string) {
-	b.hub.Publish(realtime.ProfileChanged, map[string]string{"name": name})
+	b.Hub.Publish(realtime.ProfileChanged, map[string]string{"name": name})
 	b.Trigger()
 }
 

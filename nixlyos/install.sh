@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# NixOS installer: lanzaboote Secure Boot, LUKS2 root on ext4, zram instead of swap.
+# NixOS installer: panel-signed boot chain, LUKS2 root on ext4, zram instead of swap.
 # Destructive: wipes the chosen disk completely.
 
 set -euo pipefail
@@ -40,9 +40,9 @@ Performs a clean NixOS installation on the selected disk with:
 - GPT: ${ESP_SIZE}iB ESP (FAT32, unencrypted), rest LUKS2 (argon2id, 4K sectors) for root
 - Root filesystem: ext4 (fast_commit, noatime, lazytime), tuned to the detected disk:
   NVMe switched to its fastest LBA format, discard and dm-crypt workqueue bypass on SSDs
-- Bootloader: lanzaboote (Secure Boot via UEFI)
+- Bootloader: systemd-boot, signed by the Nixly panel
 - Swap: zram (no swap partition)
-- Secure Boot keys generated automatically
+- Secure Boot: firmware stays in setup mode until nixlyos-secureboot enroll
 
 Options:
   --disk                   Device to install to (e.g., /dev/nvme0n1 or /dev/sda)
@@ -96,7 +96,7 @@ done
 
 [[ $EUID -eq 0 ]] || die "Run as root (sudo)."
 
-# Verify UEFI boot and Secure Boot state (must be disabled or in Setup Mode for lanzaboote)
+# UEFI in setup mode for enrollment.
 [[ -d /sys/firmware/efi ]] || die "System is not booted in UEFI mode. This installer requires UEFI."
 
 SB_VAR="/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
@@ -334,9 +334,6 @@ fi
 # The default user is uid 1000; nixos-install runs before the user exists.
 chown -R 1000:100 "/mnt/home/$NIXLY_USER"
 
-log "Genererer Secure Boot-nøkler for lanzaboote"
-nix-shell -p sbctl --run "sbctl create-keys --database-path /mnt/etc/secureboot --export /mnt/etc/secureboot"
-
 log "Installing NixOS from flake $NIXLY_DIR#nixlyos (no root password)"
 nixos-install --no-root-password --root /mnt --flake "$NIXLY_DIR#nixlyos"
 
@@ -344,4 +341,4 @@ log "Installation complete. Unmounting and closing LUKS."
 umount -R /mnt || true
 cryptsetup close cryptroot || true
 
-log "Done. Reboot into your new system."
+log "Done. Reboot, then enroll the panel's keys: sudo nixlyos-secureboot enroll"

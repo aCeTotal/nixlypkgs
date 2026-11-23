@@ -4,6 +4,7 @@ import { api } from "@/api/http";
 export type Platform = "desktop" | "htpc" | "server";
 export type CheckState = "pending" | "running" | "passed" | "failed" | "skipped";
 export type Branch = "stable" | "testing";
+export type Kernel = "performance" | "enterprise";
 
 export type ProfileSummary = {
   id: number;
@@ -11,6 +12,7 @@ export type ProfileSummary = {
   title: string;
   description: string;
   platform: Platform;
+  kernel: Kernel;
   pinnedSha: string | null;
   packageCount: number;
   moduleCount: number;
@@ -49,6 +51,7 @@ export type ProfileSettings = {
   title: string;
   description: string;
   platform: Platform;
+  kernel: Kernel;
   pinnedSha: string | null;
   modules: number[];
   packages: string[];
@@ -74,7 +77,7 @@ export const cloneProfile = (name: string, body: { name: string; title: string }
 
 export const deleteProfile = (name: string) => api(`/profiles/${name}`, { method: "DELETE" });
 
-export const profileAction = (name: string, action: "check" | "publish") => api(`/profiles/${name}/${action}`, { method: "POST" });
+export const recheckProfile = (name: string) => api(`/profiles/${name}/check`, { method: "POST" });
 
 export type FileChange = "added" | "removed" | "changed";
 
