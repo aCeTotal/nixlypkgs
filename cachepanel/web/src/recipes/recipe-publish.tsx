@@ -5,7 +5,6 @@ import { shortSha } from "@/format/sha";
 import { FileBrowser } from "@/shell/file-browser";
 import { Button } from "@/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
-import { DeployKey } from "./deploy-key";
 import { publishRecipe, type RecipeDetail } from "./queries";
 
 const flow = [
@@ -54,7 +53,6 @@ export function RecipePublish({ recipe, dirty }: { recipe: RecipeDetail; dirty: 
           )}
         </CardContent>
       </Card>
-      <DeployKey />
       <FileBrowser files={files} />
     </div>
   );

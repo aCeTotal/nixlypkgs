@@ -1,24 +1,26 @@
 package profiles
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
 
 var spec = Spec{
-	Name:     "desktop",
-	Platform: "desktop",
-	Kernel:   "enterprise",
-	Packages: []string{"blender", "python3Packages.numpy"},
-	Modules:  []Module{{Slug: "system", Source: "{ ... }: { }"}, {Slug: "motd", Source: "{ ... }: { }"}},
+	Name:           "desktop",
+	Platform:       "desktop",
+	Kernel:         "enterprise",
+	KernelSettings: map[string]string{"tickRate": "300", "hugepages": "madvise"},
+	Packages:       []string{"blender", "python3Packages.numpy"},
+	Modules:        []string{"motd", "gaming"},
 }
 
 func TestDefaultNix(t *testing.T) {
 	nix := defaultNix(spec)
 	for _, want := range []string{
-		"./modules/system.nix\n    ./modules/motd.nix",
 		`nixlyos.mode = lib.mkForce "desktop";`,
 		`nixlyos.kernel = lib.mkForce "enterprise";`,
+		`nixlyos.kernelSettings = lib.mkForce { "hugepages" = "madvise"; "tickRate" = "300"; };`,
 		`[ "blender" ]`,
 		`[ "python3Packages" "numpy" ]`,
 	} {
@@ -28,10 +30,21 @@ func TestDefaultNix(t *testing.T) {
 	}
 }
 
-func TestFilesCarryModules(t *testing.T) {
+func TestFilesListChosenModules(t *testing.T) {
 	files := Files(spec, nil)
-	if len(files) != 4 || files[2].Path != "modules/system.nix" || files[3].Path != "modules/motd.nix" {
+	if len(files) != 3 || files[1].Path != modulesFile || files[1].Content != "[\n  \"gaming\"\n  \"motd\"\n]\n" {
 		t.Fatalf("files: %+v", files)
+	}
+	if strings.Contains(files[0].Content, "imports") {
+		t.Fatalf("default.nix imports modules itself:\n%s", files[0].Content)
+	}
+}
+
+func TestArchiveFoldersFollowFiles(t *testing.T) {
+	flat := folders([]File{{Path: "default.nix"}, {Path: "pins.nix"}})
+	nested := folders([]File{{Path: "default.nix"}, {Path: "modules/a.nix"}, {Path: "modules/b.nix"}})
+	if !slices.Equal(flat, []string{treeRoot}) || !slices.Equal(nested, []string{treeRoot, treeRoot + "modules/"}) {
+		t.Fatalf("flat %v, nested %v", flat, nested)
 	}
 }
 

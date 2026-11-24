@@ -4,10 +4,10 @@ let
   cfg = config.services.nixly-cachepanel;
   inherit (lib) mkOption types;
   stateDir = "/var/lib/cachepanel";
-  githubRepo = builtins.match "https://github.com/([^/]+)/([^/]+)" (lib.removeSuffix ".git" (lib.removeSuffix "/" cfg.repository));
-  generatedKey = "/var/lib/nixly-cachepanel-publish/id_ed25519";
-  publishKey = if cfg.publish.keyFile == null then generatedKey else cfg.publish.keyFile;
-  publishing = cfg.publish.remote != null;
+  databaseURL = "postgres:///cachepanel?host=/run/postgresql";
+  # sshd wants a root-owned path.
+  sshCommand = "/etc/ssh/nixly-panel";
+  updateDir = "${stateDir}/update";
 in
 {
   options.services.nixly-cachepanel = {
@@ -22,12 +22,6 @@ in
       type = types.str;
       default = "127.0.0.1:8686";
       description = "Address the panel listens on.";
-    };
-
-    repository = mkOption {
-      type = types.str;
-      default = "https://github.com/aCeTotal/nixlypkgs";
-      description = "Git repository of nixlypkgs.";
     };
 
     branch = mkOption {
@@ -50,18 +44,37 @@ in
       description = "Base URL machines fetch uploaded sources from.";
     };
 
-    publish = {
-      remote = mkOption {
-        type = types.nullOr types.str;
-        default = if githubRepo == null then null else "git@github.com:${lib.elemAt githubRepo 0}/${lib.elemAt githubRepo 1}.git";
-        defaultText = "the SSH form of repository on GitHub";
-        description = "SSH remote the package wizard pushes to; null disables publishing.";
+    source = {
+      seed = mkOption {
+        type = types.str;
+        default = "https://github.com/aCeTotal/nixlypkgs";
+        description = "Repository copied into the panel's own source once, on first start.";
       };
-      keyFile = mkOption {
+      sshRemote = mkOption {
+        type = types.nullOr types.str;
+        default = if cfg.domain == null then null else "cachepanel@${cfg.domain}:source.git";
+        defaultText = lib.literalExpression ''"cachepanel@''${domain}:source.git"'';
+        description = "Git remote shown to pushers; null hides SSH push.";
+      };
+    };
+
+    selfUpdate = {
+      flake = mkOption {
         type = types.nullOr types.str;
         default = null;
-        example = "/var/lib/secrets/nixlypkgs-deploy";
-        description = "Deploy key for publish.remote, kept out of the store; null generates one the panel shows.";
+        example = "/etc/nixos";
+        description = "Flake of this server's NixOS configuration, rebuilt when the panel's source brings a new panel; null disables self-update.";
+      };
+      host = mkOption {
+        type = types.str;
+        default = config.networking.hostName;
+        defaultText = lib.literalExpression "config.networking.hostName";
+        description = "nixosConfigurations attribute to build.";
+      };
+      input = mkOption {
+        type = types.str;
+        default = "nixlypkgs";
+        description = "Flake input that brings the panel.";
       };
     };
 
@@ -115,6 +128,8 @@ in
         isSystemUser = true;
         group = "cachepanel";
         home = stateDir;
+        # sshd runs forced commands through it.
+        useDefaultShell = true;
       };
       users.groups.cachepanel = { };
 
@@ -133,16 +148,16 @@ in
         unitConfig.RequiresMountsFor = [ cfg.cache.dir ];
         path = [ config.nix.package pkgs.openssl pkgs.sbsigntool pkgs.efitools ];
         environment = {
-          CACHEPANEL_DATABASE_URL = "postgres:///cachepanel?host=/run/postgresql";
+          CACHEPANEL_DATABASE_URL = databaseURL;
           CACHEPANEL_STATE_DIR = stateDir;
           CACHEPANEL_HTTP_ADDR = cfg.listenAddress;
-          CACHEPANEL_REPOSITORY = cfg.repository;
+          CACHEPANEL_SOURCE_SEED = cfg.source.seed;
           CACHEPANEL_BRANCH = cfg.branch;
           CACHEPANEL_ADMIN_USER = cfg.admin.username;
           CACHEPANEL_ADMIN_PASSWORD_HASH = cfg.admin.passwordHash;
           CACHEPANEL_PUBLIC_URL = cfg.publicURL;
-          CACHEPANEL_PUBLISH_REMOTE = lib.mkIf publishing cfg.publish.remote;
-          CACHEPANEL_PUBLISH_KEY = lib.mkIf publishing "%d/publish-key";
+          CACHEPANEL_SSH_REMOTE = lib.mkIf (cfg.source.sshRemote != null) cfg.source.sshRemote;
+          CACHEPANEL_UPDATE_DIR = lib.mkIf (cfg.selfUpdate.flake != null) updateDir;
           CACHEPANEL_CACHE_DIR = cfg.cache.dir;
           CACHEPANEL_CACHE_KEY = "%d/cache-key";
           CACHEPANEL_MICROSOFT_CERTS = "${pkgs.sbctl.src}/certs/microsoft";
@@ -159,7 +174,7 @@ in
           Restart = "always";
           RestartSec = "5s";
           LimitNOFILE = 1048576;
-          LoadCredential = [ "cache-key:${cfg.cache.keyDir}/cache-priv.key" ] ++ lib.optional publishing "publish-key:${publishKey}";
+          LoadCredential = [ "cache-key:${cfg.cache.keyDir}/cache-priv.key" ];
           ReadWritePaths = [ cfg.cache.dir ];
           NoNewPrivileges = true;
           PrivateTmp = true;
@@ -183,29 +198,6 @@ in
       };
     }
 
-    (lib.mkIf (publishing && cfg.publish.keyFile == null) {
-      systemd.services.nixly-cachepanel-publish-key = {
-        description = "Generate the package wizard's deploy key";
-        wantedBy = [ "multi-user.target" ];
-        before = [ "nixly-cachepanel.service" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-        };
-        path = [ pkgs.openssh ];
-        script = ''
-          install -d -m 0700 ${dirOf generatedKey}
-          if [ ! -f ${generatedKey} ]; then
-            ssh-keygen -q -t ed25519 -N "" -C nixly-cachepanel -f ${generatedKey}
-          fi
-        '';
-      };
-
-      systemd.services.nixly-cachepanel = {
-        after = [ "nixly-cachepanel-publish-key.service" ];
-        requires = [ "nixly-cachepanel-publish-key.service" ];
-      };
-    })
 
     {
       systemd.tmpfiles.rules = [ "d ${cfg.cache.dir} 0755 cachepanel cachepanel -" ];
@@ -258,6 +250,73 @@ in
         '';
       };
       networking.firewall.allowedTCPPorts = [ 80 443 ];
+    })
+
+    (lib.mkIf (cfg.selfUpdate.flake != null) {
+      systemd.tmpfiles.rules = [ "d ${updateDir} 0755 cachepanel cachepanel -" ];
+
+      systemd.paths.nixly-cachepanel-update = {
+        description = "Watch for panel update requests";
+        wantedBy = [ "paths.target" ];
+        pathConfig.PathChanged = "${updateDir}/request.json";
+      };
+
+      systemd.services.nixly-cachepanel-update = {
+        description = "Rebuild the server for a new panel";
+        # The switch must not stop its own caller.
+        restartIfChanged = false;
+        environment = {
+          UPDATE_DIR = updateDir;
+          FLAKE = cfg.selfUpdate.flake;
+          HOST = cfg.selfUpdate.host;
+          INPUT = cfg.selfUpdate.input;
+          HEALTH_URL = "http://${cfg.listenAddress}/api/health";
+        };
+        serviceConfig = {
+          Type = "oneshot";
+          StateDirectory = "nixly-cachepanel-update";
+          ExecStart = lib.getExe (pkgs.writeShellApplication {
+            name = "nixly-cachepanel-update";
+            runtimeInputs = [
+              config.nix.package
+              config.services.postgresql.package
+              config.systemd.package
+              pkgs.coreutils
+              pkgs.curl
+              pkgs.findutils
+              pkgs.getent
+              pkgs.git
+              pkgs.gnugrep
+              pkgs.jq
+              pkgs.util-linux
+            ];
+            text = builtins.readFile ./self-update.sh;
+          });
+        };
+      };
+    })
+
+    (lib.mkIf config.services.openssh.enable {
+      environment.etc."ssh/nixly-panel" = {
+        mode = "0755";
+        text = ''
+          #!${pkgs.runtimeShell}
+          export CACHEPANEL_DATABASE_URL=${databaseURL} CACHEPANEL_STATE_DIR=${stateDir} CACHEPANEL_SSH_COMMAND=${sshCommand}
+          exec ${lib.getExe cfg.package} "$@"
+        '';
+      };
+
+      # Keys live in the panel; each may only run git.
+      services.openssh.extraConfig = ''
+        Match User cachepanel
+          AuthorizedKeysFile none
+          AuthorizedKeysCommand ${sshCommand} authorized-keys
+          AuthorizedKeysCommandUser cachepanel
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          PermitTTY no
+          DisableForwarding yes
+      '';
     })
   ]);
 }

@@ -23,6 +23,8 @@ import (
 	"cachepanel/release"
 	"cachepanel/repo"
 	"cachepanel/signing"
+	"cachepanel/source"
+	"cachepanel/update"
 	"cachepanel/watcher"
 	"cachepanel/wizard"
 )
@@ -48,35 +50,45 @@ func Run(ctx context.Context, cfg config.Config) error {
 	if err := auth.EnsureAdmin(ctx, db, cfg.AdminUser, cfg.AdminHash); err != nil {
 		return err
 	}
-	mirror, err := repo.Open(ctx, filepath.Join(cfg.StateDir, "nixlypkgs.git"), cfg.Repository, cfg.Branch)
+	origin, err := source.Open(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	mirror, err := repo.Open(ctx, filepath.Join(cfg.StateDir, "nixlypkgs.git"), origin.Dir(), cfg.Branch)
 	if err != nil {
 		return err
 	}
 	hub := realtime.NewHub()
-	releases := release.New(db, mirror)
+	releases := release.New(db, origin)
 	store, err := cache.Open(cfg.CacheDir, cfg.CacheKey)
 	if err != nil {
 		return err
 	}
 	signer := signing.NewStore(db, filepath.Join(cfg.StateDir, "signing"), cfg.MicrosoftCerts)
 	rebuilder := profiles.NewRebuilder(profiles.Deps{
-		DB: db, Hub: hub, Mirror: mirror, Cache: store, Signer: signer,
+		DB: db, Hub: hub, Mirror: mirror, Cache: store, Signer: signer, Source: origin,
 		ChecksDir: filepath.Join(cfg.StateDir, "checks"), PublicURL: cfg.PublicURL, Published: releases.Trigger,
 	})
 	files := builds.NewFiles(cfg.StateDir)
 	pool := builds.NewPool(db, hub, files, store, rebuilder.Trigger)
 	follow := watcher.New(db, hub, mirror, pool, files, rebuilder.Trigger)
 	lab := &wizard.Lab{Flake: headFlake(db, mirror), Uploads: wizard.NewUploads(filepath.Join(cfg.StateDir, "sources"), cfg.PublicURL)}
-	publisher := &wizard.Publisher{Mirror: mirror, Remote: cfg.PublishRemote, Key: cfg.PublishKey, Branch: cfg.Branch,
-		KnownHosts: filepath.Join(cfg.StateDir, "known_hosts")}
+	publisher := &wizard.Publisher{Mirror: mirror, Remote: origin.Dir(), Branch: cfg.Branch}
 	recipes := wizard.NewService(ctx, db, hub, lab, publisher, filepath.Join(cfg.StateDir, "recipes"), follow.Poke)
 	if err := recipes.Recover(ctx); err != nil {
+		return err
+	}
+	clones, err := origin.Handler()
+	if err != nil {
 		return err
 	}
 	panel := &app{
 		cfg: cfg, db: db, hub: hub, auth: auth.NewService(db), mirror: mirror, releases: releases, rebuilder: rebuilder,
 		pool: pool, watcher: follow, recipes: recipes, uploads: lab.Uploads, cache: store,
-		trust: &signing.Routes{Store: signer, Hub: hub},
+		trust:  &signing.Routes{Store: signer, Hub: hub},
+		source: &source.Routes{Repo: origin, Keys: source.Keys{DB: db}, Hub: hub, Poke: follow.Poke, Remote: cfg.SSHRemote},
+		clones: clones,
+		update: &update.Updater{DB: db, Hub: hub, Watcher: follow, Dir: cfg.UpdateDir},
 	}
 
 	group, ctx := errgroup.WithContext(ctx)
@@ -89,6 +101,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 			workers.Go(func() error { return follow.Run(ctx) })
 			workers.Go(func() error { return rebuilder.Run(ctx) })
 			workers.Go(func() error { return store.Run(ctx, liveRoots(pool, rebuilder)) })
+			workers.Go(func() error { return panel.update.Run(ctx) })
 			return workers.Wait()
 		})
 	})

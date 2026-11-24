@@ -4,7 +4,11 @@ import { api } from "@/api/http";
 export type Platform = "desktop" | "htpc" | "server";
 export type CheckState = "pending" | "running" | "passed" | "failed" | "skipped";
 export type Branch = "stable" | "testing";
-export type Kernel = "performance" | "enterprise";
+export type SettingKind = "build" | "boot" | "sysctl";
+
+export type KernelSetting = { title: string; description: string; kind: SettingKind; options: string[]; default: string };
+
+export type KernelOffer = { title: string; description: string; settings: Record<string, KernelSetting> };
 
 export type ProfileSummary = {
   id: number;
@@ -12,7 +16,8 @@ export type ProfileSummary = {
   title: string;
   description: string;
   platform: Platform;
-  kernel: Kernel;
+  kernel: string;
+  kernelSettings: Record<string, string>;
   pinnedSha: string | null;
   packageCount: number;
   moduleCount: number;
@@ -31,7 +36,6 @@ export type ProfileSummary = {
 };
 
 export type ProfileModule = {
-  id: number;
   slug: string;
   title: string;
   description: string;
@@ -51,9 +55,10 @@ export type ProfileSettings = {
   title: string;
   description: string;
   platform: Platform;
-  kernel: Kernel;
+  kernel: string;
+  kernelSettings: Record<string, string>;
   pinnedSha: string | null;
-  modules: number[];
+  modules: string[];
   packages: string[];
 };
 
@@ -63,6 +68,8 @@ export const testingAhead = (profile: ProfileSummary) =>
   profile.testingRev !== null && (profile.testingTree !== profile.stableTree || profile.testingRev !== profile.stableRev);
 
 export const profilesQuery = queryOptions({ queryKey: ["profiles"], queryFn: () => api<ProfileSummary[]>("/profiles") });
+
+export const kernelsQuery = queryOptions({ queryKey: ["kernels"], queryFn: () => api<Record<string, KernelOffer>>("/kernels") });
 
 export const profileQuery = (name: string) =>
   queryOptions({ queryKey: ["profile", name], queryFn: () => api<ProfileDetail>(`/profiles/${name}`) });

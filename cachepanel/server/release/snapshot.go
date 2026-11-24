@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"cachepanel/repo"
+	"cachepanel/source"
 )
 
 const reloadInterval = 30 * time.Second
@@ -78,13 +78,13 @@ type state struct {
 // Releases serves both branches from memory.
 type Releases struct {
 	db      *pgxpool.Pool
-	mirror  *repo.Mirror
+	origin  *source.Repo
 	current atomic.Pointer[state]
 	reload  chan struct{}
 }
 
-func New(db *pgxpool.Pool, mirror *repo.Mirror) *Releases {
-	r := &Releases{db: db, mirror: mirror, reload: make(chan struct{}, 1)}
+func New(db *pgxpool.Pool, origin *source.Repo) *Releases {
+	r := &Releases{db: db, origin: origin, reload: make(chan struct{}, 1)}
 	r.current.Store(&state{pointers: map[pointerKey]Entry{}, archives: map[string][]byte{}})
 	return r
 }
@@ -137,7 +137,7 @@ func (r *Releases) load(ctx context.Context) error {
 		s.Stable, s.Testing = rel[0].live(), rel[1].live()
 		summaries = append(summaries, s)
 		for i, branch := range branches {
-			if err := next.add(s, branch, rel[i], r.mirror); err != nil {
+			if err := next.add(s, branch, rel[i], r.origin); err != nil {
 				return err
 			}
 		}
@@ -154,13 +154,13 @@ func (r *Releases) load(ctx context.Context) error {
 }
 
 // add serves one branch's release.
-func (s *state) add(profile summary, branch Branch, rel released, mirror *repo.Mirror) error {
+func (s *state) add(profile summary, branch Branch, rel released, origin *source.Repo) error {
 	if !rel.live() {
 		return nil
 	}
 	entry, err := encode(Pointer{
 		Profile: profile.Name, Title: profile.Title, Platform: profile.Platform, Branch: branch,
-		Rev: rel.rev, Source: mirror.Source(rel.rev), Tree: rel.tree, Path: "/api/v1/trees/" + rel.tree + ".tar.gz",
+		Rev: rel.rev, Source: origin.Source(rel.rev), Tree: rel.tree, Path: "/api/v1/trees/" + rel.tree + ".tar.gz",
 		Published: rel.at,
 	})
 	s.pointers[pointerKey{profile.Name, branch}] = entry

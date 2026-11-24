@@ -1,7 +1,6 @@
 package wizard
 
 import (
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,7 +37,7 @@ func TestPublish(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	publisher := &Publisher{Mirror: mirror, Remote: remote, Key: "unused", Branch: "main", KnownHosts: filepath.Join(t.TempDir(), "known_hosts")}
+	publisher := &Publisher{Mirror: mirror, Remote: remote, Branch: "main"}
 	files := map[string][]byte{"default.nix": []byte("{ }\n"), "PKGBUILD": []byte("pkgname=demo\n")}
 	sha, err := publisher.Publish(t.Context(), "demo", "1.0", files)
 	if err != nil {
@@ -55,21 +54,5 @@ func TestPublish(t *testing.T) {
 	}
 	if subject := git(t, remote, "log", "-1", "--format=%s", "main"); subject != "demo: 1.0" {
 		t.Fatalf("subject = %q", subject)
-	}
-}
-
-func TestPublicKey(t *testing.T) {
-	key := filepath.Join(t.TempDir(), "id")
-	cmd := exec.CommandContext(t.Context(), "ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", key)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Skipf("ssh-keygen: %v %s", err, out)
-	}
-	publisher := &Publisher{Remote: "git@github.com:a/b.git", Key: key}
-	got, err := publisher.PublicKey(t.Context())
-	if err != nil || !strings.HasPrefix(got, "ssh-ed25519 ") {
-		t.Fatalf("PublicKey = %q, %v", got, err)
-	}
-	if _, err := (&Publisher{}).PublicKey(t.Context()); !errors.Is(err, errNoRemote) {
-		t.Fatalf("unconfigured: %v", err)
 	}
 }

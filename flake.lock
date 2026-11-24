@@ -324,32 +324,6 @@
         "url": "https://cache.aceclan.no/api/v1/ca.pem"
       }
     },
-    "nixlyos-kernel": {
-      "inputs": {
-        "cachy-config": "cachy-config",
-        "cachy-patches": "cachy-patches",
-        "linux-src": "linux-src",
-        "linux-vanilla": "linux-vanilla",
-        "msi-ec": "msi-ec",
-        "nixlyos-ca": "nixlyos-ca",
-        "nixpkgs": "nixpkgs_3",
-        "xone": "xone",
-        "xpadneo": "xpadneo"
-      },
-      "locked": {
-        "lastModified": 1795541536,
-        "narHash": "sha256-s94j8sXoVNqqbtodlI9PGa6GWCsULGfgfOo8IqSIPWE=",
-        "owner": "aCeTotal",
-        "repo": "kernel_nixlyos",
-        "rev": "af1723dfa460c206291dc5b856804aef9acfd402",
-        "type": "github"
-      },
-      "original": {
-        "owner": "aCeTotal",
-        "repo": "kernel_nixlyos",
-        "type": "github"
-      }
-    },
     "nixos-hardware": {
       "inputs": {
         "nixpkgs": "nixpkgs_4"
@@ -518,18 +492,26 @@
     },
     "root": {
       "inputs": {
+        "cachy-config": "cachy-config",
+        "cachy-patches": "cachy-patches",
         "codeindexcache_src": "codeindexcache_src",
         "determinate-nix": "determinate-nix",
         "home-manager": "home-manager",
+        "kernel-nixpkgs": "nixpkgs_3",
         "lanzaboote": "lanzaboote",
+        "linux-src": "linux-src",
+        "linux-vanilla": "linux-vanilla",
         "mnw": "mnw",
+        "msi-ec": "msi-ec",
         "nixly_launcher_src": "nixly_launcher_src",
         "nixly_voice_src": "nixly_voice_src",
-        "nixlyos-kernel": "nixlyos-kernel",
+        "nixlyos-ca": "nixlyos-ca",
         "nixos-hardware": "nixos-hardware",
         "nixos-stable": "nixos-stable",
         "nixpkgs": "nixpkgs_5",
-        "totalvim": "totalvim"
+        "totalvim": "totalvim",
+        "xone": "xone",
+        "xpadneo": "xpadneo"
       }
     },
     "rust-overlay": {

@@ -23,8 +23,9 @@ function settingsOf({ profile, modules, packages }: ProfileDetail): ProfileSetti
     description: profile.description,
     platform: profile.platform,
     kernel: profile.kernel,
+    kernelSettings: profile.kernelSettings,
     pinnedSha: profile.pinnedSha,
-    modules: modules.filter((module) => module.selected && !module.required).map((module) => module.id),
+    modules: modules.filter((module) => module.selected && !module.required).map((module) => module.slug),
     packages,
   };
 }

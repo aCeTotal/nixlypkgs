@@ -10,6 +10,7 @@ import (
 
 const (
 	pinsFile    = "pins.nix"
+	modulesFile = "modules.nix"
 	signingFile = "signing.nix"
 )
 

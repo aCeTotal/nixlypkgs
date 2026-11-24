@@ -1,0 +1,51 @@
+--- a/drivers/hid/hid-microsoft.c
++++ b/drivers/hid/hid-microsoft.c
+@@ -424,6 +424,7 @@
+ 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, 0x091B),
+ 		.driver_data = MS_SURFACE_DIAL },
+ 
++#if !IS_ENABLED(CONFIG_HID_XPADNEO)
+ 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1708),
+ 		.driver_data = MS_QUIRK_FF },
+ 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1708_BLE),
+@@ -434,6 +435,7 @@
+ 		.driver_data = MS_QUIRK_FF },
+ 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_MS_XBOX_CONTROLLER_MODEL_1797_BLE),
+ 		.driver_data = MS_QUIRK_FF },
++#endif
+ 	{ HID_BLUETOOTH_DEVICE(USB_VENDOR_ID_MICROSOFT, USB_DEVICE_ID_8BITDO_SN30_PRO_PLUS),
+ 		.driver_data = MS_QUIRK_FF },
+ 	{ }
+--- a/drivers/hid/Kconfig
++++ b/drivers/hid/Kconfig
+@@ -1522,6 +1522,8 @@
+ 	  Support for huawei cd30 keyboard or other hid devices
+ 	  that need fix-ups to work properly.
+ 
++source "drivers/hid/xpadneo/Kconfig"
++
+ endmenu
+ 
+ source "drivers/hid/bpf/Kconfig"
+--- a/drivers/hid/Makefile
++++ b/drivers/hid/Makefile
+@@ -156,6 +156,7 @@
+ obj-$(CONFIG_HID_XINMO)		+= hid-xinmo.o
+ obj-$(CONFIG_HID_ZEROPLUS)	+= hid-zpff.o
+ obj-$(CONFIG_HID_ZYDACRON)	+= hid-zydacron.o
++obj-$(CONFIG_HID_XPADNEO)	+= xpadneo/
+ obj-$(CONFIG_HID_VIEWSONIC)	+= hid-viewsonic.o
+ obj-$(CONFIG_HID_VRC2)		+= hid-vrc2.o
+ obj-$(CONFIG_HID_HUAWEI)	+= hid-huawei.o
+--- a/drivers/hid/xpadneo/Kconfig
++++ b/drivers/hid/xpadneo/Kconfig
+@@ -0,0 +1,9 @@
++# SPDX-License-Identifier: GPL-2.0-only
++config HID_XPADNEO
++	tristate "Xbox controllers over Bluetooth (xpadneo)"
++	depends on HID && INPUT && POWER_SUPPLY
++	select INPUT_FF_MEMLESS
++	help
++	  Xbox One, Series and Elite controllers over Bluetooth with
++	  rumble, trigger rumble, paddles and battery, in place of
++	  hid-microsoft for them.

@@ -1,0 +1,46 @@
+--- a/drivers/input/joystick/Kconfig
++++ b/drivers/input/joystick/Kconfig
+@@ -422,4 +422,6 @@
+ 	  To compile this driver as a module, choose M here: the module will be
+ 	  called adafruit-seesaw.
+ 
++source "drivers/input/joystick/xone/Kconfig"
++
+ endif
+--- a/drivers/input/joystick/Makefile
++++ b/drivers/input/joystick/Makefile
+@@ -40,4 +40,5 @@
+ obj-$(CONFIG_JOYSTICK_WARRIOR)		+= warrior.o
+ obj-$(CONFIG_JOYSTICK_WALKERA0701)	+= walkera0701.o
+ obj-$(CONFIG_JOYSTICK_XPAD)		+= xpad.o
++obj-$(CONFIG_JOYSTICK_XONE)		+= xone/
+ obj-$(CONFIG_JOYSTICK_ZHENHUA)		+= zhenhua.o
+--- a/drivers/input/joystick/xone/Kconfig
++++ b/drivers/input/joystick/xone/Kconfig
+@@ -0,0 +1,12 @@
++# SPDX-License-Identifier: GPL-2.0-only
++config JOYSTICK_XONE
++	tristate "Xbox One and Series controllers (xone)"
++	depends on USB && INPUT && SND && CFG80211
++	select CRYPTO_RSA
++	select CRYPTO_ECDH
++	select CRYPTO_SHA256
++	select INPUT_FF_MEMLESS
++	select SND_PCM
++	help
++	  Drives the Xbox wireless dongle, wired controllers and headsets
++	  that speak the Gaming Input Protocol, in place of xpad.
+--- a/drivers/input/joystick/xpad.c
++++ b/drivers/input/joystick/xpad.c
+@@ -2122,8 +2122,10 @@
+ 	}
+ 
+ 	if (xpad->xtype == XTYPE_XBOXONE &&
+-	    intf->cur_altsetting->desc.bInterfaceNumber != GIP_WIRED_INTF_DATA) {
++	    (IS_ENABLED(CONFIG_JOYSTICK_XONE) ||
++	     intf->cur_altsetting->desc.bInterfaceNumber != GIP_WIRED_INTF_DATA)) {
+ 		/*
++		 * xone drives every GIP device when it is built.
+ 		 * The Xbox One controller lists three interfaces all with the
+ 		 * same interface class, subclass and protocol. Differentiate by
+ 		 * interface number.

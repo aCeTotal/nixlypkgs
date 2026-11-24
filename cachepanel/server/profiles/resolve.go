@@ -28,17 +28,15 @@ func loadReady(ctx context.Context, db *pgxpool.Pool) (string, error) {
 
 func loadSpecs(ctx context.Context, db *pgxpool.Pool) ([]Spec, error) {
 	rows, err := db.Query(ctx, `
-		SELECT p.id, p.name, p.platform, p.kernel, coalesce(p.pinned_sha, ''), p.packages,
-			coalesce((SELECT json_agg(json_build_object('slug', m.slug, 'source', m.source) ORDER BY m.position)
-				FROM modules m WHERE m.required
-					OR EXISTS (SELECT 1 FROM profile_modules pm WHERE pm.profile_id = p.id AND pm.module_id = m.id)), '[]')
+		SELECT p.id, p.name, p.platform, p.kernel, p.kernel_settings, coalesce(p.pinned_sha, ''), p.packages,
+			coalesce((SELECT array_agg(pm.slug ORDER BY pm.slug) FROM profile_modules pm WHERE pm.profile_id = p.id), '{}')
 		FROM profiles p ORDER BY p.id`)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Spec, error) {
 		var spec Spec
-		err := row.Scan(&spec.ID, &spec.Name, &spec.Platform, &spec.Kernel, &spec.Pinned, &spec.Packages, &spec.Modules)
+		err := row.Scan(&spec.ID, &spec.Name, &spec.Platform, &spec.Kernel, &spec.KernelSettings, &spec.Pinned, &spec.Packages, &spec.Modules)
 		return spec, err
 	})
 }

@@ -17,11 +17,9 @@ var (
 	namePattern  = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
 	attrPattern  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_'-]*(\.[A-Za-z_][A-Za-z0-9_'-]*)*$`)
 	platforms    = map[string]bool{"desktop": true, "htpc": true, "server": true}
-	kernels      = map[string]bool{"performance": true, "enterprise": true}
 	errName      = rest.Unprocessable("invalid_name", "The ID may only contain lowercase letters, digits and hyphens (max 32)")
 	errTitle     = rest.Unprocessable("invalid_title", "The name needs 1–80 characters")
 	errPlatform  = rest.Unprocessable("invalid_platform", "Unknown platform")
-	errKernel    = rest.Unprocessable("invalid_kernel", "Unknown kernel")
 	errPackage   = rest.Unprocessable("invalid_package", "Invalid package – use e.g. blender or python3Packages.numpy")
 	errPinnedRev = rest.Unprocessable("invalid_revision", "That revision is not evaluated")
 )
@@ -63,18 +61,16 @@ func (b *Rebuilder) create(w http.ResponseWriter, r *http.Request) error {
 
 type settings struct {
 	identity
-	Kernel   string   `json:"kernel"`
-	Pinned   *string  `json:"pinnedSha"`
-	Modules  []int64  `json:"modules"`
-	Packages []string `json:"packages"`
+	Kernel         string            `json:"kernel"`
+	KernelSettings map[string]string `json:"kernelSettings"`
+	Pinned         *string           `json:"pinnedSha"`
+	Modules        []string          `json:"modules"`
+	Packages       []string          `json:"packages"`
 }
 
 func (s settings) validate() error {
 	if err := s.identity.validate(); err != nil {
 		return err
-	}
-	if !kernels[s.Kernel] {
-		return errKernel
 	}
 	for _, pkg := range s.Packages {
 		if !attrPattern.MatchString(pkg) {
@@ -92,7 +88,14 @@ func (b *Rebuilder) update(w http.ResponseWriter, r *http.Request) error {
 	if err := req.validate(); err != nil {
 		return err
 	}
-	err := pgx.BeginFunc(r.Context(), b.DB, func(tx pgx.Tx) error {
+	entries, err := b.moduleCatalogue(r.Context())
+	if err != nil {
+		return err
+	}
+	if err := checkModules(entries, req.Modules); err != nil {
+		return err
+	}
+	err = pgx.BeginFunc(r.Context(), b.DB, func(tx pgx.Tx) error {
 		return save(r.Context(), tx, chi.URLParam(r, "name"), req)
 	})
 	if err != nil {
@@ -110,21 +113,24 @@ func save(ctx context.Context, tx pgx.Tx, current string, req settings) error {
 			return errPinnedRev
 		}
 	}
-	var id int64
-	err := tx.QueryRow(ctx, `
-		UPDATE profiles SET name = $2, title = $3, description = $4, platform = $5, pinned_sha = $6,
-			packages = $7, kernel = $8, updated_at = now()
-		WHERE name = $1 RETURNING id`,
-		current, req.Name, req.Title, req.Description, req.Platform, req.Pinned, uniq(req.Packages), req.Kernel).Scan(&id)
+	kernel, err := chooseKernel(ctx, tx, req)
 	if err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM profile_modules WHERE profile_id = $1 AND module_id <> ALL($2)`, id, req.Modules); err != nil {
+	var id int64
+	err = tx.QueryRow(ctx, `
+		UPDATE profiles SET name = $2, title = $3, description = $4, platform = $5, pinned_sha = $6,
+			packages = $7, kernel = $8, kernel_settings = $9, updated_at = now()
+		WHERE name = $1 RETURNING id`,
+		current, req.Name, req.Title, req.Description, req.Platform, req.Pinned, uniq(req.Packages), req.Kernel, kernel).Scan(&id)
+	if err != nil {
 		return err
 	}
-	// Required modules are implicit.
+	if _, err := tx.Exec(ctx, `DELETE FROM profile_modules WHERE profile_id = $1 AND slug <> ALL($2)`, id, req.Modules); err != nil {
+		return err
+	}
 	_, err = tx.Exec(ctx, `
-		INSERT INTO profile_modules (profile_id, module_id) SELECT $1, id FROM modules WHERE id = ANY($2) AND NOT required
+		INSERT INTO profile_modules (profile_id, slug) SELECT $1, unnest($2::text[])
 		ON CONFLICT DO NOTHING`, id, req.Modules)
 	return err
 }
@@ -143,15 +149,15 @@ func (b *Rebuilder) clone(w http.ResponseWriter, r *http.Request) error {
 	err := pgx.BeginFunc(r.Context(), b.DB, func(tx pgx.Tx) error {
 		var id int64
 		err := tx.QueryRow(r.Context(), `
-			INSERT INTO profiles (name, title, description, platform, pinned_sha, packages, kernel)
-			SELECT $2, $3, description, platform, pinned_sha, packages, kernel FROM profiles WHERE name = $1
+			INSERT INTO profiles (name, title, description, platform, pinned_sha, packages, kernel, kernel_settings)
+			SELECT $2, $3, description, platform, pinned_sha, packages, kernel, kernel_settings FROM profiles WHERE name = $1
 			RETURNING id`, chi.URLParam(r, "name"), req.Name, req.Title).Scan(&id)
 		if err != nil {
 			return err
 		}
 		_, err = tx.Exec(r.Context(), `
-			INSERT INTO profile_modules (profile_id, module_id)
-			SELECT $1, module_id FROM profile_modules WHERE profile_id = (SELECT id FROM profiles WHERE name = $2)`,
+			INSERT INTO profile_modules (profile_id, slug)
+			SELECT $1, slug FROM profile_modules WHERE profile_id = (SELECT id FROM profiles WHERE name = $2)`,
 			id, chi.URLParam(r, "name"))
 		return err
 	})

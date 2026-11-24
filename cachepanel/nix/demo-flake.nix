@@ -26,6 +26,13 @@
       packages.${system} = {
         hello-demo = demo "hello-demo" 3;
         clock-demo = demo "clock-demo" 8;
+        # Stands in for a newer panel.
+        cachepanel = derivation {
+          name = "cachepanel-demo";
+          inherit system;
+          builder = "/bin/sh";
+          args = [ "-c" "echo panel > $out" ];
+        };
         steady-demo = derivation {
           name = "steady-demo";
           inherit system;
@@ -36,6 +43,19 @@
 
       lib.nixlyos = {
         pinnable = _: [ "hello-demo" "clock-demo" ];
+        kernels = _: {
+          performance = {
+            title = "Performance";
+            description = "Demo kernel.";
+            settings.tickRate = {
+              title = "Timer frequency";
+              description = "Ticks per second.";
+              kind = "build";
+              options = [ "300" "1000" ];
+              default = "1000";
+            };
+          };
+        };
         pkgs = system: packageSet.lib.nixlyos.pkgs system;
         nixpkgs = system: packageSet.lib.nixlyos.nixpkgs system;
       };

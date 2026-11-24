@@ -1,0 +1,500 @@
+--- a/arch/x86/include/uapi/asm/setup_data.h
++++ b/arch/x86/include/uapi/asm/setup_data.h
+@@ -14,7 +14,8 @@
+ #define SETUP_IMA			8
+ #define SETUP_RNG_SEED			9
+ #define SETUP_KEXEC_KHO			10
+-#define SETUP_ENUM_MAX			SETUP_KEXEC_KHO
++#define SETUP_HIBERNATE_KEY		11
++#define SETUP_ENUM_MAX			SETUP_HIBERNATE_KEY
+ 
+ #define SETUP_INDIRECT			(1<<31)
+ #define SETUP_TYPE_MAX			(SETUP_ENUM_MAX | SETUP_INDIRECT)
+--- a/arch/x86/kernel/setup.c
++++ b/arch/x86/kernel/setup.c
+@@ -26,6 +26,7 @@
+ #include <linux/static_call.h>
+ #include <linux/sysfb.h>
+ #include <linux/swiotlb.h>
++#include <linux/suspend.h>
+ #include <linux/tboot.h>
+ #include <linux/usb/xhci-dbgp.h>
+ #include <linux/vmalloc.h>
+@@ -517,6 +518,13 @@ static void __init parse_setup_data(void)
+ 			memzero_explicit(&data->len, sizeof(data->len));
+ 			early_memunmap(data, data_len);
+ 			break;
++		case SETUP_HIBERNATE_KEY:
++			data = early_memremap(pa_data, data_len);
++			hibernate_auth_set_key(data->data, data->len);
++			memzero_explicit(data->data, data->len);
++			memzero_explicit(&data->len, sizeof(data->len));
++			early_memunmap(data, data_len);
++			break;
+ 		default:
+ 			break;
+ 		}
+--- a/drivers/firmware/efi/libstub/x86-stub.c
++++ b/drivers/firmware/efi/libstub/x86-stub.c
+@@ -472,6 +472,53 @@ static efi_char16_t *efistub_fw_vendor(void)
+ 	return (efi_char16_t *)vendor;
+ }
+ 
++
++#define HIBERNATE_KEY_SIZE 32
++
++static const efi_char16_t hibernate_key_name[] = L"NixlyHibernateKey";
++static const efi_guid_t hibernate_key_guid =
++	EFI_GUID(0x3b0a8e5c, 0x7f2d, 0x4c51, 0x9a, 0x6e, 0x1d, 0x52, 0xc4, 0x8b, 0x37, 0xe0);
++
++/* Readable only before ExitBootServices(). */
++static void setup_hibernate_key(struct boot_params *boot_params)
++{
++	const u32 attr = EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS;
++	unsigned long size = HIBERNATE_KEY_SIZE;
++	struct setup_data *new;
++	efi_status_t status;
++	u32 found = 0;
++
++	status = efi_bs_call(allocate_pool, EFI_LOADER_DATA,
++			     sizeof(*new) + HIBERNATE_KEY_SIZE, (void **)&new);
++	if (status != EFI_SUCCESS)
++		return;
++
++	status = get_efi_var(hibernate_key_name, &hibernate_key_guid, &found,
++			     &size, new->data);
++	if (status == EFI_BUFFER_TOO_SMALL ||
++	    (status == EFI_SUCCESS && (found != attr || size != HIBERNATE_KEY_SIZE))) {
++		/* Runtime-visible keys are worthless. */
++		set_efi_var(hibernate_key_name, &hibernate_key_guid, found, 0, NULL);
++		status = EFI_NOT_FOUND;
++	}
++	if (status != EFI_SUCCESS) {
++		status = efi_get_random_bytes(HIBERNATE_KEY_SIZE, new->data);
++		if (status == EFI_SUCCESS)
++			status = set_efi_var(hibernate_key_name, &hibernate_key_guid,
++					     attr, HIBERNATE_KEY_SIZE, new->data);
++	}
++	if (status != EFI_SUCCESS) {
++		memset(new->data, 0, HIBERNATE_KEY_SIZE);
++		efi_bs_call(free_pool, new);
++		return;
++	}
++
++	new->type = SETUP_HIBERNATE_KEY;
++	new->len  = HIBERNATE_KEY_SIZE;
++	new->next = boot_params->hdr.setup_data;
++	boot_params->hdr.setup_data = (unsigned long)new;
++}
++
+ static const efi_char16_t apple[] = L"Apple";
+ 
+ static void setup_quirks(struct boot_params *boot_params)
+@@ -1021,6 +1068,9 @@ void __noreturn efi_stub_entry(efi_handle_t handle,
+ 
+ 	setup_quirks(boot_params);
+ 
++	if (IS_ENABLED(CONFIG_HIBERNATION))
++		setup_hibernate_key(boot_params);
++
+ 	setup_unaccepted_memory();
+ 
+ 	status = exit_boot(boot_params, handle);
+--- a/include/linux/suspend.h
++++ b/include/linux/suspend.h
+@@ -393,6 +393,7 @@ extern void hibernation_set_ops(const struct platform_hibernation_ops *ops);
+ extern int hibernate(void);
+ extern bool system_entering_hibernation(void);
+ extern bool hibernation_available(void);
++extern void hibernate_auth_set_key(const u8 *key, u32 len);
+ asmlinkage int swsusp_save(void);
+ extern struct pbe *restore_pblist;
+ int pfn_is_nosave(unsigned long pfn);
+@@ -412,6 +413,7 @@ static inline void hibernation_set_ops(const struct platform_hibernation_ops *op
+ static inline int hibernate(void) { return -ENOSYS; }
+ static inline bool system_entering_hibernation(void) { return false; }
+ static inline bool hibernation_available(void) { return false; }
++static inline void hibernate_auth_set_key(const u8 *key, u32 len) {}
+ 
+ static inline int hibernate_quiet_exec(int (*func)(void *data), void *data) {
+ 	return -ENOTSUPP;
+--- a/kernel/power/Makefile
++++ b/kernel/power/Makefile
+@@ -14,7 +14,7 @@ obj-$(CONFIG_VT_CONSOLE_SLEEP)	+= console.o
+ obj-$(CONFIG_FREEZER)		+= process.o
+ obj-$(CONFIG_SUSPEND)		+= suspend.o
+ obj-$(CONFIG_PM_TEST_SUSPEND)	+= suspend_test.o
+-obj-$(CONFIG_HIBERNATION)	+= hibernate.o snapshot.o swap.o
++obj-$(CONFIG_HIBERNATION)	+= hibernate.o snapshot.o swap.o auth.o
+ obj-$(CONFIG_HIBERNATION_SNAPSHOT_DEV) += user.o
+ obj-$(CONFIG_PM_AUTOSLEEP)	+= autosleep.o
+ obj-$(CONFIG_PM_WAKELOCKS)	+= wakelock.o
+--- /dev/null
++++ b/kernel/power/auth.c
+@@ -0,0 +1,71 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <crypto/sha2.h>
++#include <crypto/utils.h>
++#include <linux/init.h>
++#include <linux/string.h>
++#include <linux/suspend.h>
++
++#include "power.h"
++
++/* Never written to the image. */
++static u8 hibernate_key[SHA256_DIGEST_SIZE] __nosavedata;
++static bool hibernate_key_set __nosavedata;
++
++/* Empty on disk; resume fills it. */
++static struct hibernate_key_slot hibernate_slot = { .magic = HIBERNATE_SLOT_MAGIC };
++
++void __init hibernate_auth_set_key(const u8 *key, u32 len)
++{
++	if (len != sizeof(hibernate_key))
++		return;
++	memcpy(hibernate_key, key, len);
++	hibernate_key_set = true;
++}
++
++bool hibernate_auth_available(void)
++{
++	return hibernate_key_set;
++}
++
++void hibernate_auth_init(struct hmac_sha256_ctx *ctx)
++{
++	struct hmac_sha256_key key;
++
++	hmac_sha256_preparekey(&key, hibernate_key, sizeof(hibernate_key));
++	hmac_sha256_init(ctx, &key);
++	memzero_explicit(&key, sizeof(key));
++}
++
++bool hibernate_auth_verify(struct hmac_sha256_ctx *ctx, const u8 *mac)
++{
++	u8 computed[SHA256_DIGEST_SIZE];
++	bool valid;
++
++	hmac_sha256_final(ctx, computed);
++	valid = !crypto_memneq(computed, mac, sizeof(computed));
++	memzero_explicit(computed, sizeof(computed));
++	return valid;
++}
++
++phys_addr_t hibernate_auth_slot(void)
++{
++	return __pa_symbol(&hibernate_slot);
++}
++
++void hibernate_auth_fill(struct hibernate_key_slot *slot)
++{
++	slot->magic = HIBERNATE_SLOT_MAGIC;
++	memcpy(slot->key, hibernate_key, sizeof(slot->key));
++	slot->filled = true;
++}
++
++/* KASLR moved the nosave copy. */
++void hibernate_auth_resumed(void)
++{
++	if (hibernate_slot.filled) {
++		memcpy(hibernate_key, hibernate_slot.key, sizeof(hibernate_key));
++		hibernate_key_set = true;
++	}
++	memzero_explicit(hibernate_slot.key, sizeof(hibernate_slot.key));
++	hibernate_slot.filled = false;
++}
+--- a/kernel/power/hibernate.c
++++ b/kernel/power/hibernate.c
+@@ -109,7 +109,8 @@ bool hibernation_in_progress(void)
+ bool hibernation_available(void)
+ {
+ 	return nohibernate == 0 &&
+-		!security_locked_down(LOCKDOWN_HIBERNATION) &&
++		(hibernate_auth_available() ||
++		 !security_locked_down(LOCKDOWN_HIBERNATION)) &&
+ 		!secretmem_active() && !cxl_mem_active();
+ }
+ 
+@@ -364,6 +365,7 @@ static int create_image(int platform_mode)
+ 
+ 	if (!in_suspend) {
+ 		events_check_enabled = false;
++		hibernate_auth_resumed();
+ 		clear_or_poison_free_pages();
+ 	}
+ 
+--- a/kernel/power/power.h
++++ b/kernel/power/power.h
+@@ -7,6 +7,7 @@
+ #include <linux/cpu.h>
+ #include <linux/cpuidle.h>
+ #include <linux/crypto.h>
++#include <crypto/sha2.h>
+ 
+ struct swsusp_info {
+ 	struct new_utsname	uts;
+@@ -16,6 +17,7 @@ struct swsusp_info {
+ 	unsigned long		image_pages;
+ 	unsigned long		pages;
+ 	unsigned long		size;
++	u64			key_slot;
+ } __aligned(PAGE_SIZE);
+ 
+ #if defined(CONFIG_SUSPEND) || defined(CONFIG_HIBERNATION)
+@@ -195,6 +197,27 @@ extern int swsusp_swap_in_use(void);
+  */
+ #define SF_COMPRESSION_ALG_LZ4	16
+ 
++/* Image carries HMAC-SHA256 tag */
++#define SF_HMAC_MODE	32
++
++extern bool hibernate_auth_available(void);
++extern void hibernate_auth_init(struct hmac_sha256_ctx *ctx);
++extern bool hibernate_auth_verify(struct hmac_sha256_ctx *ctx, const u8 *mac);
++
++#define HIBERNATE_SLOT_MAGIC	0x4e69786c794b6579ULL
++
++/* Carries the key across resume. */
++struct hibernate_key_slot {
++	u64 magic;
++	u8 key[SHA256_DIGEST_SIZE];
++	bool filled;
++} __aligned(64);
++
++extern phys_addr_t hibernate_auth_slot(void);
++extern void hibernate_auth_fill(struct hibernate_key_slot *slot);
++extern void hibernate_auth_resumed(void);
++extern int snapshot_hand_over_key(void);
++
+ /* kernel/power/hibernate.c */
+ int swsusp_check(bool exclusive);
+ extern void swsusp_free(void);
+--- a/kernel/power/snapshot.c
++++ b/kernel/power/snapshot.c
+@@ -149,6 +149,9 @@ void __init hibernate_image_size_init(void)
+  */
+ struct pbe *restore_pblist;
+ 
++/* The image kernel's key slot. */
++static phys_addr_t restore_key_slot;
++
+ /* struct linked_page is used to build chains of pages */
+ 
+ #define LINKED_PAGE_DATA_SIZE	(PAGE_SIZE - sizeof(void *))
+@@ -2185,6 +2188,7 @@ static int init_header(struct swsusp_info *info)
+ 	info->pages = snapshot_get_image_size();
+ 	info->size = info->pages;
+ 	info->size <<= PAGE_SHIFT;
++	info->key_slot = hibernate_auth_slot();
+ 	return init_header_complete(info);
+ }
+ 
+@@ -2340,6 +2344,7 @@ static int load_header(struct swsusp_info *info)
+ 	restore_pblist = NULL;
+ 	error = check_header(info);
+ 	if (!error) {
++		restore_key_slot = info->key_slot;
+ 		nr_copy_pages = info->image_pages;
+ 		nr_meta_pages = info->pages - info->image_pages - 1;
+ 	}
+@@ -2706,6 +2711,34 @@ static int prepare_image(struct memory_bitmap *new_bm, struct memory_bitmap *bm,
+ 	return error;
+ }
+ 
++
++/* Writes the key into the verified image. */
++int snapshot_hand_over_key(void)
++{
++	struct hibernate_key_slot slot;
++	unsigned long pfn = PHYS_PFN(restore_key_slot);
++	struct pbe *pbe;
++	void *page;
++	int error;
++
++	if (!pfn_valid(pfn) || PageHighMem(pfn_to_page(pfn)) ||
++	    offset_in_page(restore_key_slot) + sizeof(slot) > PAGE_SIZE)
++		return -EINVAL;
++	page = page_address(pfn_to_page(pfn));
++	for (pbe = restore_pblist; pbe; pbe = pbe->next) {
++		if (pbe->orig_address == page) {
++			page = pbe->address;
++			break;
++		}
++	}
++	error = hibernate_restore_unprotect_page(page);
++	if (error)
++		return error;
++	hibernate_auth_fill(&slot);
++	memcpy(page + offset_in_page(restore_key_slot), &slot, sizeof(slot));
++	memzero_explicit(&slot, sizeof(slot));
++	return hibernate_restore_protect_page(page);
++}
+ /*
+  * get_buffer - Get the address to store the next image data page.
+  *
+--- a/kernel/power/swap.c
++++ b/kernel/power/swap.c
+@@ -28,6 +28,7 @@
+ #include <linux/cpumask.h>
+ #include <linux/atomic.h>
+ #include <linux/kthread.h>
++#include <crypto/sha2.h>
+ #include <linux/crc32.h>
+ #include <linux/ktime.h>
+ 
+@@ -98,11 +99,14 @@ struct swap_map_handle {
+ 	unsigned int k;
+ 	unsigned long reqd_free_pages;
+ 	u32 crc32;
++	bool authenticated;
++	struct hmac_sha256_ctx hmac;
+ };
+ 
+ struct swsusp_header {
+ 	char reserved[PAGE_SIZE - 20 - sizeof(sector_t) - sizeof(int) -
+-	              sizeof(u32) - sizeof(u32)];
++	              sizeof(u32) - sizeof(u32) - SHA256_DIGEST_SIZE];
++	u8	hmac[SHA256_DIGEST_SIZE];
+ 	u32	hw_sig;
+ 	u32	crc32;
+ 	sector_t image;
+@@ -316,6 +320,8 @@ static int mark_swapfiles(struct swap_map_handle *handle, unsigned int flags)
+ 		swsusp_header->flags = flags;
+ 		if (flags & SF_CRC32_MODE)
+ 			swsusp_header->crc32 = handle->crc32;
++		if (flags & SF_HMAC_MODE)
++			hmac_sha256_final(&handle->hmac, swsusp_header->hmac);
+ 		error = hib_submit_io_sync(REQ_OP_WRITE | REQ_SYNC,
+ 				      swsusp_resume_block, swsusp_header);
+ 	} else {
+@@ -579,6 +585,7 @@ struct crc_data {
+ 	wait_queue_head_t go;                     /* start crc update */
+ 	wait_queue_head_t done;                   /* crc update done */
+ 	u32 *crc32;                               /* points to handle's crc32 */
++	struct hmac_sha256_ctx *hmac;             /* handle's HMAC, if authenticated */
+ 	size_t **unc_len;			  /* uncompressed lengths */
+ 	unsigned char *unc[];			  /* uncompressed data */
+ };
+@@ -633,6 +640,8 @@ static int crc32_threadfn(void *data)
+ 		for (i = 0; i < d->run_threads; i++)
+ 			*d->crc32 = crc32_le(*d->crc32,
+ 			                     d->unc[i], *d->unc_len[i]);
++		for (i = 0; d->hmac && i < d->run_threads; i++)
++			hmac_sha256_update(d->hmac, d->unc[i], *d->unc_len[i]);
+ 		atomic_set_release(&d->stop, 1);
+ 		wake_up(&d->done);
+ 	}
+@@ -780,6 +789,7 @@ static int save_compressed_image(struct swap_map_handle *handle,
+ 
+ 	handle->crc32 = 0;
+ 	crc->crc32 = &handle->crc32;
++	crc->hmac = handle->authenticated ? &handle->hmac : NULL;
+ 	for (thr = 0; thr < nr_threads; thr++) {
+ 		crc->unc[thr] = data[thr].unc;
+ 		crc->unc_len[thr] = &data[thr].unc_len;
+@@ -957,6 +967,11 @@ int swsusp_write(unsigned int flags)
+ 		pr_err("Cannot get swap writer\n");
+ 		return error;
+ 	}
++	handle.authenticated = hibernate_auth_available();
++	if (handle.authenticated) {
++		flags = (flags & ~SF_NOCOMPRESS_MODE) | SF_HMAC_MODE;
++		hibernate_auth_init(&handle.hmac);
++	}
+ 	if (flags & SF_NOCOMPRESS_MODE) {
+ 		if (!enough_swap(pages)) {
+ 			pr_err("Not enough free swap\n");
+@@ -973,6 +988,8 @@ int swsusp_write(unsigned int flags)
+ 		goto out_finish;
+ 	}
+ 	header = (struct swsusp_info *)data_of(snapshot);
++	if (handle.authenticated)
++		hmac_sha256_update(&handle.hmac, (u8 *)header, PAGE_SIZE);
+ 	error = swap_write_page(&handle, header, NULL);
+ 	if (!error) {
+ 		error = (flags & SF_NOCOMPRESS_MODE) ?
+@@ -981,6 +998,7 @@ int swsusp_write(unsigned int flags)
+ 	}
+ out_finish:
+ 	error = swap_writer_finish(&handle, flags, error);
++	memzero_explicit(&handle.hmac, sizeof(handle.hmac));
+ 	return error;
+ }
+ 
+@@ -1284,6 +1302,7 @@ static int load_compressed_image(struct swap_map_handle *handle,
+ 
+ 	handle->crc32 = 0;
+ 	crc->crc32 = &handle->crc32;
++	crc->hmac = handle->authenticated ? &handle->hmac : NULL;
+ 	for (thr = 0; thr < nr_threads; thr++) {
+ 		crc->unc[thr] = data[thr].unc;
+ 		crc->unc_len[thr] = &data[thr].unc_len;
+@@ -1495,6 +1514,13 @@ out_finish:
+ 					ret = -ENODATA;
+ 				}
+ 			}
++			if (!ret && handle->authenticated &&
++			    !hibernate_auth_verify(&handle->hmac, swsusp_header->hmac)) {
++				pr_err("Invalid image authentication code!\n");
++				ret = -EBADMSG;
++			}
++			if (!ret && handle->authenticated)
++				ret = snapshot_hand_over_key();
+ 		}
+ 	}
+ 	swsusp_show_speed(start, stop, nr_to_read, "Read");
+@@ -1542,19 +1568,31 @@ int swsusp_read(unsigned int *flags_p)
+ 	error = get_swap_reader(&handle, flags_p);
+ 	if (error)
+ 		goto end;
+-	if (!error)
+-		error = swap_read_page(&handle, header, NULL);
++	handle.authenticated = hibernate_auth_available();
++	if (handle.authenticated) {
++		if (!(*flags_p & SF_HMAC_MODE) || (*flags_p & SF_NOCOMPRESS_MODE)) {
++			pr_err("Image is not authenticated\n");
++			error = -EPERM;
++			goto finish;
++		}
++		hibernate_auth_init(&handle.hmac);
++	}
++	error = swap_read_page(&handle, header, NULL);
++	if (!error && handle.authenticated)
++		hmac_sha256_update(&handle.hmac, (u8 *)header, PAGE_SIZE);
+ 	if (!error) {
+ 		error = (*flags_p & SF_NOCOMPRESS_MODE) ?
+ 			load_image(&handle, &snapshot, header->pages - 1) :
+ 			load_compressed_image(&handle, &snapshot, header->pages - 1);
+ 	}
++finish:
+ 	swap_reader_finish(&handle);
+ end:
+ 	if (!error)
+ 		pr_debug("Image successfully loaded\n");
+ 	else
+ 		pr_debug("Error %d resuming\n", error);
++	memzero_explicit(&handle.hmac, sizeof(handle.hmac));
+ 	return error;
+ }
+ 
+--- a/kernel/power/user.c
++++ b/kernel/power/user.c
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <linux/suspend.h>
++#include <linux/security.h>
+ #include <linux/reboot.h>
+ #include <linux/string.h>
+ #include <linux/device.h>
+@@ -50,6 +51,10 @@ static int snapshot_open(struct inode *inode, struct file *filp)
+ 	unsigned int sleep_flags;
+ 	int error;
+ 
++	/* Userspace images are never authenticated. */
++	if (security_locked_down(LOCKDOWN_HIBERNATION))
++		return -EPERM;
++
+ 	if (!hibernation_available())
+ 		return -EPERM;
+ 

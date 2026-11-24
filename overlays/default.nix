@@ -1,7 +1,7 @@
 inputs: final: prev:
 let
   callPackage = final.callPackage;
-  kernels = import ../pkgs/linux-nixlyos { kernelFlake = inputs.nixlyos-kernel; };
+  kernels = import ../kernel inputs;
 in {
   speedtree = callPackage ../pkgs/speedtree { };
   nixlytile = callPackage ../pkgs/nixlytile { };
@@ -61,6 +61,13 @@ in {
   linuxPackages_nixlyos_server = import ./nvidia-latest.nix inputs final final.linux-nixlyos-server;
   # In-tree drivers only.
   linuxPackages_nixlyos_enterprise = final.linuxPackagesFor final.linux-nixlyos-enterprise;
+  # A profile's kernel, rebuilt only for build settings.
+  nixlyosKernel = { name, cpuLevel, build }:
+    let
+      entry = (import ../kernel/catalogue.nix).${name};
+      kernel = kernels.${if cpuLevel >= entry.level then entry.variant else entry.fallback}.tune build;
+    in
+    if entry.inTree then final.linuxPackagesFor kernel else import ./nvidia-latest.nix inputs final kernel;
   linux-nixlyserver = import ../pkgs/linux-nixlyserver { inherit (final) lib linux; };
   linuxPackages_nixlyserver = final.linuxPackagesFor final.linux-nixlyserver;
 

@@ -5,11 +5,13 @@ import { invalidateSoon, onEvent } from "./realtime";
 // Maps server events onto queries.
 const invalidations: Record<string, (data: Record<string, unknown>) => unknown[][]> = {
   "version.changed": (data) => [["overview"], ["packages"], ["package", data.attr], ["build-log", data.id], ["profiles"]],
-  "package.changed": (data) => [["overview"], ["packages"], ["package", data.attr], ["profiles"]],
+  "package.changed": (data) => [["overview"], ["packages"], ["package", data.attr], ["profiles"], ["kernels"]],
   "commit.changed": () => [["commits"], ["overview"]],
   "watcher.changed": () => [["overview"]],
   "profile.changed": () => [["profiles"], ["profile"], ["commits"], ["trust"], ["packages"], ["package"]],
   "trust.changed": () => [["trust"]],
+  "source.changed": () => [["source"]],
+  "update.changed": () => [["update"]],
   "module.changed": () => [["modules"], ["module"], ["profile"]],
   "recipe.changed": (data) => [["recipes"], ["recipe", data.id]],
 };

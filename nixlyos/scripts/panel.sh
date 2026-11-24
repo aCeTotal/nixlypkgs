@@ -62,7 +62,7 @@ cmd_flake() {
 
   inputs = {
     # Both pinned by nixlyos-panel.
-    nixlypkgs.url = "github:aCeTotal/nixlypkgs";
+    nixlypkgs.url = "git+$NIXLY_PANEL/source.git";
     nixlyprofile = { url = "$NIXLY_PANEL/api/v1/profiles"; flake = false; };
     # BEGIN USER INPUTS (generated from custom/inputs.nix — edit that instead)
 ${inputs}

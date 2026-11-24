@@ -3,6 +3,7 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import { ArrowLeft, CircleCheck, CircleX, History, ListTree, Lock, Save, Trash2 } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { shortSha } from "@/format/sha";
 import { dateTime, timeAgo } from "@/format/time";
 import { CheckBadge } from "@/profiles/check-badge";
 import { ConfirmButton } from "@/shell/confirm-button";
@@ -20,15 +21,18 @@ import { activePath, outline, type OutlineItem } from "./outline";
 import { deleteModule, moduleQuery, revisionSource, saveModule, type ModuleDetail, type ModuleDraft } from "./queries";
 import { useSyntaxCheck, type SyntaxState } from "./use-syntax-check";
 
-const route = getRouteApi("/app/modules/$id");
+const route = getRouteApi("/app/modules/$slug");
 
 export function ModulePage() {
-  const { id } = route.useParams();
-  const { data } = useSuspenseQuery(moduleQuery(Number(id)));
-  return <ModuleEditor key={data.id} module={data} />;
+  const { slug } = route.useParams();
+  const { data } = useSuspenseQuery(moduleQuery(slug));
+  return <ModuleEditor key={data.slug} module={data} />;
 }
 
-function draftOf(module: ModuleDetail): ModuleDraft {
+// The base comes from main when saving.
+type Draft = Omit<ModuleDraft, "base">;
+
+function draftOf(module: ModuleDetail): Draft {
   return { slug: module.slug, title: module.title, description: module.description, source: module.source, required: module.required };
 }
 
@@ -50,12 +54,12 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const valid = syntax.problem.error === "";
   const save = useMutation({
-    mutationFn: () => saveModule(module.id, draft),
-    onSuccess: () => toast.success("Saved – profiles using this module are being checked"),
+    mutationFn: () => saveModule({ ...draft, base: module.head }),
+    onSuccess: ({ sha }) => toast.success(`Committed ${shortSha(sha)}; profiles using it are checked in testing`),
   });
-  const remove = useMutation({ mutationFn: () => deleteModule(module.id), onSuccess: () => navigate({ to: "/modules" }) });
+  const remove = useMutation({ mutationFn: () => deleteModule(module.slug, module.head), onSuccess: () => navigate({ to: "/modules" }) });
   const restore = useMutation({
-    mutationFn: (revision: number) => revisionSource(module.id, revision),
+    mutationFn: (sha: string) => revisionSource(module.slug, sha),
     onSuccess: ({ source }) => setDraft((current) => ({ ...current, source })),
   });
   const trySave = () => {
@@ -82,7 +86,7 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
         title={module.title}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <span className="font-mono">{module.slug}.nix</span>· revision {module.revision} · changed {timeAgo(module.updatedAt)}
+            <span className="font-mono">nixlyos/modules/{module.slug}.nix</span>· changed {timeAgo(module.changedAt)}
             {module.required && (
               <Badge variant="secondary" className="gap-1">
                 <Lock className="size-3" />
@@ -113,7 +117,7 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
           <CardHeader className="px-4">
             <CardTitle className="flex items-center gap-2 text-sm">
               <ListTree className="size-4 text-primary" />
-              Disposisjon
+              Outline
             </CardTitle>
           </CardHeader>
           <CardContent className="min-h-0 flex-1 px-3">
@@ -140,10 +144,6 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
                 <Field>
                   <FieldLabel htmlFor="module-title">Title</FieldLabel>
                   <Input id="module-title" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="module-slug">File name</FieldLabel>
-                  <Input id="module-slug" className="font-mono" value={draft.slug} onChange={(event) => setDraft({ ...draft, slug: event.target.value })} />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="module-description">Description</FieldLabel>
@@ -186,19 +186,22 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <History className="size-4" />
-                Revisjoner
+                History
               </CardTitle>
             </CardHeader>
             <CardContent className="max-h-72 space-y-1 overflow-auto">
-              {module.revisions.map((revision) => (
+              {module.history.map((commit) => (
                 <button
-                  key={revision.revision}
+                  key={commit.sha}
                   type="button"
-                  onClick={() => restore.mutate(revision.revision)}
-                  className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                  title="Load this version into the editor"
+                  onClick={() => restore.mutate(commit.sha)}
+                  className="flex w-full flex-col rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
                 >
-                  <span>Revision {revision.revision}</span>
-                  <span className="text-xs text-muted-foreground">{dateTime(revision.createdAt)}</span>
+                  <span className="truncate">{commit.subject}</span>
+                  <span className="text-xs text-muted-foreground">
+                    <span className="font-mono">{shortSha(commit.sha)}</span> · {commit.author} · {dateTime(commit.time)}
+                  </span>
                 </button>
               ))}
             </CardContent>

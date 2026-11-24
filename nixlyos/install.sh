@@ -252,14 +252,14 @@ cp "$HWC" "$NIXLY_DIR/hardware/hardware-configuration.nix"
 
 STATE_VERSION=$(grep -oP 'system\.stateVersion = "\K[0-9]{2}\.[0-9]{2}' /mnt/etc/nixos/configuration.nix || echo "26.05")
 
-# Offline fallback: nixlypkgs main.
+# Without a profile: the panel's main.
 legacy_flake() {
   cat > "$NIXLY_DIR/flake.nix" <<FLAKE
 {
   description = "NixlyOS machine";
 
   inputs = {
-    nixlypkgs.url = "github:aCeTotal/nixlypkgs";
+    nixlypkgs.url = "git+$NIXLY_PANEL/source.git";
     # BEGIN USER INPUTS (generated from custom/inputs.nix — edit that instead)
     # END USER INPUTS
   };

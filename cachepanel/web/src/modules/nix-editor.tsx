@@ -2,7 +2,7 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirro
 import { bracketMatching, foldGutter, foldKeymap, HighlightStyle, indentOnInput, syntaxHighlighting } from "@codemirror/language";
 import { lintGutter, setDiagnostics } from "@codemirror/lint";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
-import { EditorSelection, EditorState } from "@codemirror/state";
+import { EditorSelection, EditorState, type Extension } from "@codemirror/state";
 import { drawSelection, EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { useEffect, useEffectEvent, useImperativeHandle, useRef, type Ref } from "react";
@@ -57,13 +57,15 @@ type NixEditorProps = {
   onSave?: () => void;
   problem?: SyntaxProblem;
   readOnly?: boolean;
+  // Nix unless another is given.
+  language?: Extension;
   ref?: Ref<NixEditorHandle>;
 };
 
-export function NixEditor({ value, onChange, onCursor, onSave, problem, readOnly = false, ref }: NixEditorProps) {
+export function NixEditor({ value, onChange, onCursor, onSave, problem, readOnly = false, language, ref }: NixEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
-  const initial = useRef({ value, readOnly });
+  const initial = useRef({ value, readOnly, language });
   const changed = useEffectEvent((text: string) => onChange?.(text));
   const moved = useEffectEvent((pos: number) => onCursor?.(pos));
   const saved = useEffectEvent(() => onSave?.());
@@ -84,7 +86,7 @@ export function NixEditor({ value, onChange, onCursor, onSave, problem, readOnly
           history(),
           indentOnInput(),
           bracketMatching(),
-          nix(),
+          initial.current.language ?? nix(),
           syntaxHighlighting(highlight),
           theme,
           keymap.of([

@@ -1,0 +1,74 @@
+[
+  {
+    "slug": "system",
+    "title": "System",
+    "description": "Boot, kernel, Nix, users, locale, performance, memory, power and update tools.",
+    "required": true
+  },
+  {
+    "slug": "security",
+    "title": "Security",
+    "description": "Firewall, sandboxing, reduced attack surface, Secure Boot and snapshots.",
+    "required": true
+  },
+  {
+    "slug": "network",
+    "title": "Network",
+    "description": "TCP and DNS, Wi-Fi, queueing, VPN, SSH and NFS.",
+    "required": true
+  },
+  {
+    "slug": "session",
+    "title": "Session",
+    "description": "Wayland, nixlytile, login, mouse and keyboard.",
+    "required": false
+  },
+  {
+    "slug": "audio",
+    "title": "Audio and Bluetooth",
+    "description": "PipeWire, microphone chain, push-to-talk and Bluetooth.",
+    "required": false
+  },
+  {
+    "slug": "user",
+    "title": "User environment",
+    "description": "Shell, terminal, git, theme and editor.",
+    "required": true
+  },
+  {
+    "slug": "gaming",
+    "title": "Gaming",
+    "description": "Steam, Proton, GeForce NOW, controllers, game mode and emulators.",
+    "required": false
+  },
+  {
+    "slug": "apps",
+    "title": "Applications",
+    "description": "Browser, media, office, RSS and text browser.",
+    "required": false
+  },
+  {
+    "slug": "desktop",
+    "title": "Desktop",
+    "description": "Workstations and laptops: Citrix, Claude Code, Blender, FreeCAD, Gaea, Unreal, RetroArch, calculator and PDF.",
+    "required": false
+  },
+  {
+    "slug": "htpc",
+    "title": "HTPC",
+    "description": "Living-room mode: one app at a time, media, TV audio and nightly updates.",
+    "required": false
+  },
+  {
+    "slug": "server",
+    "title": "Server",
+    "description": "Headless machines: no desktop, audio or games, and they never sleep.",
+    "required": false
+  },
+  {
+    "slug": "hardware",
+    "title": "Hardware",
+    "description": "CPU, graphics, mainboard, virtualisation and peripherals, chosen by the hardware.",
+    "required": true
+  }
+]

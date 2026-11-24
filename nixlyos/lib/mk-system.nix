@@ -15,7 +15,7 @@
 }:
 
 assert profileTree != null
-  || throw "NixlyOS følger en profil i Nixly-panelet. Kjør: nix run github:aCeTotal/nixlypkgs#nixlyos-panel adopt";
+  || throw "NixlyOS følger en profil i Nixly-panelet. Kjør: nix run git+${(import ./panel.nix).url}/source.git#nixlyos-panel adopt";
 
 let
   nixpkgs = inputs.nixos-stable;
@@ -33,6 +33,12 @@ let
 
   # Shared with the cached packages.
   pkgsConfig = import ./pkgs-config.nix;
+
+  # Required modules plus the profile's choice, in catalogue order.
+  chosen = import (profileTree + "/modules.nix");
+  profileModules = map (entry: ../modules + "/${entry.slug}.nix")
+    (builtins.filter (entry: entry.required || builtins.elem entry.slug chosen)
+      (builtins.fromJSON (builtins.readFile ../modules/catalogue.json)));
 
   pkgs = import nixpkgs {
     system = effectiveSystem;
@@ -101,6 +107,7 @@ nixpkgs.lib.nixosSystem {
     (hardwareDir + "/devices.nix")
 
     (profileTree + "/default.nix")
+    ./kernel.nix
     (import ./pins.nix (profileTree + "/pins.nix"))
     (import ./signing.nix (profileTree + "/signing.nix"))
     inputs.home-manager.nixosModules.home-manager
@@ -113,6 +120,7 @@ nixpkgs.lib.nixosSystem {
       };
     }
   ]
+  ++ profileModules
   ++ nixpkgs.lib.optional (localConfig != null) localConfig
   # Guarded by user-config.sh's scan.
   ++ nixpkgs.lib.optional (userModules != null) userModules;

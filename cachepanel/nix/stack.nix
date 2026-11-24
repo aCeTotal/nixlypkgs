@@ -60,10 +60,10 @@ writeShellApplication {
     export CACHEPANEL_STATE_DIR="$STATE/panel"
     export CACHEPANEL_DATABASE_URL="postgres://cachepanel@127.0.0.1:${toString postgresPort}/cachepanel?sslmode=disable"
     export CACHEPANEL_HTTP_ADDR="127.0.0.1:${toString port}"
-    export CACHEPANEL_REPOSITORY="''${CACHEPANEL_REPOSITORY:-file://$STATE/demo}"
+    export CACHEPANEL_SOURCE_SEED="''${CACHEPANEL_SOURCE_SEED:-file://$STATE/demo}"
     export CACHEPANEL_ADMIN_USER=nixlyos
     export CACHEPANEL_ADMIN_PASSWORD_HASH="${adminHash}"
-    echo "Nixly Panel: ${appUrl}  ·  nixlyos / nixos  ·  repo: $CACHEPANEL_REPOSITORY  ·  data: $STATE"
+    echo "Nixly Panel: ${appUrl}  ·  nixlyos / nixos  ·  seed: $CACHEPANEL_SOURCE_SEED  ·  data: $STATE"
     exec process-compose up --config ${composeConfig} --use-uds --unix-socket "$STATE/process-compose.sock" "$@"
   '';
   meta.mainProgram = "cachepanel-stack";

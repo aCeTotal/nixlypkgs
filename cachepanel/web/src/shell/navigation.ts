@@ -1,6 +1,6 @@
 import type { LinkProps } from "@tanstack/react-router";
 import type { ComponentType } from "react";
-import { Blocks, FlaskConical, GitCommitVertical, LayoutDashboard, Layers, Package, PackagePlus, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Blocks, FlaskConical, FolderGit2, GitCommitVertical, LayoutDashboard, Layers, Package, PackagePlus, ShieldCheck, type LucideIcon } from "lucide-react";
 import { AwaitingCount } from "@/profiles/awaiting-count";
 
 export type NavItem = {
@@ -29,6 +29,7 @@ export const navigation: NavGroup[] = [
       { label: "Derivations", to: "/packages", icon: Package },
       { label: "Add derivation", to: "/recipes", icon: PackagePlus },
       { label: "Commits", to: "/commits", icon: GitCommitVertical },
+      { label: "Source", to: "/source", icon: FolderGit2 },
     ],
   },
 ];

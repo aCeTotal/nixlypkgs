@@ -10,7 +10,7 @@ Each server carries only `/etc/nixlyserver` (root-owned):
 ```nix
 # /etc/nixlyserver/flake.nix
 {
-  inputs.nixlypkgs.url = "github:aCeTotal/nixlypkgs";
+  inputs.nixlypkgs.url = "git+https://cache.aceclan.no/source.git";
   outputs = { nixlypkgs, ... }: {
     nixosConfigurations.<hostname> = nixlypkgs.lib.mkNixlyServer {
       hostName = "<hostname>";

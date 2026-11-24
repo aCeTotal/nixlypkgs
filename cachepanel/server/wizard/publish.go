@@ -25,26 +25,17 @@ const (
 	authorEmail  = "cachepanel@nixlyos.local"
 )
 
-var (
-	errNoRemote = errors.New("publishing is not set up; set publish.remote and publish.keyFile in the module")
-	listedAttr  = regexp.MustCompile(`"([A-Za-z0-9_-]+)"`)
-)
+var listedAttr = regexp.MustCompile(`"([A-Za-z0-9_-]+)"`)
 
 // Publisher commits recipes to the package repository.
 type Publisher struct {
 	Mirror *repo.Mirror
 	Remote string
-	Key    string
 	Branch string
-	// KnownHosts pins the host key.
-	KnownHosts string
 }
 
 // Publish writes pkgs/<attr> and pushes one commit.
 func (p *Publisher) Publish(ctx context.Context, attr, version string, files map[string][]byte) (string, error) {
-	if p.Remote == "" || p.Key == "" {
-		return "", errNoRemote
-	}
 	var err error
 	for range pushAttempts {
 		var sha string
@@ -133,8 +124,7 @@ func (p *Publisher) git(ctx context.Context, dir string, args ...string) (string
 		args = append([]string{"-C", dir}, args...)
 	}
 	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0",
-		"GIT_SSH_COMMAND=ssh -i "+p.Key+" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="+p.KnownHosts)
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -142,15 +132,4 @@ func (p *Publisher) git(ctx context.Context, dir string, args ...string) (string
 		return "", fmt.Errorf("git %s: %w: %s", command, err, strings.TrimSpace(stderr.String()))
 	}
 	return string(out), nil
-}
-
-// PublicKey is what GitHub needs as a deploy key.
-func (p *Publisher) PublicKey(ctx context.Context) (string, error) {
-	if p.Remote == "" || p.Key == "" {
-		return "", errNoRemote
-	}
-	ctx, cancel := context.WithTimeout(ctx, gitTimeout)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, "ssh-keygen", "-y", "-f", p.Key).Output()
-	return strings.TrimSpace(string(out)), err
 }

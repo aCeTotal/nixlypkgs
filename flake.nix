@@ -32,8 +32,44 @@
       inputs.nixpkgs.follows = "nixos-stable";
     };
 
-    # NixlyOS gaming kernel.
-    nixlyos-kernel.url = "github:aCeTotal/kernel_nixlyos";
+    # Kernel toolchain, bumped with the kernels.
+    kernel-nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Latest stable CachyOS release.
+    linux-src = {
+      url = "github:CachyOS/linux/cachyos-7.3.5-2";
+      flake = false;
+    };
+    # Server and enterprise start from kernel.org.
+    linux-vanilla = {
+      url = "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.3.6.tar.xz";
+      flake = false;
+    };
+    cachy-config = {
+      url = "github:CachyOS/linux-cachyos";
+      flake = false;
+    };
+    # BORE ships as a separate patch.
+    cachy-patches = {
+      url = "github:CachyOS/kernel-patches";
+      flake = false;
+    };
+    xone = {
+      url = "github:dlundqvist/xone/v0.5.8";
+      flake = false;
+    };
+    xpadneo = {
+      url = "github:atar-axis/xpadneo/v0.10.5";
+      flake = false;
+    };
+    msi-ec = {
+      url = "github:MControlSuite/msi-ec";
+      flake = false;
+    };
+    # The panel CA, the only module key.
+    nixlyos-ca = {
+      url = "file+https://cache.aceclan.no/api/v1/ca.pem";
+      flake = false;
+    };
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:
@@ -71,6 +107,23 @@
             let stable = stableFor system; in
             builtins.filter (name: stable ? ${name} && (stable.${name}.outputs or [ "out" ]) == [ "out" ])
               (builtins.attrNames self.packages.${system});
+          # Kernels and the settings each offers.
+          kernels = _:
+            let
+              inherit (import ./kernel/settings.nix { inherit (nixpkgs) lib; }) knobs available;
+            in
+            nixpkgs.lib.mapAttrs
+              (_: entry: {
+                inherit (entry) title description;
+                settings = nixpkgs.lib.mapAttrs
+                  (knob: options: {
+                    inherit (knobs.${knob}) title description kind;
+                    inherit options;
+                    default = entry.defaults.${knob};
+                  })
+                  (available entry);
+              })
+              (import ./kernel/catalogue.nix);
         };
       };
 
@@ -137,6 +190,11 @@
           imports = [ ./cachepanel/nix/module.nix ];
           services.nixly-cachepanel.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.cachepanel;
         };
+      };
+
+      checks.x86_64-linux = import ./kernel/checks.nix {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        kernels = import ./kernel inputs;
       };
 
       homeManagerModules = {

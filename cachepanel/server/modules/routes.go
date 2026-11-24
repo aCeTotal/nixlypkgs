@@ -4,14 +4,17 @@ import (
 	"context"
 	"net/http"
 	"regexp"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"cachepanel/database"
 	"cachepanel/realtime"
 	"cachepanel/rest"
+	"cachepanel/source"
 )
 
 var (
@@ -19,87 +22,166 @@ var (
 	errSlug     = rest.Unprocessable("invalid_slug", "The file name may only contain lowercase letters, digits and hyphens")
 	errTitle    = rest.Unprocessable("invalid_title", "The title needs 1–120 characters")
 	errRequired = rest.Conflict("required", "Required modules cannot be deleted")
+	errUsed     = rest.Conflict("in_use", "Profiles still choose this module")
+	errExists   = rest.Conflict("module_exists", "A module already has that file name")
 )
 
-// Modules are the NixOS modules profiles import.
+// Modules are the NixOS modules profiles import, kept in the source.
 type Modules struct {
-	db      *pgxpool.Pool
-	hub     *realtime.Hub
-	changed func()
-}
-
-func New(db *pgxpool.Pool, hub *realtime.Hub, changed func()) *Modules {
-	return &Modules{db: db, hub: hub, changed: changed}
+	DB   *pgxpool.Pool
+	Hub  *realtime.Hub
+	Repo *source.Repo
+	// Poke starts evaluating a new commit.
+	Poke func()
 }
 
 func (m *Modules) Mount(r chi.Router) {
 	r.Get("/modules", rest.Handle(m.list))
 	r.Post("/modules", rest.Handle(m.create))
 	r.Post("/modules/validate", rest.Handle(m.validate))
-	r.Get("/modules/{id}", rest.Handle(m.get))
-	r.Put("/modules/{id}", rest.Handle(m.update))
-	r.Delete("/modules/{id}", rest.Handle(m.remove))
-	r.Get("/modules/{id}/revisions/{revision}", rest.Handle(m.revision))
+	r.Get("/modules/{slug}", rest.Handle(m.get))
+	r.Put("/modules/{slug}", rest.Handle(m.update))
+	r.Delete("/modules/{slug}", rest.Handle(m.remove))
+	r.Get("/modules/{slug}/revisions/{sha}", rest.Handle(m.revision))
 }
 
-// Required modules belong to every profile.
-const usedBy = `coalesce((SELECT json_agg(json_build_object('name', p.name, 'title', p.title, 'checkState', p.check_state)
-	ORDER BY p.id) FROM profiles p
-	WHERE m.required OR EXISTS (SELECT 1 FROM profile_modules pm WHERE pm.profile_id = p.id AND pm.module_id = m.id)), '[]')`
+// User is a profile that imports a module.
+type User struct {
+	Name       string `json:"name"`
+	Title      string `json:"title"`
+	CheckState string `json:"checkState"`
+}
 
-const fields = `'id', m.id, 'slug', m.slug, 'title', m.title, 'description', m.description, 'required', m.required,
-	'position', m.position, 'revision', m.revision, 'updatedAt', m.updated_at, 'usedBy', ` + usedBy
+// Summary is a module in the list.
+type Summary struct {
+	Entry
+	Position  int        `json:"position"`
+	Lines     int        `json:"lines"`
+	ChangedAt *time.Time `json:"changedAt"`
+	UsedBy    []User     `json:"usedBy"`
+}
+
+type profileUse struct {
+	User
+	Chosen []string
+}
+
+// uses lists every profile with its chosen modules.
+func (m *Modules) uses(ctx context.Context) ([]profileUse, error) {
+	rows, err := m.DB.Query(ctx, `
+		SELECT p.name, p.title, p.check_state::text, coalesce(array_agg(pm.slug) FILTER (WHERE pm.slug IS NOT NULL), '{}')
+		FROM profiles p LEFT JOIN profile_modules pm ON pm.profile_id = p.id
+		GROUP BY p.id ORDER BY p.id`)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (profileUse, error) {
+		var use profileUse
+		err := row.Scan(&use.Name, &use.Title, &use.CheckState, &use.Chosen)
+		return use, err
+	})
+}
+
+func usedBy(entry Entry, uses []profileUse) []User {
+	users := []User{}
+	for _, use := range uses {
+		if entry.Required || slices.Contains(use.Chosen, entry.Slug) {
+			users = append(users, use.User)
+		}
+	}
+	return users
+}
 
 func (m *Modules) list(w http.ResponseWriter, r *http.Request) error {
-	body, err := database.JSON(r.Context(), m.db, `
-		SELECT coalesce(json_agg(json_build_object(`+fields+`,
-			'lines', array_length(string_to_array(m.source, E'\n'), 1)) ORDER BY m.position), '[]')
-		FROM modules m`)
+	ctx := r.Context()
+	head, err := m.Repo.Head(ctx)
 	if err != nil {
 		return err
 	}
-	return rest.WriteRaw(w, body)
+	entries, err := Catalogue(ctx, m.Repo, head)
+	if err != nil {
+		return err
+	}
+	paths := make([]string, len(entries))
+	for i, entry := range entries {
+		paths[i] = entry.Path()
+	}
+	sources, err := m.Repo.FilesAt(ctx, head, paths)
+	if err != nil {
+		return err
+	}
+	changed, err := m.Repo.LastChanged(ctx, paths)
+	if err != nil {
+		return err
+	}
+	uses, err := m.uses(ctx)
+	if err != nil {
+		return err
+	}
+	summaries := make([]Summary, len(entries))
+	for i, entry := range entries {
+		summaries[i] = Summary{Entry: entry, Position: i + 1, Lines: strings.Count(sources[entry.Path()], "\n"), UsedBy: usedBy(entry, uses)}
+		if when, found := changed[entry.Path()]; found {
+			summaries[i].ChangedAt = &when
+		}
+	}
+	return rest.WriteJSON(w, http.StatusOK, map[string]any{"head": head, "modules": summaries})
+}
+
+// Detail is one module with its source and history.
+type Detail struct {
+	Summary
+	Head    string          `json:"head"`
+	Source  string          `json:"source"`
+	History []source.Commit `json:"history"`
 }
 
 func (m *Modules) get(w http.ResponseWriter, r *http.Request) error {
-	id, err := rest.ID(r, "id")
+	ctx := r.Context()
+	head, err := m.Repo.Head(ctx)
 	if err != nil {
 		return err
 	}
-	body, err := database.JSON(r.Context(), m.db, `
-		SELECT json_build_object(`+fields+`, 'source', m.source,
-			'revisions', (SELECT json_agg(json_build_object('revision', rv.revision, 'createdAt', rv.created_at)
-				ORDER BY rv.revision DESC) FROM module_revisions rv WHERE rv.module_id = m.id))
-		FROM modules m WHERE m.id = $1`, id)
+	entries, err := Catalogue(ctx, m.Repo, head)
 	if err != nil {
 		return err
 	}
-	return rest.WriteRaw(w, body)
+	index := find(entries, chi.URLParam(r, "slug"))
+	if index < 0 {
+		return rest.NotFound()
+	}
+	entry := entries[index]
+	blob, err := m.Repo.FileAt(ctx, head, entry.Path())
+	if err != nil {
+		return err
+	}
+	history, err := m.Repo.Log(ctx, entry.Path(), 0)
+	if err != nil {
+		return err
+	}
+	uses, err := m.uses(ctx)
+	if err != nil {
+		return err
+	}
+	detail := Detail{Head: head, Source: blob.Text, History: history.Commits}
+	detail.Summary = Summary{Entry: entry, Position: index + 1, Lines: strings.Count(blob.Text, "\n"), UsedBy: usedBy(entry, uses)}
+	return rest.WriteJSON(w, http.StatusOK, detail)
 }
 
 func (m *Modules) revision(w http.ResponseWriter, r *http.Request) error {
-	id, err := rest.ID(r, "id")
+	entry := Entry{Slug: chi.URLParam(r, "slug")}
+	blob, err := m.Repo.FileAt(r.Context(), chi.URLParam(r, "sha"), entry.Path())
 	if err != nil {
 		return err
 	}
-	revision, err := rest.ID(r, "revision")
-	if err != nil {
-		return err
-	}
-	var source string
-	if err := m.db.QueryRow(r.Context(), `SELECT source FROM module_revisions WHERE module_id = $1 AND revision = $2`,
-		id, revision).Scan(&source); err != nil {
-		return err
-	}
-	return rest.WriteJSON(w, http.StatusOK, map[string]string{"source": source})
+	return rest.WriteJSON(w, http.StatusOK, map[string]string{"source": blob.Text})
 }
 
+// draft is a module change on top of Base.
 type draft struct {
-	Slug        string `json:"slug"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Source      string `json:"source"`
-	Required    bool   `json:"required"`
+	Entry
+	Base   string `json:"base"`
+	Source string `json:"source"`
 }
 
 func (d draft) validate(ctx context.Context) error {
@@ -121,84 +203,97 @@ func (m *Modules) create(w http.ResponseWriter, r *http.Request) error {
 	if err := req.validate(r.Context()); err != nil {
 		return err
 	}
-	var id int64
-	err := pgx.BeginFunc(r.Context(), m.db, func(tx pgx.Tx) error {
-		if err := tx.QueryRow(r.Context(), `
-			INSERT INTO modules (slug, title, description, source, required, position)
-			VALUES ($1, $2, $3, $4, $5, (SELECT coalesce(max(position), 0) + 1 FROM modules)) RETURNING id`,
-			req.Slug, req.Title, req.Description, req.Source, req.Required).Scan(&id); err != nil {
-			return err
-		}
-		_, err := tx.Exec(r.Context(), `INSERT INTO module_revisions (module_id, revision, source) VALUES ($1, 1, $2)`, id, req.Source)
-		return err
-	})
+	entries, err := Catalogue(r.Context(), m.Repo, req.Base)
 	if err != nil {
 		return err
 	}
-	m.announce(id)
-	return rest.WriteJSON(w, http.StatusCreated, map[string]int64{"id": id})
+	if find(entries, req.Slug) >= 0 {
+		return errExists
+	}
+	change, err := moduleEdit(req, append(entries, req.Entry), "modules: add "+req.Slug)
+	if err != nil {
+		return err
+	}
+	return m.committed(w, r, change)
 }
 
-// update keeps source revisions.
 func (m *Modules) update(w http.ResponseWriter, r *http.Request) error {
-	id, err := rest.ID(r, "id")
-	if err != nil {
-		return err
-	}
 	var req draft
 	if err := rest.Decode(r, &req); err != nil {
 		return err
 	}
+	req.Slug = chi.URLParam(r, "slug")
 	if err := req.validate(r.Context()); err != nil {
 		return err
 	}
-	err = pgx.BeginFunc(r.Context(), m.db, func(tx pgx.Tx) error {
-		var revision int
-		if err := tx.QueryRow(r.Context(), `
-			UPDATE modules SET slug = $2, title = $3, description = $4, required = $6, updated_at = now(),
-				revision = revision + (source IS DISTINCT FROM $5)::int, source = $5
-			WHERE id = $1 RETURNING revision`,
-			id, req.Slug, req.Title, req.Description, req.Source, req.Required).Scan(&revision); err != nil {
-			return err
-		}
-		_, err := tx.Exec(r.Context(), `
-			INSERT INTO module_revisions (module_id, revision, source) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-			id, revision, req.Source)
-		return err
-	})
+	entries, err := Catalogue(r.Context(), m.Repo, req.Base)
 	if err != nil {
 		return err
 	}
-	m.announce(id)
-	return rest.NoContent(w)
+	index := find(entries, req.Slug)
+	if index < 0 {
+		return rest.NotFound()
+	}
+	entries[index] = req.Entry
+	change, err := moduleEdit(req, entries, "modules: update "+req.Slug)
+	if err != nil {
+		return err
+	}
+	return m.committed(w, r, change)
 }
 
-// remove keeps required modules; profiles hold the rest.
+// remove keeps modules any profile still needs.
 func (m *Modules) remove(w http.ResponseWriter, r *http.Request) error {
-	id, err := rest.ID(r, "id")
+	ctx := r.Context()
+	base := r.URL.Query().Get("base")
+	entries, err := Catalogue(ctx, m.Repo, base)
 	if err != nil {
 		return err
 	}
-	tag, err := m.db.Exec(r.Context(), `DELETE FROM modules WHERE id = $1 AND NOT required`, id)
-	if err != nil {
-		return err
+	index := find(entries, chi.URLParam(r, "slug"))
+	if index < 0 {
+		return rest.NotFound()
 	}
-	if tag.RowsAffected() == 0 {
-		return m.missingOrRequired(r.Context(), id)
-	}
-	m.announce(id)
-	return rest.NoContent(w)
-}
-
-func (m *Modules) missingOrRequired(ctx context.Context, id int64) error {
-	var exists bool
-	if err := m.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM modules WHERE id = $1)`, id).Scan(&exists); err != nil {
-		return err
-	}
-	if exists {
+	entry := entries[index]
+	if entry.Required {
 		return errRequired
 	}
-	return rest.NotFound()
+	var used bool
+	if err := m.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM profile_modules WHERE slug = $1)`, entry.Slug).Scan(&used); err != nil {
+		return err
+	}
+	if used {
+		return errUsed
+	}
+	catalogue, err := encode(slices.Delete(entries, index, index+1))
+	if err != nil {
+		return err
+	}
+	edit := source.Edit{Base: base, Message: "modules: remove " + entry.Slug, Changes: []source.FileChange{
+		{Path: entry.Path()},
+		{Path: catalogueFile, Content: &catalogue},
+	}}
+	return m.committed(w, r, edit)
+}
+
+// moduleEdit writes a module and the catalogue together.
+func moduleEdit(req draft, entries []Entry, message string) (source.Edit, error) {
+	catalogue, err := encode(entries)
+	return source.Edit{Base: req.Base, Message: message, Changes: []source.FileChange{
+		{Path: req.Path(), Content: &req.Source},
+		{Path: catalogueFile, Content: &catalogue},
+	}}, err
+}
+
+func (m *Modules) committed(w http.ResponseWriter, r *http.Request, edit source.Edit) error {
+	sha, err := m.Repo.Commit(r.Context(), edit, m.Repo.Author(r))
+	if err != nil {
+		return err
+	}
+	m.Poke()
+	m.Hub.Publish(realtime.ModuleChanged, map[string]string{"sha": sha})
+	m.Hub.Publish(realtime.SourceChanged, map[string]string{"sha": sha})
+	return rest.WriteJSON(w, http.StatusCreated, map[string]string{"sha": sha})
 }
 
 // validate checks syntax while editing.
@@ -214,9 +309,4 @@ func (m *Modules) validate(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return rest.WriteJSON(w, http.StatusOK, problem)
-}
-
-func (m *Modules) announce(id int64) {
-	m.hub.Publish(realtime.ModuleChanged, map[string]int64{"id": id})
-	m.changed()
 }

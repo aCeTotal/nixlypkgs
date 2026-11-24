@@ -59,6 +59,7 @@ func (w *Watcher) Run(ctx context.Context) error {
 	if _, err := w.db.Exec(ctx, `DELETE FROM commits WHERE eval_state = 'evaluating'`); err != nil {
 		return err
 	}
+	w.catchUp(ctx)
 	for ctx.Err() == nil {
 		if w.cycle(ctx) {
 			continue
@@ -165,7 +166,7 @@ func (w *Watcher) advance(ctx context.Context, c repo.Commit) error {
 		return w.failCommit(ctx, c.SHA, err)
 	}
 	w.pool.Forget(evicted)
-	w.syncPinnable(ctx, c.SHA)
+	w.syncMeta(ctx, c.SHA)
 	w.settle(ctx, c.SHA)
 	return nil
 }

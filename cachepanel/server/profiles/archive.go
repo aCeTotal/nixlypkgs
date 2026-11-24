@@ -19,7 +19,7 @@ func Archive(files []File) (string, []byte, error) {
 	var plain bytes.Buffer
 	writer := tar.NewWriter(&plain)
 	epoch := time.Unix(0, 0)
-	for _, dir := range []string{treeRoot, treeRoot + "modules/"} {
+	for _, dir := range folders(files) {
 		if err := writer.WriteHeader(&tar.Header{Typeflag: tar.TypeDir, Name: dir, Mode: 0o755, ModTime: epoch, Format: tar.FormatPAX}); err != nil {
 			return "", nil, err
 		}
@@ -49,4 +49,16 @@ func Archive(files []File) (string, []byte, error) {
 		return "", nil, err
 	}
 	return hex.EncodeToString(sum[:]), packed.Bytes(), nil
+}
+
+// folders lists each file's folder once, sorted.
+func folders(files []File) []string {
+	dirs := []string{treeRoot}
+	for _, file := range files {
+		if dir, _, found := strings.Cut(file.Path, "/"); found {
+			dirs = append(dirs, treeRoot+dir+"/")
+		}
+	}
+	slices.Sort(dirs)
+	return slices.Compact(dirs)
 }

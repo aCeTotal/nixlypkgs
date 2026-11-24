@@ -13,13 +13,23 @@ in
 
     services.nixly-cachepanel = {
       enable = true;
-      repository = "file:///var/lib/demo";
+      source = {
+        seed = "file:///var/lib/demo";
+        sshRemote = "cachepanel@localhost:source.git";
+      };
+      # Missing on purpose: the update must fail cleanly.
+      selfUpdate = {
+        flake = "/var/lib/demo-server";
+        host = "demo";
+      };
     };
 
     nix.settings = {
       substituters = lib.mkForce [ ];
       experimental-features = [ "nix-command" "flakes" ];
     };
+
+    services.openssh.enable = true;
 
     environment.systemPackages = [ pkgs.curl pkgs.git pkgs.gnutar pkgs.gzip pkgs.openssl pkgs.unzip ];
 
@@ -67,9 +77,10 @@ in
         return json.loads(server.succeed(f"curl -fsS -b /tmp/jar {panel}/api{path}"))
 
     def send(path, body="{}", method="POST"):
+        encoded = base64.b64encode(body.encode()).decode()
         return server.succeed(
-            f"curl -fsS -b /tmp/jar -X {method} -H 'X-Cachepanel-CSRF: {csrf}' "
-            f"-H 'Content-Type: application/json' -d '{body}' {panel}/api{path}")
+            f"echo {encoded} | base64 -d | curl -fsS -b /tmp/jar -X {method} -H 'X-Cachepanel-CSRF: {csrf}' "
+            f"-H 'Content-Type: application/json' --data-binary @- {panel}/api{path}")
 
     def packages():
         return {p["attr"]: p for p in get("/packages")}
@@ -81,14 +92,45 @@ in
     def head():
         return server.succeed("runuser -u cachepanel -- git -C /var/lib/demo rev-parse HEAD").strip()
 
+    push = "GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=no' git -c safe.directory=/var/lib/demo -C /var/lib/demo push --quiet"
+
+    def source_head():
+        return server.succeed("runuser -u cachepanel -- git -C /var/lib/cachepanel/source.git rev-parse main").strip()
+
+    # The panel commits too; follow it before adding a demo commit.
     def bump():
+        server.succeed("runuser -u cachepanel -- git -C /var/lib/demo fetch --quiet /var/lib/cachepanel/source.git main")
+        server.succeed("runuser -u cachepanel -- git -C /var/lib/demo reset --quiet --hard FETCH_HEAD")
         server.succeed("runuser -u cachepanel -- ${lib.getExe demoRepo} /var/lib/demo bump")
+        server.succeed(f"{push} cachepanel@localhost:source.git HEAD:main")
         send("/watcher/poll")
 
     with subtest("history fills three versions per package and builds them"):
         send("/watcher/poll")
         retry(lambda _: settled("hello-demo", 3) and settled("clock-demo", 3) and settled("steady-demo", 1), timeout_seconds=600)
         assert packages()["hello-demo"]["versions"][0]["commit"] == head()
+
+    with subtest("the panel owns the source: SSH pushes, HTTPS clones, history only grows"):
+        source = get("/source")
+        assert source == {"clone": f"{panel}/source.git", "remote": "cachepanel@localhost:source.git", "keys": []}, source
+        server.succeed("ssh-keygen -q -t ed25519 -N ''' -f /root/.ssh/id_ed25519")
+        server.succeed("runuser -u cachepanel -- ${lib.getExe demoRepo} /var/lib/demo bump")
+        server.fail(f"{push} cachepanel@localhost:source.git HEAD:main")
+        public_key = server.succeed("cat /root/.ssh/id_ed25519.pub").strip()
+        added = json.loads(send("/source/keys", json.dumps({"name": "test", "publicKey": public_key})))
+        assert added["type"] == "ssh-ed25519" and added["fingerprint"].startswith("SHA256:"), added
+        server.fail("ssh -o StrictHostKeyChecking=no cachepanel@localhost true")
+        server.succeed(f"{push} cachepanel@localhost:source.git HEAD:main")
+        assert source_head() == head()
+        server.fail(f"{push} --force cachepanel@localhost:source.git HEAD~1:main")
+        server.fail(f"{push} cachepanel@localhost:source.git :main")
+        assert source_head() == head()
+        server.succeed(f"git clone --quiet {panel}/source.git /tmp/clone")
+        assert server.succeed("git -C /tmp/clone rev-parse HEAD").strip() == head()
+        server.fail(f"git -C /tmp/clone push --quiet {panel}/source.git HEAD:refs/heads/other")
+        server.succeed(f"nix flake metadata 'git+{panel}/source.git?rev={head()}'")
+        send("/watcher/poll")
+        retry(lambda _: settled("hello-demo", 3) and packages()["hello-demo"]["versions"][0]["commit"] == head(), timeout_seconds=300)
 
     with subtest("a new commit is cached and the oldest version evicted"):
         oldest = packages()["hello-demo"]["versions"][-1]["id"]
@@ -106,15 +148,15 @@ in
         kept = [v["id"] for v in packages()["hello-demo"]["versions"]]
         assert pinned in kept and len(kept) == 4, kept
 
-    with subtest("every module lives in the database, in import order"):
-        modules = get("/modules")
+    with subtest("modules come from the source's catalogue, in import order"):
+        modules = get("/modules")["modules"]
         assert [m["slug"] for m in modules] == ["system", "security", "network", "session", "audio", "user",
                                                 "gaming", "apps", "desktop", "htpc", "server", "hardware"], modules
         assert {m["slug"] for m in modules if m["required"]} == {"system", "security", "network", "user", "hardware"}
-        sources = {m["slug"]: get(f"/modules/{m['id']}")["source"] for m in modules}
-        assert "options.nixlyos.kernel" in sources["system"] and "nixly-module-lock" in sources["system"]
-        assert "lanzaboote" not in sources["security"] and "nixlyos-secureboot" in sources["security"]
-        assert "hardware.xpadneo.enable" not in sources["gaming"] and "msi-ec-autoload" not in sources["hardware"]
+        assert all(m["lines"] == 1 and m["changedAt"] for m in modules), modules
+        assert get("/modules/gaming")["source"] == "{ ... }: { }\n"
+        assert {u["name"] for u in get("/modules/system")["usedBy"]} == {"desktop", "htpc", "server"}
+        server.fail("runuser -u postgres -- psql -d cachepanel -c 'SELECT 1 FROM modules'")
         problem = json.loads(send("/modules/validate", json.dumps({"source": "{ a = ; }"})))
         assert problem["line"] == 1 and problem["column"] == 7, problem
 
@@ -134,26 +176,27 @@ in
         assert all(p["stableTree"] is None for p in get("/profiles"))
         assert status(f"{panel}/api/v1/profiles/desktop") == "404"
         assert status(f"{panel}/api/v1/profiles/desktop/testing") == "200"
+        def tree(name, path):
+            return next(f["content"] for f in get(f"/profiles/{name}")["files"] if f["path"] == path)
+
+        assert sorted(f["path"] for f in get("/profiles/desktop")["files"]) == ["default.nix", "modules.nix", "pins.nix"]
+        assert "hello-demo" in tree("desktop", "pins.nix")
+        assert "imports" not in tree("desktop", "default.nix")
+        chosen = tree("desktop", "modules.nix")
+        assert all(f'"{slug}"' in chosen for slug in ("session", "audio", "desktop")) and '"htpc"' not in chosen, chosen
+        assert '"system"' not in chosen, chosen
+        assert '"htpc"' in tree("htpc", "modules.nix") and '"desktop"' not in tree("htpc", "modules.nix")
+        headless = tree("server", "modules.nix")
+        assert '"server"' in headless and '"session"' not in headless and '"audio"' not in headless, headless
         desktop = get("/profiles/desktop")
-        paths = [f["path"] for f in desktop["files"]]
-        assert "default.nix" in paths and "pins.nix" in paths and "modules/desktop.nix" in paths, paths
-        assert "modules/htpc.nix" not in paths, paths
-        pins = next(f["content"] for f in desktop["files"] if f["path"] == "pins.nix")
-        assert "hello-demo" in pins, pins
-        imports = next(f["content"] for f in desktop["files"] if f["path"] == "default.nix")
-        assert imports.index("./modules/system.nix") < imports.index("./modules/hardware.nix"), imports
-        htpc = [f["path"] for f in get("/profiles/htpc")["files"]]
-        assert "modules/htpc.nix" in htpc and "modules/desktop.nix" not in htpc, htpc
-        headless = [f["path"] for f in get("/profiles/server")["files"]]
-        assert "modules/server.nix" in headless and "modules/session.nix" not in headless and "modules/audio.nix" not in headless, headless
-        assert "modules/session.nix" in paths and "modules/audio.nix" in paths, paths
+        assert {m["slug"] for m in desktop["modules"] if m["selected"]} >= {"system", "session", "desktop"}, desktop["modules"]
 
     with subtest("stable moves only on an approval of everything reviewed"):
         retry(lambda _: all(p["checkState"] in ("passed", "skipped") for p in get("/profiles")), timeout_seconds=300)
         awaiting = get("/approval")["profiles"]
         assert {p["name"] for p in awaiting} == {"desktop", "htpc", "server"}, awaiting
         desktop = next(p for p in awaiting if p["name"] == "desktop")
-        assert {"path": "modules/desktop.nix", "change": "added"} in desktop["files"], desktop
+        assert {"path": "modules.nix", "change": "added"} in desktop["files"], desktop
         assert approval_status(approve(awaiting[:1])) == "409"
         stale = [dict(p, testingRev="0" * 40) for p in awaiting]
         assert approval_status(approve(stale)) == "409"
@@ -164,32 +207,33 @@ in
         retry(lambda _: status(f"{panel}/api/v1/profiles/desktop") == "200", timeout_seconds=60)
         assert json.loads(server.succeed(f"curl -fsS {panel}/api/v1/profiles/desktop/stable"))["branch"] == "stable"
 
-    with subtest("editing a module keeps revisions and only reaches testing"):
-        apps = next(m for m in get("/modules") if m["slug"] == "apps")
-        module = get(f"/modules/{apps['id']}")
-        stable = profile("desktop")["stableTree"]
-        body = json.dumps({"slug": "apps", "title": module["title"], "description": module["description"],
+    with subtest("editing a module is a commit that only reaches testing"):
+        module = get("/modules/apps")
+        stable = (profile("desktop")["stableTree"], profile("desktop")["stableRev"])
+        body = json.dumps({"base": module["head"], "slug": "apps", "title": module["title"], "description": "Edited in the panel",
                            "source": module["source"] + "# edited\n", "required": False})
-        server.succeed(f"echo {base64.b64encode(body.encode()).decode()} | base64 -d > /tmp/edit.json")
-        server.succeed(
-            f"curl -fsS -b /tmp/jar -X PUT -H 'X-Cachepanel-CSRF: {csrf}' "
-            f"-H 'Content-Type: application/json' -d @/tmp/edit.json {panel}/api/modules/{apps['id']}")
-        assert get(f"/modules/{apps['id']}")["revision"] == 2
-        edited = {"path": "modules/apps.nix", "change": "changed"}
-        retry(lambda _: edited in next((p["files"] for p in get("/approval")["profiles"] if p["name"] == "desktop"), []), timeout_seconds=300)
-        assert profile("desktop")["stableTree"] == stable
-        awaiting = get("/approval")["profiles"]
-        desktop = next(p for p in awaiting if p["name"] == "desktop")
-        assert desktop["files"] == [{"path": "modules/apps.nix", "change": "changed"}], desktop
+        edited = json.loads(send("/modules/apps", body, "PUT"))["sha"]
+        assert source_head() == edited
+        module = get("/modules/apps")
+        assert module["source"].endswith("# edited\n") and module["description"] == "Edited in the panel", module
+        assert module["history"][0]["sha"] == edited and module["history"][0]["subject"] == "modules: update apps", module["history"]
+        assert get(f"/modules/apps/revisions/{module['history'][1]['sha']}")["source"] == "{ ... }: { }\n"
+        stale = base64.b64encode(body.encode()).decode()
+        assert status(f"-b /tmp/jar -X PUT -H 'X-Cachepanel-CSRF: {csrf}' -H 'Content-Type: application/json' "
+                      f"--data-binary \"$(echo {stale} | base64 -d)\" {panel}/api/modules/apps") == "409"
+        retry(lambda _: any(p["name"] == "desktop" and p["testingRev"] == edited for p in get("/approval")["profiles"]), timeout_seconds=300)
+        assert (profile("desktop")["stableTree"], profile("desktop")["stableRev"]) == stable
+        assert any(c["sha"] == edited for c in get("/approval")["commits"])
 
     with subtest("machines read both branches with ETag and immutable trees"):
         server.succeed(f"curl -fsS -D /tmp/headers -o /tmp/pointer {panel}/api/v1/profiles/desktop")
         etag = server.succeed("grep -i '^etag:' /tmp/headers | cut -d' ' -f2 | tr -d '\\r'").strip()
         assert status(f"-H 'If-None-Match: {etag}' {panel}/api/v1/profiles/desktop") == "304"
         pointer = json.loads(server.succeed("cat /tmp/pointer"))
+        assert pointer["source"] == f"git+{panel}/source.git?rev={pointer['rev']}", pointer
         server.succeed(f"curl -fsS {panel}{pointer['path']} | tar -tz tree/default.nix")
         testing = json.loads(server.succeed(f"curl -fsS {panel}/api/v1/profiles/desktop/testing"))
-        assert testing["branch"] == "testing" and testing["tree"] != pointer["tree"], (testing, pointer)
+        assert testing["branch"] == "testing" and (testing["tree"], testing["rev"]) != (pointer["tree"], pointer["rev"]), (testing, pointer)
         assert status(f"{panel}/api/v1/profiles/desktop/nightly") == "404"
         branches = {p["name"]: (p["stable"], p["testing"]) for p in json.loads(server.succeed(f"curl -fsS {panel}/api/v1/profiles"))}
         assert branches["desktop"] == (True, True), branches
@@ -260,5 +304,78 @@ in
         server.wait_until_succeeds("journalctl -u nixly-cachepanel | grep -q '\"msg\":\"garbage collection\"'", timeout=120)
         server.wait_until_succeeds(f"test ! -e /var/lib/cachepanel/cache/{evicted}.narinfo", timeout=120)
         server.fail("journalctl -u nixly-cachepanel | grep '\"level\":\"WARN\",\"msg\":\"garbage collection\"'")
+
+    with subtest("a profile picks its kernel and settings from the source's catalogue"):
+        assert get("/kernels")["performance"]["settings"]["tickRate"]["default"] == "1000"
+        detail = get("/profiles/desktop")
+        current = detail["profile"]
+        def save(settings):
+            body = json.dumps({"name": current["name"], "title": current["title"], "description": current["description"],
+                               "platform": current["platform"], "kernel": "performance", "kernelSettings": settings,
+                               "pinnedSha": current["pinnedSha"], "packages": detail["packages"],
+                               "modules": [m["slug"] for m in detail["modules"] if m["selected"] and not m["required"]]})
+            return status(f"-b /tmp/jar -X PUT -H 'X-Cachepanel-CSRF: {csrf}' -H 'Content-Type: application/json' "
+                          f"-d '{body}' {panel}/api/profiles/desktop")
+
+        assert save({"tickRate": "250"}) == "422" and save({"scheduler": "bore"}) == "422"
+        assert save({"tickRate": "1000"}) == "204"
+        assert get("/profiles/desktop")["profile"]["kernelSettings"] == {}
+        assert save({"tickRate": "300"}) == "204"
+        assert get("/profiles/desktop")["profile"]["kernelSettings"] == {"tickRate": "300"}
+        retry(lambda _: any('"tickRate" = "300";' in f["content"] for f in get("/profiles/desktop")["files"]), timeout_seconds=120)
+
+    with subtest("an idle server asks root for the new panel once, and a failed update is not retried"):
+        update = get("/update")
+        assert update["configured"] and update["enabled"], update
+        retry(lambda _: get("/update")["newest"] is not None, timeout_seconds=300)
+        newest = get("/update")["newest"]
+        assert newest["out"] != update["running"] and newest["out"].endswith("-cachepanel-demo"), (newest, update)
+        server.wait_until_succeeds("test -n \"$(find /var/lib/cachepanel/update/idle -newermt '-60 seconds')\"", timeout=180)
+        request = json.loads(server.wait_until_succeeds("cat /var/lib/cachepanel/update/request.json", timeout=120))
+        assert request["target"] == newest["out"], request
+        retry(lambda _: (get("/update")["status"] or {}).get("phase") == "failed", timeout_seconds=120)
+        assert "stopped at line" in get("/update")["status"]["log"], get("/update")
+        written = server.succeed("stat -c %Y /var/lib/cachepanel/update/request.json")
+        server.sleep(35)
+        assert server.succeed("stat -c %Y /var/lib/cachepanel/update/request.json") == written
+        send("/update", json.dumps({"enabled": False}), method="PUT")
+        assert not get("/update")["enabled"]
+
+    with subtest("the panel edits the source: commit, history, diff and revert"):
+        head = get("/source/tree")["head"]
+        assert head == source_head()
+        note = {"path": "docs/notes.md", "content": "hello\n"}
+        created = json.loads(send("/source/commits", json.dumps({"base": head, "message": "Add notes", "changes": [note]})))
+        assert source_head() == created["sha"]
+        assert get("/source/file?path=docs/notes.md")["text"] == "hello\n"
+        stale = json.dumps({"base": head, "message": "stale", "changes": [note]})
+        assert status(f"-b /tmp/jar -X POST -H 'X-Cachepanel-CSRF: {csrf}' -H 'Content-Type: application/json' "
+                      f"-d '{stale}' {panel}/api/source/commits") == "409"
+        details = get(f"/source/commits/{created['sha']}")
+        assert details["files"][0]["path"] == "docs/notes.md" and "+hello" in details["files"][0]["patch"], details
+        assert get("/source/log?path=docs/notes.md")["commits"][0]["sha"] == created["sha"]
+        reverted = json.loads(send(f"/source/commits/{created['sha']}/revert", json.dumps({"base": created["sha"]})))
+        assert status(f"-b /tmp/jar {panel}/api/source/file?path=docs/notes.md") == "404"
+        author = server.succeed("runuser -u cachepanel -- git -C /var/lib/cachepanel/source.git log -1 --format=%an").strip()
+        assert author == "nixlyos", author
+        retry(lambda _: any(c["sha"] == reverted["sha"] for c in get("/commits")["items"]), timeout_seconds=120)
+
+    with subtest("inputs update into a flake.lock commit"):
+        assert get("/source/inputs")["inputs"] == []
+        server.succeed("mkdir -p /var/lib/demo-extra && echo 1 > /var/lib/demo-extra/value")
+        flake = get("/source/file?path=flake.nix")
+        declared = flake["text"].replace("outputs = { self }:", 'inputs.extra = { url = "path:/var/lib/demo-extra"; flake = false; };\n  outputs = { self, ... }:')
+        send("/source/commits", json.dumps({"base": flake["head"], "message": "Add an input", "changes": [{"path": "flake.nix", "content": declared}]}))
+        send("/source/inputs/update", json.dumps({"base": get("/source/inputs")["head"], "inputs": []}))
+        extra = next(i for i in get("/source/inputs")["inputs"] if i["name"] == "extra")
+        assert extra["source"] == "/var/lib/demo-extra", extra
+        locked = get("/source/file?path=flake.lock")["text"]
+        server.succeed("echo 2 > /var/lib/demo-extra/value")
+        send("/source/inputs/update", json.dumps({"base": get("/source/inputs")["head"], "inputs": ["extra"]}))
+        assert get("/source/file?path=flake.lock")["text"] != locked
+        same = json.dumps({"base": get("/source/inputs")["head"], "inputs": ["extra"]})
+        assert status(f"-b /tmp/jar -X POST -H 'X-Cachepanel-CSRF: {csrf}' -H 'Content-Type: application/json' "
+                      f"-d '{same}' {panel}/api/source/inputs/update") == "422"
+        assert get("/source/log?path=flake.lock")["commits"][0]["subject"] == "flake.lock: update extra"
   '';
 }

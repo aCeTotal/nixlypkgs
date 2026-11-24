@@ -84,7 +84,7 @@ export function ProfileSettingsForm({ draft, update }: ProfileSettingsFormProps)
           </Field>
         </CardContent>
       </Card>
-      <KernelChoice kernel={draft.kernel} onChange={(kernel) => update({ kernel })} />
+      <KernelChoice kernel={draft.kernel} settings={draft.kernelSettings} onChange={(kernel, kernelSettings) => update({ kernel, kernelSettings })} />
     </div>
   );
 }

@@ -3,17 +3,21 @@
 Control panel for nixlypkgs and every NixlyOS setup: the binary cache, profiles, the module registry and
 the package wizard. The panel knows profiles, never individual machines.
 
+- **Source** – nixlypkgs lives in the panel as its own git repository, seeded once from GitHub. Keys
+  added under Source push over SSH, or edit any file in the panel's editor with history, diffs and revert;
+  anyone clones over HTTPS and machines lock each release from it. History only moves forward.
 - **Cache** – every commit on the branch is evaluated; each derivation keeps its three newest versions in
   a signed file cache the panel serves itself (`cache.dir`, put it on a big disk); the Nix store is only
   build space. Older versions are garbage collected. Any version can be selected, rebuilt, cancelled or
   deleted, with live progress and logs.
 - **Profiles** – Desktop, HTPC, Server and your own. A profile is the required modules plus its chosen
-  ones, packages from nixpkgs stable (nixlypkgs on top), a nixlypkgs revision and its kernel: performance
-  or enterprise. The hardware module picks drivers on each machine. Machines pull their profile's
-  release with ETags; trees are content-addressed and CDN-cacheable.
-- **Modules** – every NixlyOS module lives in the database with its revisions: a matrix shows which
-  profile uses what, and the editor has an outline of each module's sections, search, folding and
-  inline syntax errors.
+  ones, packages from nixpkgs stable (nixlypkgs on top), a nixlypkgs revision and a kernel from the
+  source's catalogue with its own settings: tick rate, idle ticks, preemption, huge pages, TCP and the
+  scheduler. Only tick changes rebuild the kernel. The hardware module picks drivers on each machine.
+  Machines pull their profile's release with ETags; trees are content-addressed and CDN-cacheable.
+- **Modules** – every NixlyOS module is a file in `nixlyos/modules`, listed in `catalogue.json` in import
+  order; saving commits it and its history is git's. A matrix shows which profile uses what, and the
+  editor has an outline of each module's sections, search, folding and inline syntax errors.
 - **Testing** – every change to a profile is evaluated *and built* on all reference hardware before it
   reaches the **testing** branch. **Stable**, which machines follow by default, moves only when you
   approve testing on its own page, for every profile at once. Machines only ever receive tested releases.
@@ -33,8 +37,8 @@ nix develop  # Go, Node, PostgreSQL, nix-eval-jobs, nixfmt
 nix flake check   # NixOS VM test of the whole flow
 ```
 
-Log in with `nixlyos` / `nixos`. Set `CACHEPANEL_REPOSITORY=https://github.com/aCeTotal/nixlypkgs` to
-follow the real repository, or `CACHEPANEL_DEMO_PACKAGES=path:/path/to/nixlypkgs` to give the demo
+Log in with `nixlyos` / `nixos`. Set `CACHEPANEL_SOURCE_SEED=https://github.com/aCeTotal/nixlypkgs` before
+the first start to seed the source from the real repository, or `CACHEPANEL_DEMO_PACKAGES=path:/path/to/nixlypkgs` to give the demo
 repository a real package set for the wizard. Inside `nix develop`, `cd web && npm run dev` gives hot
 reload against :8686.
 
@@ -44,7 +48,7 @@ reload against :8686.
 ## Deploy
 
 ```nix
-# flake inputs: nixlypkgs.url = "github:aCeTotal/nixlypkgs";
+# flake inputs: nixlypkgs.url = "git+file:///var/lib/cachepanel/source.git";
 imports = [ nixlypkgs.nixosModules.cachepanel ];
 services.nixly-cachepanel = {
   enable = true;
@@ -55,9 +59,8 @@ services.nixly-cachepanel = {
 ```
 
 The module sets up PostgreSQL, the panel service (unprivileged, sandboxed), the cache signed with the
-existing `cache.aceclan.no-1` key, Caddy with HTTPS and a deploy key for the wizard; the panel shows its
-public half under Add derivation → Publish, to be added on GitHub with write access. It replaces the old
-nixlycaching watcher. Change the password under the user menu after the first login.
+existing `cache.aceclan.no-1` key, Caddy with HTTPS and SSH push for `cachepanel@<domain>:source.git`.
+It replaces the old nixlycaching watcher. Change the password under the user menu after the first login.
 
 ## Layout
 
@@ -65,7 +68,7 @@ nixlycaching watcher. Change the password under the user menu after the first lo
 |---|---|
 | `server/<feature>` | Go backend, one package per feature (`builds`, `watcher`, `profiles`, `wizard`, …) |
 | `server/recipe`, `server/analyse`, `server/pkgbuild`, `server/depmap` | Wizard internals: Nix generation, source analysis, PKGBUILD reading, nixpkgs name tables |
-| `server/migrations` | SQL migrations; `00005_modules.sql` seeds the NixlyOS modules on fresh installs |
+| `server/migrations` | SQL migrations, applied in order |
 | `web/src/<feature>` | React frontend, one folder per feature; `web/src/ui` is the shadcn/ui kit |
 | `web/src/modules/nix` | Nix grammar for the editor, compiled by `@lezer/generator` at build time |
 | `nix` | Package, NixOS module, dev stack, demo repository and VM test |

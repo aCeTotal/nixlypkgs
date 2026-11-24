@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -6,7 +6,7 @@ import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "@/ui/field";
 import { Input } from "@/ui/input";
-import { createModule } from "./queries";
+import { createModule, modulesQuery } from "./queries";
 
 const template = `{ config, lib, pkgs, ... }:
 
@@ -16,11 +16,12 @@ const template = `{ config, lib, pkgs, ... }:
 
 export function NewModuleDialog() {
   const navigate = useNavigate();
+  const head = useQuery(modulesQuery).data?.head ?? "";
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const create = useMutation({
-    mutationFn: () => createModule({ slug, title, description: "", source: template, required: false }),
-    onSuccess: ({ id }) => navigate({ to: "/modules/$id", params: { id: String(id) } }),
+    mutationFn: () => createModule({ base: head, slug, title, description: "", source: template, required: false }),
+    onSuccess: () => navigate({ to: "/modules/$slug", params: { slug } }),
   });
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -38,7 +39,7 @@ export function NewModuleDialog() {
         <form onSubmit={submit} className="space-y-6">
           <DialogHeader>
             <DialogTitle>New module</DialogTitle>
-            <DialogDescription>A plain NixOS module. Choose it on the profiles that should use it.</DialogDescription>
+            <DialogDescription>A plain NixOS module, committed to nixlyos/modules. Choose it on the profiles that should use it.</DialogDescription>
           </DialogHeader>
           <FieldGroup>
             <Field>
@@ -60,7 +61,7 @@ export function NewModuleDialog() {
           </FieldGroup>
           <DialogFooter>
             <Button type="submit" disabled={create.isPending}>
-              Opprett
+              Create
             </Button>
           </DialogFooter>
         </form>

@@ -11,6 +11,7 @@ import (
 	"cachepanel/realtime"
 	"cachepanel/repo"
 	"cachepanel/signing"
+	"cachepanel/source"
 )
 
 const settle = time.Second
@@ -29,6 +30,7 @@ type Deps struct {
 	Mirror    *repo.Mirror
 	Cache     *cache.Cache
 	Signer    *signing.Store
+	Source    *source.Repo
 	ChecksDir string
 	// PublicURL serves signature bundles to machines.
 	PublicURL string

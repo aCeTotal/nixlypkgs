@@ -1,0 +1,194 @@
+--- a/drivers/platform/x86/msi-ec.c
++++ b/drivers/platform/x86/msi-ec.c
+@@ -1675,9 +1675,8 @@
+ module_param(firmware, charp, 0);
+ MODULE_PARM_DESC(firmware, "Load a configuration for a specified firmware version");
+ 
+-static bool debug = false;
+-module_param(debug, bool, 0);
+-MODULE_PARM_DESC(debug, "Load the driver in the debug mode, exporting the debug attributes");
++// Debug mode writes arbitrary EC registers; never enabled.
++static const bool debug;
+ 
+ // ============================================================ //
+ // Helper functions
+@@ -2372,6 +2371,118 @@
+ };
+ 
+ // ============================================================ //
++// Sysfs platform device attributes (fan curves)
++// ============================================================ //
++
++#define MSI_EC_CURVE_TEMPS     6
++#define MSI_EC_CURVE_POINTS    13
++#define MSI_EC_CURVE_MAX_TEMP  100
++#define MSI_EC_CURVE_MAX_SPEED 150
++
++// Temperatures follow the realtime temperature, speeds the realtime speed.
++struct msi_ec_curve {
++	int temp_address;
++	int speed_address;
++};
++
++#define MSI_EC_CURVE(fan) ((struct msi_ec_curve){ \
++	(fan).rt_temp_address + 2, (fan).rt_fan_speed_address + 1 })
++
++static int fan_curve_address(struct msi_ec_curve curve, int i)
++{
++	return i < MSI_EC_CURVE_TEMPS ? curve.temp_address + i
++				      : curve.speed_address + i - MSI_EC_CURVE_TEMPS;
++}
++
++static ssize_t fan_curve_show(struct msi_ec_curve curve, char *buf)
++{
++	int count = 0;
++	u8 value;
++	int result;
++
++	for (int i = 0; i < MSI_EC_CURVE_POINTS; i++) {
++		result = ec_read(fan_curve_address(curve, i), &value);
++		if (result < 0)
++			return result;
++		count += sysfs_emit_at(buf, count, "%u%c", value,
++				       i == MSI_EC_CURVE_POINTS - 1 ? '\n' : ' ');
++	}
++	return count;
++}
++
++// Six ascending temperatures, then seven speeds in percent.
++static ssize_t fan_curve_store(struct msi_ec_curve curve, const char *buf,
++			       size_t count)
++{
++	unsigned int v[MSI_EC_CURVE_POINTS];
++	int result;
++
++	if (sscanf(buf, "%u %u %u %u %u %u %u %u %u %u %u %u %u",
++		   &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6],
++		   &v[7], &v[8], &v[9], &v[10], &v[11], &v[12]) != MSI_EC_CURVE_POINTS)
++		return -EINVAL;
++
++	for (int i = 0; i < MSI_EC_CURVE_POINTS; i++) {
++		if (i < MSI_EC_CURVE_TEMPS &&
++		    (v[i] > MSI_EC_CURVE_MAX_TEMP || (i > 0 && v[i] <= v[i - 1])))
++			return -EINVAL;
++		if (i >= MSI_EC_CURVE_TEMPS && v[i] > MSI_EC_CURVE_MAX_SPEED)
++			return -EINVAL;
++	}
++
++	for (int i = 0; i < MSI_EC_CURVE_POINTS; i++) {
++		result = ec_write(fan_curve_address(curve, i), v[i]);
++		if (result < 0)
++			return result;
++	}
++	return count;
++}
++
++static ssize_t cpu_fan_curve_show(struct device *device,
++				  struct device_attribute *attr, char *buf)
++{
++	return fan_curve_show(MSI_EC_CURVE(conf.cpu), buf);
++}
++
++static ssize_t cpu_fan_curve_store(struct device *dev,
++				   struct device_attribute *attr,
++				   const char *buf, size_t count)
++{
++	return fan_curve_store(MSI_EC_CURVE(conf.cpu), buf, count);
++}
++
++static ssize_t gpu_fan_curve_show(struct device *device,
++				  struct device_attribute *attr, char *buf)
++{
++	return fan_curve_show(MSI_EC_CURVE(conf.gpu), buf);
++}
++
++static ssize_t gpu_fan_curve_store(struct device *dev,
++				   struct device_attribute *attr,
++				   const char *buf, size_t count)
++{
++	return fan_curve_store(MSI_EC_CURVE(conf.gpu), buf, count);
++}
++
++static struct device_attribute dev_attr_cpu_fan_curve = {
++	.attr = {
++		.name = "fan_curve",
++		.mode = 0644,
++	},
++	.show = cpu_fan_curve_show,
++	.store = cpu_fan_curve_store,
++};
++
++static struct device_attribute dev_attr_gpu_fan_curve = {
++	.attr = {
++		.name = "fan_curve",
++		.mode = 0644,
++	},
++	.show = gpu_fan_curve_show,
++	.store = gpu_fan_curve_store,
++};
++
++// ============================================================ //
+ // Sysfs platform device attributes (cpu)
+ // ============================================================ //
+ 
+@@ -2422,6 +2533,7 @@
+ static struct attribute *msi_cpu_attrs[] = {
+ 	&dev_attr_cpu_realtime_temperature.attr,
+ 	&dev_attr_cpu_realtime_fan_speed.attr,
++	&dev_attr_cpu_fan_curve.attr,
+ 	NULL
+ };
+ 
+@@ -2476,6 +2588,7 @@
+ static struct attribute *msi_gpu_attrs[] = {
+ 	&dev_attr_gpu_realtime_temperature.attr,
+ 	&dev_attr_gpu_realtime_fan_speed.attr,
++	&dev_attr_gpu_fan_curve.attr,
+ 	NULL
+ };
+ 
+@@ -2726,6 +2839,10 @@
+ 	else if (attr == &dev_attr_cpu_realtime_fan_speed.attr)
+ 		address = conf.cpu.rt_fan_speed_address;
+ 
++	else if (attr == &dev_attr_cpu_fan_curve.attr)
++		address = conf.cpu.rt_temp_address == MSI_EC_ADDR_UNSUPP ?
++			  MSI_EC_ADDR_UNSUPP : conf.cpu.rt_fan_speed_address;
++
+ 	/* gpu group */
+ 	else if (attr == &dev_attr_gpu_realtime_temperature.attr)
+ 		address = conf.gpu.rt_temp_address;
+@@ -2733,6 +2850,10 @@
+ 	else if (attr == &dev_attr_gpu_realtime_fan_speed.attr)
+ 		address = conf.gpu.rt_fan_speed_address;
+ 
++	else if (attr == &dev_attr_gpu_fan_curve.attr)
++		address = conf.gpu.rt_temp_address == MSI_EC_ADDR_UNSUPP ?
++			  MSI_EC_ADDR_UNSUPP : conf.gpu.rt_fan_speed_address;
++
+ 	/* default */
+ 	else
+ 		return attr->mode;
+@@ -2845,6 +2966,22 @@
+ 				conf.allowed_fw = NULL;
+ 				conf_loaded = true;
+ 				return 0;
++			}
++		}
++
++		// Unknown update of a known model: use its configuration.
++		size_t model = strcspn(ver, ".");
++
++		for (int i = 0; CONFIGURATIONS[i]; i++) {
++			for (int j = 0; CONFIGURATIONS[i]->allowed_fw[j]; j++) {
++				if (strncmp(CONFIGURATIONS[i]->allowed_fw[j], ver, model + 1))
++					continue;
++				pr_warn("firmware %s unknown, using the %s configuration\n",
++					ver, CONFIGURATIONS[i]->allowed_fw[j]);
++				memcpy(&conf, CONFIGURATIONS[i], sizeof(struct msi_ec_conf));
++				conf.allowed_fw = NULL;
++				conf_loaded = true;
++				return 0;
+ 			}
+ 		}
+ 	} else {

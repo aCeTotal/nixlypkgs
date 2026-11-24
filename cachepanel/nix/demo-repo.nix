@@ -15,12 +15,25 @@ writeShellApplication {
       git -C "$dir" commit --quiet -m "Demo-revisjon $1"
     }
 
+    # Empty modules under the slugs the seeded profiles choose.
+    modules() {
+      mkdir -p "$dir/nixlyos/modules"
+      entries=""
+      for slug in system security network session audio user gaming apps desktop htpc server hardware; do
+        echo '{ ... }: { }' > "$dir/nixlyos/modules/$slug.nix"
+        case $slug in system | security | network | user | hardware) required=true ;; *) required=false ;; esac
+        entries+="''${entries:+,}{\"slug\":\"$slug\",\"title\":\"$slug\",\"description\":\"\",\"required\":$required}"
+      done
+      echo "[$entries]" > "$dir/nixlyos/modules/catalogue.json"
+    }
+
     case "''${2:-init}" in
       init)
         [ -d "$dir/.git" ] && exit 0
         mkdir -p "$dir"
         install -m 0644 ${./demo-flake.nix} "$dir/flake.nix"
         git -C "$dir" init --quiet --initial-branch=main
+        modules
         for revision in 1 2 3 4; do commit "$revision"; done
         ;;
       bump)

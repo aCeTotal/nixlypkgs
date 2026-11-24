@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -19,8 +18,6 @@ const (
 	logFormat  = "%H%x1f%an%x1f%ct%x1f%s"
 )
 
-var githubURL = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+?)(\.git)?/?$`)
-
 type Commit struct {
 	SHA     string
 	Subject string
@@ -31,12 +28,11 @@ type Commit struct {
 // Mirror is a bare clone.
 type Mirror struct {
 	dir    string
-	url    string
 	branch string
 }
 
 func Open(ctx context.Context, dir, url, branch string) (*Mirror, error) {
-	m := &Mirror{dir: dir, url: url, branch: branch}
+	m := &Mirror{dir: dir, branch: branch}
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, err
 	}
@@ -96,14 +92,6 @@ func (m *Mirror) Dir() string {
 // FlakeRef evaluates without network access.
 func (m *Mirror) FlakeRef(sha string) string {
 	return "git+file://" + m.dir + "?rev=" + sha
-}
-
-// Source is what machines lock.
-func (m *Mirror) Source(sha string) string {
-	if match := githubURL.FindStringSubmatch(m.url); match != nil {
-		return "github:" + match[1] + "/" + match[2] + "/" + sha
-	}
-	return "git+" + m.url + "?rev=" + sha
 }
 
 func (m *Mirror) known(ctx context.Context, sha string) bool {

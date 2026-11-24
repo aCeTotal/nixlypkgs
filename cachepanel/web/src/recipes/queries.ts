@@ -131,9 +131,3 @@ export const deleteRecipe = (id: number) => api(`/recipes/${id}`, { method: "DEL
 
 export const uploadSource = (file: File, onProgress: (fraction: number) => void) =>
   upload<{ hash: string; name: string; url: string }>("/sources", file, onProgress);
-
-export const publishingQuery = queryOptions({
-  queryKey: ["publishing"],
-  queryFn: () => api<{ remote: string | null; publicKey: string | null }>("/publishing"),
-  staleTime: Infinity,
-});

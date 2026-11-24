@@ -29,6 +29,8 @@ const (
 	WatcherChanged Event = "watcher.changed"
 	ProfileChanged Event = "profile.changed"
 	TrustChanged   Event = "trust.changed"
+	SourceChanged  Event = "source.changed"
+	UpdateChanged  Event = "update.changed"
 	ModuleChanged  Event = "module.changed"
 	RecipeChanged  Event = "recipe.changed"
 )

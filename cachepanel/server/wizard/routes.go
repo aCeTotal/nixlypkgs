@@ -1,7 +1,6 @@
 package wizard
 
 import (
-	"errors"
 	"net/http"
 	"os"
 
@@ -29,7 +28,6 @@ func (s *Service) Mount(r chi.Router) {
 	r.Post("/recipes/{id}/stop", rest.Handle(s.stopBuild))
 	r.Get("/recipes/{id}/log", rest.Handle(s.log))
 	r.Post("/recipes/{id}/publish", rest.Handle(s.publish))
-	r.Get("/publishing", rest.Handle(s.publishing))
 	r.Post("/sources", rest.Handle(s.upload))
 	r.Get("/nixpkgs", rest.Handle(s.search))
 }
@@ -233,16 +231,4 @@ func (s *Service) search(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return rest.WriteJSON(w, http.StatusOK, found)
-}
-
-// publishing shows where publishes go and the key to allow.
-func (s *Service) publishing(w http.ResponseWriter, r *http.Request) error {
-	key, err := s.publisher.PublicKey(r.Context())
-	if errors.Is(err, errNoRemote) {
-		return rest.WriteJSON(w, http.StatusOK, map[string]any{"remote": nil, "publicKey": nil})
-	}
-	if err != nil {
-		return err
-	}
-	return rest.WriteJSON(w, http.StatusOK, map[string]any{"remote": s.publisher.Remote, "publicKey": key})
 }

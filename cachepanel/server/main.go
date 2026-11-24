@@ -14,10 +14,12 @@ import (
 
 	"cachepanel/auth"
 	"cachepanel/config"
+	"cachepanel/database"
 	"cachepanel/serve"
+	"cachepanel/source"
 )
 
-const usage = "usage: cachepanel <serve|hash-password>"
+const usage = "usage: cachepanel <serve|hash-password|authorized-keys|git-serve>"
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
@@ -34,6 +36,10 @@ func run(args []string) error {
 	switch args[0] {
 	case "serve":
 		return serveCommand()
+	case "authorized-keys":
+		return authorizedKeys()
+	case "git-serve":
+		return gitServe()
 	case "hash-password":
 		return hashPassword()
 	}
@@ -62,4 +68,28 @@ func hashPassword() error {
 	}
 	_, err = fmt.Println(auth.HashPassword(password))
 	return err
+}
+
+// Feeds sshd's AuthorizedKeysCommand.
+func authorizedKeys() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	db, err := database.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	return source.Keys{DB: db}.Authorized(ctx, os.Stdout, cfg.SSHCommand)
+}
+
+// Runs as each key's forced command.
+func gitServe() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	return source.At(cfg).Serve(os.Getenv("SSH_ORIGINAL_COMMAND"))
 }

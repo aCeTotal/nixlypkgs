@@ -58,7 +58,7 @@ the release itself, so the fast path can never activate a stale system.
 
 ## Workflow
 
-1. Change modules in the panel, or packages here (commit on `main`,
+1. Change modules, kernels or packages in the panel, or here (commit on `main`,
    optionally `scripts/bump-inputs.sh` first) and push.
 2. The panel builds it, tests every profile on `reference/profiles` and puts
    it in testing; approve it in the panel to make it stable.
@@ -68,7 +68,9 @@ the release itself, so the fast path can never activate a stale system.
 
 ```
 lib/mk-system.nix   mkNixlySystem: machine data + profile tree -> complete NixOS system
+lib/kernel.nix      the profile's kernel from ../kernel/catalogue.nix, with its settings
 lib/signing.nix     applies the panel's signatures to modules, kernel and systemd-boot
+modules/            the NixlyOS modules profiles import, in catalogue.json order
 reference/          hardware profiles every profile is tested on
 scripts/            detect-hw, update, stage, panel, secureboot, user-config:
                     nixlyos-* commands via scripts/overlay.nix; bump-inputs (maintainer)

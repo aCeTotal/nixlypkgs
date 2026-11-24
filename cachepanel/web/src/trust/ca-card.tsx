@@ -34,7 +34,7 @@ export function CreateCACard() {
 }
 
 export function ActiveCACard({ ca, history }: { ca: CA; history: CA[] }) {
-  const rotate = useMutation({ mutationFn: createCA, onSuccess: () => toast.success("New CA active; update the kernel's CA input next") });
+  const rotate = useMutation({ mutationFn: createCA, onSuccess: () => toast.success("New CA active; update the nixlyos-ca input next") });
   const daysLeft = daysUntil(ca.notAfter);
   const retired = history.filter((entry) => entry.retiredAt !== null);
   return (
@@ -98,7 +98,7 @@ export function ActiveCACard({ ca, history }: { ca: CA; history: CA[] }) {
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-3">
           <p className="max-w-xl text-xs text-muted-foreground">
             Rotation retires this CA. Signing pauses until the kernel embeds the new one: run{" "}
-            <code className="font-mono">nix flake update nixlyos-ca</code> in kernel_nixlyos and bump nixlypkgs. Machines then run{" "}
+            <code className="font-mono">nix flake update nixlyos-ca</code> in nixlypkgs and push. Machines then run{" "}
             <code className="font-mono">nixlyos-secureboot update</code>; the previous CA stays in db so older generations keep booting.
           </p>
           <ConfirmButton

@@ -1,53 +1,56 @@
-import { Gauge, ShieldCheck, type LucideIcon } from "lucide-react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { Cpu, TriangleAlert } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { cn } from "@/ui/cn";
-import type { Kernel } from "./queries";
+import { KernelSettings } from "./kernel-settings";
+import { kernelsQuery } from "./queries";
 
-const kernels: Record<Kernel, { title: string; icon: LucideIcon; text: string }> = {
-  performance: {
-    title: "Performance",
-    icon: Gauge,
-    text: "Desktops and HTPCs get CachyOS with BORE for the fastest start-up and games. Servers get a hardened vanilla build for every kind of service.",
-  },
-  enterprise: {
-    title: "Enterprise",
-    icon: ShieldCheck,
-    text: "Vanilla, minimal and fully hardened. Module loading locks once the machine has booted; nothing can change the running kernel.",
-  },
+type KernelChoiceProps = {
+  kernel: string;
+  settings: Record<string, string>;
+  onChange: (kernel: string, settings: Record<string, string>) => void;
 };
 
-type KernelChoiceProps = { kernel: Kernel; onChange: (kernel: Kernel) => void };
-
-export function KernelChoice({ kernel, onChange }: KernelChoiceProps) {
+export function KernelChoice({ kernel, settings, onChange }: KernelChoiceProps) {
+  const { data: offers } = useSuspenseQuery(kernelsQuery);
+  const offer = offers[kernel];
   return (
     <Card>
       <CardHeader>
         <CardTitle>Kernel</CardTitle>
-        <CardDescription>Both enforce signed modules, lockdown and the NixlyOS Secure Boot chain.</CardDescription>
+        <CardDescription>Every kernel enforces signed modules, lockdown and the NixlyOS Secure Boot chain.</CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-2">
-        {(Object.keys(kernels) as Kernel[]).map((value) => {
-          const option = kernels[value];
-          const chosen = value === kernel;
-          return (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={chosen}
-              onClick={() => onChange(value)}
-              className={cn(
-                "flex flex-col gap-2 rounded-xl border p-4 text-left transition-all hover:border-primary/50",
-                chosen && "border-primary bg-primary/5 ring-2 ring-primary/20",
-              )}
-            >
-              <span className="flex items-center gap-2 font-medium">
-                <option.icon className={cn("size-4", chosen ? "text-primary" : "text-muted-foreground")} />
-                {option.title}
-              </span>
-              <span className="text-xs text-muted-foreground">{option.text}</span>
-            </button>
-          );
-        })}
+      <CardContent className="space-y-5">
+        {!offer && (
+          <p className="flex items-center gap-2 rounded-lg bg-warning-soft px-3 py-2 text-sm text-warning-foreground">
+            <TriangleAlert className="size-4 shrink-0" />
+            The source no longer offers {kernel}. Pick another kernel.
+          </p>
+        )}
+        <div className="grid gap-3 sm:grid-cols-3">
+          {Object.entries(offers).map(([name, option]) => {
+            const chosen = name === kernel;
+            return (
+              <button
+                key={name}
+                type="button"
+                aria-pressed={chosen}
+                onClick={() => onChange(name, chosen ? settings : {})}
+                className={cn(
+                  "flex flex-col gap-2 rounded-xl border p-4 text-left transition-all hover:border-primary/50",
+                  chosen && "border-primary bg-primary/5 ring-2 ring-primary/20",
+                )}
+              >
+                <span className="flex items-center gap-2 font-medium">
+                  <Cpu className={cn("size-4", chosen ? "text-primary" : "text-muted-foreground")} />
+                  {option.title}
+                </span>
+                <span className="text-xs text-muted-foreground">{option.description}</span>
+              </button>
+            );
+          })}
+        </div>
+        {offer && <KernelSettings offer={offer} settings={settings} onChange={(next) => onChange(kernel, next)} />}
       </CardContent>
     </Card>
   );

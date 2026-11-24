@@ -11,7 +11,7 @@ import { NewModuleDialog } from "./new-module-dialog";
 import { modulesQuery, type ModuleSummary } from "./queries";
 
 export function ModulesPage() {
-  const { data: modules } = useSuspenseQuery(modulesQuery);
+  const { data: { modules } } = useSuspenseQuery(modulesQuery);
   const { data: profiles } = useSuspenseQuery(profilesQuery);
   const required = modules.filter((module) => module.required);
   const optional = modules.filter((module) => !module.required);
@@ -20,7 +20,7 @@ export function ModulesPage() {
     <div className="space-y-5">
       <PageHeader
         title="Modules"
-        description="Everything the systems are built from. Required modules are in every profile; optional ones are chosen per profile. The order is the import order."
+        description="Everything the systems are built from, kept in nixlyos/modules. Required modules are in every profile; optional ones are chosen per profile. The order is the import order."
         actions={<NewModuleDialog />}
       />
       <div className="grid gap-4 sm:grid-cols-3">
@@ -71,14 +71,14 @@ function Group({ title, modules, profiles }: { title: string; modules: ModuleSum
       </TableRow>
       {modules.map((module) => (
         <TableRow
-          key={module.id}
-          onClick={() => navigate({ to: "/modules/$id", params: { id: String(module.id) } })}
+          key={module.slug}
+          onClick={() => navigate({ to: "/modules/$slug", params: { slug: module.slug } })}
           className="group cursor-pointer"
         >
           <TableCell className="whitespace-normal">
             <Link
-              to="/modules/$id"
-              params={{ id: String(module.id) }}
+              to="/modules/$slug"
+              params={{ slug: module.slug }}
               className="font-medium group-hover:text-primary"
               onClick={(event) => event.stopPropagation()}
             >
@@ -92,8 +92,8 @@ function Group({ title, modules, profiles }: { title: string; modules: ModuleSum
               <Usage module={module} profile={profile} />
             </TableCell>
           ))}
-          <TableCell className="text-right tabular-nums">{module.lines.toLocaleString("nb-NO")}</TableCell>
-          <TableCell className="text-right text-sm whitespace-nowrap text-muted-foreground">{timeAgo(module.updatedAt)}</TableCell>
+          <TableCell className="text-right tabular-nums">{module.lines.toLocaleString("en-GB")}</TableCell>
+          <TableCell className="text-right text-sm whitespace-nowrap text-muted-foreground">{timeAgo(module.changedAt)}</TableCell>
         </TableRow>
       ))}
     </>

@@ -10,7 +10,7 @@ import (
 )
 
 // ErrUntrusted means kernels lack the CA.
-var ErrUntrusted = errors.New("the kernel does not trust the active NixlyOS CA yet: update nixlyos-kernel")
+var ErrUntrusted = errors.New("the kernel does not trust the active NixlyOS CA yet: update the nixlyos-ca input")
 
 // Trusts checks kernels embed the CA.
 func Trusts(ca CA, toplevels []string) error {

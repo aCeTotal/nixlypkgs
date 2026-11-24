@@ -12,11 +12,11 @@ type ProfileModulesProps = {
 };
 
 export function ProfileModules({ detail, draft, update }: ProfileModulesProps) {
-  const toggle = (id: number, on: boolean) =>
-    update({ modules: on ? [...draft.modules, id] : draft.modules.filter((module) => module !== id) });
+  const toggle = (slug: string, on: boolean) =>
+    update({ modules: on ? [...draft.modules, slug] : draft.modules.filter((module) => module !== slug) });
   const required = detail.modules.filter((module) => module.required);
   const optional = detail.modules.filter((module) => !module.required);
-  const chosen = optional.filter((module) => draft.modules.includes(module.id)).length;
+  const chosen = optional.filter((module) => draft.modules.includes(module.slug)).length;
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       <Card>
@@ -28,7 +28,7 @@ export function ProfileModules({ detail, draft, update }: ProfileModulesProps) {
         </CardHeader>
         <CardContent className="space-y-1">
           {optional.map((module) => (
-            <ModuleRow key={module.id} module={module} checked={draft.modules.includes(module.id)} onChange={(on) => toggle(module.id, on)} />
+            <ModuleRow key={module.slug} module={module} checked={draft.modules.includes(module.slug)} onChange={(on) => toggle(module.slug, on)} />
           ))}
         </CardContent>
       </Card>
@@ -40,7 +40,7 @@ export function ProfileModules({ detail, draft, update }: ProfileModulesProps) {
           </CardHeader>
           <CardContent className="space-y-1">
             {required.map((module) => (
-              <ModuleRow key={module.id} module={module} checked />
+              <ModuleRow key={module.slug} module={module} checked />
             ))}
           </CardContent>
         </Card>
@@ -62,13 +62,13 @@ function ModuleRow({ module, checked, onChange }: { module: ProfileModule; check
   return (
     <div className="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-muted/60">
       <Checkbox
-        id={`module-${module.id}`}
+        id={`module-${module.slug}`}
         className="mt-0.5"
         disabled={!onChange}
         checked={checked}
         onCheckedChange={(on) => onChange?.(on === true)}
       />
-      <label htmlFor={`module-${module.id}`} className="min-w-0 flex-1 cursor-pointer">
+      <label htmlFor={`module-${module.slug}`} className="min-w-0 flex-1 cursor-pointer">
         <span className="flex items-center gap-2 text-sm font-medium">
           {module.title}
           <span className="font-mono text-xs font-normal text-muted-foreground">{module.slug}.nix</span>
@@ -81,7 +81,7 @@ function ModuleRow({ module, checked, onChange }: { module: ProfileModule; check
           Required
         </Badge>
       )}
-      <Link to="/modules/$id" params={{ id: String(module.id) }} className="shrink-0 text-xs text-primary hover:underline">
+      <Link to="/modules/$slug" params={{ slug: module.slug }} className="shrink-0 text-xs text-primary hover:underline">
         Open
       </Link>
     </div>
