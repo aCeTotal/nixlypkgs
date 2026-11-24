@@ -32,10 +32,10 @@ type File struct {
 }
 
 // Files renders the tree's Nix sources.
-func Files(spec Spec, pins map[string]string) []File {
+func Files(spec Spec, pins map[string]Pin) []File {
 	files := []File{
 		{Path: "default.nix", Content: defaultNix(spec)},
-		{Path: "pins.nix", Content: pinsNix(pins)},
+		{Path: pinsFile, Content: pinsNix(pins)},
 	}
 	for _, module := range spec.Modules {
 		files = append(files, File{Path: "modules/" + module.Slug + ".nix", Content: module.Source})
@@ -62,11 +62,11 @@ func defaultNix(spec Spec) string {
 	return b.String()
 }
 
-func pinsNix(pins map[string]string) string {
+func pinsNix(pins map[string]Pin) string {
 	var b strings.Builder
 	b.WriteString("{\n")
 	for _, attr := range slices.Sorted(maps.Keys(pins)) {
-		fmt.Fprintf(&b, "  %s = %s;\n", nixexpr.String(attr), nixexpr.String(pins[attr]))
+		fmt.Fprintf(&b, "  %s = %s;\n", nixexpr.String(attr), nixexpr.String(pins[attr].Out))
 	}
 	b.WriteString("}\n")
 	return b.String()

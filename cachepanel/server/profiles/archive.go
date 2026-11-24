@@ -6,13 +6,16 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"slices"
+	"strings"
 	"time"
 )
 
 const treeRoot = "tree/"
 
-// Archive hashes the plain tar.
+// Archive hashes a sorted tar.
 func Archive(files []File) (string, []byte, error) {
+	files = slices.SortedFunc(slices.Values(files), func(a, b File) int { return strings.Compare(a.Path, b.Path) })
 	var plain bytes.Buffer
 	writer := tar.NewWriter(&plain)
 	epoch := time.Unix(0, 0)

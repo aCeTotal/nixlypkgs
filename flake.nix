@@ -119,10 +119,10 @@
         }
         // kernelModules "" stable.linuxPackages_nixlyos
         // kernelModules "-v3" stable.linuxPackages_nixlyos_v3
-        // kernelModules "-v4" stable.linuxPackages_nixlyos_v4
+        // kernelModules "-server" stable.linuxPackages_nixlyos_server
         # Every output of the nixlyos kernels.
         // nixpkgs.lib.concatMapAttrs (name: kernel: { ${name} = kernel; "${name}-modules" = kernel.modules; "${name}-dev" = kernel.dev; })
-          { inherit (stable) linux-nixlyos linux-nixlyos-v3 linux-nixlyos-v4 linux-nixlyos-enterprise; }
+          { inherit (stable) linux-nixlyos linux-nixlyos-v3 linux-nixlyos-server linux-nixlyos-enterprise; }
         // nixpkgs.lib.genAttrs (import ./pkgs/recipes.nix) (name: stable.${name}));
 
       nixosModules = {

@@ -26,23 +26,6 @@ func loadReady(ctx context.Context, db *pgxpool.Pool) (string, error) {
 	return sha, err
 }
 
-// loadPins maps pins to outputs.
-func loadPins(ctx context.Context, db *pgxpool.Pool) (map[string]string, error) {
-	rows, err := db.Query(ctx, `
-		SELECT p.attr, v.outputs->>'out' FROM packages p JOIN versions v ON v.id = p.selected_version_id
-		WHERE p.pinnable AND v.state = 'cached' AND v.outputs ? 'out'`)
-	if err != nil {
-		return nil, err
-	}
-	pins := map[string]string{}
-	var attr, out string
-	_, err = pgx.ForEachRow(rows, []any{&attr, &out}, func() error {
-		pins[attr] = out
-		return nil
-	})
-	return pins, err
-}
-
 func loadSpecs(ctx context.Context, db *pgxpool.Pool) ([]Spec, error) {
 	rows, err := db.Query(ctx, `
 		SELECT p.id, p.name, p.platform, p.kernel, coalesce(p.pinned_sha, ''), p.packages,

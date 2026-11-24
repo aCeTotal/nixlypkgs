@@ -121,8 +121,9 @@ in
     def profile(name):
         return next(p for p in get("/profiles") if p["name"] == name)
 
-    def approve(awaiting):
-        return json.dumps({"profiles": [{"id": p["id"], "tree": p["testingTree"], "rev": p["testingRev"]} for p in awaiting]})
+    def approve(awaiting, derivations=()):
+        return json.dumps({"profiles": [{"id": p["id"], "tree": p["testingTree"], "rev": p["testingRev"]} for p in awaiting],
+                           "derivations": [{"attr": d["attr"], "version": d["version"]} for d in derivations]})
 
     def approval_status(body):
         return status(f"-b /tmp/jar -X POST -H 'X-Cachepanel-CSRF: {csrf}' -H 'Content-Type: application/json' -d '{body}' {panel}/api/approval")
@@ -157,16 +158,16 @@ in
         stale = [dict(p, testingRev="0" * 40) for p in awaiting]
         assert approval_status(approve(stale)) == "409"
         assert all(p["stableTree"] is None for p in get("/profiles"))
-        send("/approval", approve(awaiting))
-        assert get("/approval")["profiles"] == []
-        assert all(p["stableTree"] == p["testingTree"] and p["stableRev"] == p["testingRev"] for p in get("/profiles"))
+        approved = {p["id"]: (p["testingTree"], p["testingRev"]) for p in awaiting}
+        send("/approval", approve(awaiting, get("/approval")["derivations"]))
+        retry(lambda _: all((p["stableTree"], p["stableRev"]) == approved[p["id"]] for p in get("/profiles")), timeout_seconds=60)
         retry(lambda _: status(f"{panel}/api/v1/profiles/desktop") == "200", timeout_seconds=60)
         assert json.loads(server.succeed(f"curl -fsS {panel}/api/v1/profiles/desktop/stable"))["branch"] == "stable"
 
     with subtest("editing a module keeps revisions and only reaches testing"):
         apps = next(m for m in get("/modules") if m["slug"] == "apps")
         module = get(f"/modules/{apps['id']}")
-        before = profile("desktop")["testingTree"]
+        stable = profile("desktop")["stableTree"]
         body = json.dumps({"slug": "apps", "title": module["title"], "description": module["description"],
                            "source": module["source"] + "# edited\n", "required": False})
         server.succeed(f"echo {base64.b64encode(body.encode()).decode()} | base64 -d > /tmp/edit.json")
@@ -174,10 +175,9 @@ in
             f"curl -fsS -b /tmp/jar -X PUT -H 'X-Cachepanel-CSRF: {csrf}' "
             f"-H 'Content-Type: application/json' -d @/tmp/edit.json {panel}/api/modules/{apps['id']}")
         assert get(f"/modules/{apps['id']}")["revision"] == 2
-        retry(lambda _: profile("desktop")["testingTree"] not in (None, before), timeout_seconds=300)
-        files = get("/profiles/desktop")["files"]
-        assert next(f["content"] for f in files if f["path"] == "modules/apps.nix").endswith("# edited\n")
-        assert profile("desktop")["stableTree"] == before
+        edited = {"path": "modules/apps.nix", "change": "changed"}
+        retry(lambda _: edited in next((p["files"] for p in get("/approval")["profiles"] if p["name"] == "desktop"), []), timeout_seconds=300)
+        assert profile("desktop")["stableTree"] == stable
         awaiting = get("/approval")["profiles"]
         desktop = next(p for p in awaiting if p["name"] == "desktop")
         assert desktop["files"] == [{"path": "modules/apps.nix", "change": "changed"}], desktop
@@ -193,6 +193,24 @@ in
         assert status(f"{panel}/api/v1/profiles/desktop/nightly") == "404"
         branches = {p["name"]: (p["stable"], p["testing"]) for p in json.loads(server.succeed(f"curl -fsS {panel}/api/v1/profiles"))}
         assert branches["desktop"] == (True, True), branches
+
+    def stable_pins(name):
+        pointer = json.loads(server.succeed(f"curl -fsS {panel}/api/v1/profiles/{name}/stable"))
+        return server.succeed(f"curl -fsS {panel}{pointer['path']} | tar -xzO tree/pins.nix")
+
+    with subtest("each derivation reaches stable on its own"):
+        send("/packages/hello-demo/selection", json.dumps({"versionId": None}), "PUT")
+        retry(lambda _: any(d["attr"] == "hello-demo" for d in get("/approval")["derivations"]), timeout_seconds=300)
+        newest = next(d for d in get("/approval")["derivations"] if d["attr"] == "hello-demo")
+        assert approval_status(json.dumps({"profiles": [], "derivations": [{"attr": "hello-demo", "version": 1}]})) == "409"
+        base = profile("desktop")["stableRev"]
+        send("/approval", approve([], [newest]))
+        out = next(v for v in get("/packages/hello-demo")["versions"] if v["id"] == newest["version"])["outputs"]["out"]
+        retry(lambda _: out in stable_pins("desktop"), timeout_seconds=300)
+        assert profile("desktop")["stableRev"] == base
+        assert get("/packages/hello-demo")["stableVersionId"] == newest["version"]
+        assert all(d["attr"] != "hello-demo" for d in get("/approval")["derivations"])
+        assert get("/approval")["profiles"], "the base still waits"
 
     with subtest("the NixlyOS CA anchors module signing and the Secure Boot chain"):
         assert status(f"{panel}/api/v1/ca.pem") == "404" and get("/trust")["active"] is None

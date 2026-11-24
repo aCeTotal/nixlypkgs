@@ -6,6 +6,6 @@ in
 {
   generic = kernels.linux-nixlyos;
   v3 = kernels.linux-nixlyos-v3;
-  v4 = kernels.linux-nixlyos-v4;
+  server = kernels.linux-nixlyos-server;
   enterprise = kernels.linux-nixlyos-enterprise;
 }

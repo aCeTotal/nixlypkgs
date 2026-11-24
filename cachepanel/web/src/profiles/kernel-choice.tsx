@@ -7,7 +7,7 @@ const kernels: Record<Kernel, { title: string; icon: LucideIcon; text: string }>
   performance: {
     title: "Performance",
     icon: Gauge,
-    text: "CachyOS base with BORE, built for each CPU level. Fastest start-up, desktop and games; every controller works out of the box.",
+    text: "Desktops and HTPCs get CachyOS with BORE for the fastest start-up and games. Servers get a hardened vanilla build for every kind of service.",
   },
   enterprise: {
     title: "Enterprise",

@@ -44,6 +44,7 @@ func (p *Packages) list(w http.ResponseWriter, r *http.Request) error {
 		SELECT coalesce(json_agg(row_to_json(p) ORDER BY p.attr), '[]') FROM (
 			SELECT pk.attr, pk.auto_build AS "autoBuild", pk.present, pk.pinnable, pk.eval_error AS "evalError",
 				pk.expected_seconds AS "expectedSeconds", pk.selected_version_id AS "selectedVersionId",
+				pk.stable_version_id AS "stableVersionId",
 				coalesce((SELECT json_agg(json_build_object('id', v.id, 'name', v.name, 'state', v.state,
 					'commit', v.last_sha, 'closureBytes', v.closure_bytes) ORDER BY v.last_position DESC)
 					FROM versions v WHERE v.package_id = pk.id), '[]') AS versions
@@ -58,7 +59,7 @@ func (p *Packages) get(w http.ResponseWriter, r *http.Request) error {
 	body, err := database.JSON(r.Context(), p.db, `
 		SELECT json_build_object('attr', pk.attr, 'autoBuild', pk.auto_build, 'present', pk.present,
 			'pinnable', pk.pinnable, 'evalError', pk.eval_error, 'expectedSeconds', pk.expected_seconds,
-			'selectedVersionId', pk.selected_version_id,
+			'selectedVersionId', pk.selected_version_id, 'stableVersionId', pk.stable_version_id,
 			'versions', coalesce((SELECT json_agg(json_build_object(
 				'id', v.id, 'name', v.name, 'drvPath', v.drv_path, 'outputs', v.outputs, 'state', v.state,
 				'queuedAt', v.queued_at, 'startedAt', v.started_at, 'finishedAt', v.finished_at,

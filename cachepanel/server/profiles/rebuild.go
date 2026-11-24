@@ -48,7 +48,11 @@ func (b *Rebuilder) Trigger() {
 }
 
 func (b *Rebuilder) Run(ctx context.Context) error {
-	if _, err := b.DB.Exec(ctx, `UPDATE profiles SET check_state = 'pending' WHERE check_state = 'running'`); err != nil {
+	if _, err := b.DB.Exec(ctx, `
+		UPDATE profiles SET
+			check_state = CASE WHEN check_state = 'running' THEN 'pending' ELSE check_state END,
+			stable_check_state = CASE WHEN stable_check_state = 'running' THEN 'pending' ELSE stable_check_state END
+		WHERE check_state = 'running' OR stable_check_state = 'running'`); err != nil {
 		return err
 	}
 	go b.runChecks(ctx)
@@ -79,10 +83,7 @@ func (b *Rebuilder) rebuild(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	pins, err := loadPins(ctx, b.DB)
-	if err != nil {
-		return err
-	}
+	pins := map[string]map[string]Pin{}
 	changed := false
 	for _, spec := range specs {
 		rev := ready
@@ -95,7 +96,11 @@ func (b *Rebuilder) rebuild(ctx context.Context) error {
 		}
 		changed = changed || moved
 	}
-	if changed {
+	stable, err := b.stableCandidates(ctx)
+	if err != nil {
+		return err
+	}
+	if changed || stable {
 		b.Hub.Publish(realtime.ProfileChanged, map[string]string{})
 		b.wakeChecks()
 	}
@@ -103,21 +108,35 @@ func (b *Rebuilder) rebuild(ctx context.Context) error {
 }
 
 // candidate stores a profile's next tree.
-func (b *Rebuilder) candidate(ctx context.Context, spec Spec, rev string, pins map[string]string) (bool, error) {
+func (b *Rebuilder) candidate(ctx context.Context, spec Spec, rev string, pinsByRev map[string]map[string]Pin) (bool, error) {
 	if rev == "" {
 		return false, nil
+	}
+	pins, err := b.pinsAt(ctx, rev, pinsByRev)
+	if err != nil {
+		return false, err
 	}
 	hash, archive, err := Archive(Files(spec, pins))
 	if err != nil {
 		return false, err
 	}
-	if _, err := b.DB.Exec(ctx, `INSERT INTO trees (hash, archive) VALUES ($1, $2) ON CONFLICT DO NOTHING`, hash, archive); err != nil {
+	if err := storeTree(ctx, b.DB, hash, archive, pins); err != nil {
 		return false, err
 	}
 	tag, err := b.DB.Exec(ctx, `
 		UPDATE profiles SET candidate_tree = $2, candidate_rev = $3, check_state = 'pending', check_error = NULL
 		WHERE id = $1 AND (candidate_tree IS DISTINCT FROM $2 OR candidate_rev IS DISTINCT FROM $3)`, spec.ID, hash, rev)
 	return tag.RowsAffected() > 0, err
+}
+
+// pinsAt loads each revision's pins once.
+func (b *Rebuilder) pinsAt(ctx context.Context, rev string, pinsByRev map[string]map[string]Pin) (map[string]Pin, error) {
+	if pins, found := pinsByRev[rev]; found {
+		return pins, nil
+	}
+	pins, err := testingPins(ctx, b.DB, rev)
+	pinsByRev[rev] = pins
+	return pins, err
 }
 
 func (b *Rebuilder) wakeChecks() {

@@ -27,7 +27,48 @@ const (
 	maxCheckError = 16 << 10
 )
 
+// lane is one branch's check queue.
+type lane struct {
+	claim  string
+	record string
+}
+
+// Stable first: approvals wait.
+var lanes = []lane{
+	{
+		claim: `
+			UPDATE profiles t SET stable_check_state = 'running'
+			FROM trees tr
+			WHERE tr.hash = t.stable_candidate_tree AND t.id = (
+				SELECT id FROM profiles WHERE stable_check_state = 'pending' AND stable_candidate_tree IS NOT NULL AND base_rev IS NOT NULL
+				ORDER BY id LIMIT 1)
+			RETURNING t.id, t.stable_candidate_tree, t.base_rev, tr.archive`,
+		record: `
+			UPDATE profiles SET stable_check_state = $4::check_state, stable_check_error = nullif($5, ''),
+				stable_tree = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN $6 ELSE stable_tree END,
+				stable_rev = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN base_rev ELSE stable_rev END,
+				stable_at = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN now() ELSE stable_at END
+			WHERE id = $1 AND stable_candidate_tree = $2 AND base_rev = $3 AND stable_check_state = 'running'`,
+	},
+	{
+		claim: `
+			UPDATE profiles t SET check_state = 'running'
+			FROM trees tr
+			WHERE tr.hash = t.candidate_tree AND t.id = (
+				SELECT id FROM profiles WHERE check_state = 'pending' AND candidate_tree IS NOT NULL AND candidate_rev IS NOT NULL
+				ORDER BY id LIMIT 1)
+			RETURNING t.id, t.candidate_tree, t.candidate_rev, tr.archive`,
+		record: `
+			UPDATE profiles SET check_state = $4::check_state, check_error = nullif($5, ''), checked_at = now(),
+				testing_tree = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN $6 ELSE testing_tree END,
+				testing_rev = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN candidate_rev ELSE testing_rev END,
+				testing_at = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN now() ELSE testing_at END
+			WHERE id = $1 AND candidate_tree = $2 AND candidate_rev = $3 AND check_state = 'running'`,
+	},
+}
+
 type pendingCheck struct {
+	lane    *lane
 	id      int64
 	tree    string
 	rev     string
@@ -54,15 +95,18 @@ func (b *Rebuilder) runChecks(ctx context.Context) {
 }
 
 func (b *Rebuilder) nextCheck(ctx context.Context) (pendingCheck, bool, error) {
-	var next pendingCheck
-	err := b.DB.QueryRow(ctx, `
-		UPDATE profiles t SET check_state = 'running'
-		FROM trees tr
-		WHERE tr.hash = t.candidate_tree AND t.id = (
-			SELECT id FROM profiles WHERE check_state = 'pending' AND candidate_tree IS NOT NULL AND candidate_rev IS NOT NULL
-			ORDER BY id LIMIT 1)
-		RETURNING t.id, t.candidate_tree, t.candidate_rev, tr.archive`).
-		Scan(&next.id, &next.tree, &next.rev, &next.archive)
+	for i := range lanes {
+		next, found, err := b.claim(ctx, &lanes[i])
+		if err != nil || found {
+			return next, found, err
+		}
+	}
+	return pendingCheck{}, false, nil
+}
+
+func (b *Rebuilder) claim(ctx context.Context, queue *lane) (pendingCheck, bool, error) {
+	next := pendingCheck{lane: queue}
+	err := b.DB.QueryRow(ctx, queue.claim).Scan(&next.id, &next.tree, &next.rev, &next.archive)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return pendingCheck{}, false, nil
 	}
@@ -95,13 +139,7 @@ func (b *Rebuilder) runCheck(ctx context.Context, next pendingCheck) {
 
 // recordCheck promotes signed trees.
 func (b *Rebuilder) recordCheck(ctx context.Context, next pendingCheck, tree, state, message string) error {
-	tag, err := b.DB.Exec(ctx, `
-		UPDATE profiles SET check_state = $4::check_state, check_error = nullif($5, ''), checked_at = now(),
-			testing_tree = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN $6 ELSE testing_tree END,
-			testing_rev = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN candidate_rev ELSE testing_rev END,
-			testing_at = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN now() ELSE testing_at END
-		WHERE id = $1 AND candidate_tree = $2 AND candidate_rev = $3 AND check_state = 'running'`,
-		next.id, next.tree, next.rev, state, message, tree)
+	tag, err := b.DB.Exec(ctx, next.lane.record, next.id, next.tree, next.rev, state, message, tree)
 	if err != nil || tag.RowsAffected() == 0 {
 		return err
 	}
@@ -171,7 +209,7 @@ func (b *Rebuilder) verify(ctx context.Context, next pendingCheck) (string, erro
 	if err != nil {
 		return "", err
 	}
-	tree, archive, err := b.signTree(ctx, next.archive, unsigned)
+	tree, archive, err := b.signTree(ctx, next.tree, next.archive, unsigned)
 	if err != nil {
 		return "", err
 	}

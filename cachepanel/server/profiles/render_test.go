@@ -36,7 +36,7 @@ func TestFilesCarryModules(t *testing.T) {
 }
 
 func TestArchiveIsReproducible(t *testing.T) {
-	files := Files(spec, map[string]string{"nixlytile": "/nix/store/x-nixlytile"})
+	files := Files(spec, map[string]Pin{"nixlytile": {Version: 1, Out: "/nix/store/x-nixlytile"}})
 	first, _, err := Archive(files)
 	if err != nil {
 		t.Fatal(err)

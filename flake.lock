@@ -337,11 +337,11 @@
         "xpadneo": "xpadneo"
       },
       "locked": {
-        "lastModified": 1795508074,
-        "narHash": "sha256-i1yvnn1oqAxgJEGIQ28YG7JMZpaPjx2uGdnBUmPk/8E=",
+        "lastModified": 1795541536,
+        "narHash": "sha256-s94j8sXoVNqqbtodlI9PGa6GWCsULGfgfOo8IqSIPWE=",
         "owner": "aCeTotal",
         "repo": "kernel_nixlyos",
-        "rev": "a1de1ed8b4581ceb6aa471e09277b02c8ad7cc6d",
+        "rev": "af1723dfa460c206291dc5b856804aef9acfd402",
         "type": "github"
       },
       "original": {

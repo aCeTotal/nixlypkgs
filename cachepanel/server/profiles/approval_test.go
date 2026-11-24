@@ -38,11 +38,22 @@ func TestFirstReleaseAddsEverything(t *testing.T) {
 }
 
 func TestEditedFileIsChanged(t *testing.T) {
-	got, err := changes(archive(t, File{Path: "pins.nix", Content: "{ }"}), archive(t, File{Path: "pins.nix", Content: "{ x = 1; }"}))
+	got, err := changes(archive(t, File{Path: "modules/apps.nix", Content: "a"}), archive(t, File{Path: "modules/apps.nix", Content: "b"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []changedFile{{Path: "pins.nix", Change: fileChanged}}; !slices.Equal(got, want) {
+	if want := []changedFile{{Path: "modules/apps.nix", Change: fileChanged}}; !slices.Equal(got, want) {
 		t.Errorf("changes = %v, want %v", got, want)
+	}
+}
+
+func TestPinsAndSignaturesAreNotBase(t *testing.T) {
+	got, err := changes(archive(t, File{Path: "pins.nix", Content: "{ }"}),
+		archive(t, File{Path: "pins.nix", Content: "{ x = 1; }"}, File{Path: "signing.nix", Content: "{ }"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Errorf("changes = %v, want none", got)
 	}
 }

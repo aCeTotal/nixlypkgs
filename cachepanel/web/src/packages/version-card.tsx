@@ -11,6 +11,7 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, CardContent } from "@/ui/card";
 import { cn } from "@/ui/cn";
+import { BranchBadge } from "@/profiles/branch-badge";
 import { ConfirmButton } from "@/shell/confirm-button";
 import { LogViewer } from "./log-viewer";
 import { selectVersion, versionAction, type PackageDetail, type Version } from "./queries";
@@ -22,6 +23,7 @@ export function VersionCard({ pkg, version, newest }: VersionCardProps) {
   const act = useMutation({ mutationFn: (action: "build" | "cancel" | "drop") => versionAction(version.id, action) });
   const choose = useMutation({ mutationFn: (id: number | null) => selectVersion(pkg.attr, id) });
   const selected = pkg.selectedVersionId === version.id;
+  const stable = pkg.stableVersionId === version.id;
   const running = version.state === "building" || version.state === "queued";
   const rebuildable = version.state === "pending" || version.state === "failed" || version.state === "cancelled";
   return (
@@ -39,6 +41,7 @@ export function VersionCard({ pkg, version, newest }: VersionCardProps) {
                   Selected
                 </Badge>
               )}
+              {stable && <BranchBadge branch="stable" />}
             </div>
             <p className="text-sm text-muted-foreground">
               Commit <span className="font-mono">{shortSha(version.first.sha)}</span>
@@ -77,7 +80,7 @@ export function VersionCard({ pkg, version, newest }: VersionCardProps) {
                 Cancel
               </Button>
             )}
-            {!selected && version.state !== "pending" && version.state !== "building" && (
+            {!selected && !stable && version.state !== "pending" && version.state !== "building" && (
               <ConfirmButton
                 label="Delete from cache"
                 icon={Trash2}

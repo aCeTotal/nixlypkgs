@@ -94,7 +94,7 @@ func retain(ctx context.Context, tx pgx.Tx) ([]Evicted, error) {
 			) ranked WHERE rank > $1
 		) old
 		WHERE v.id = old.id
-			AND NOT EXISTS (SELECT 1 FROM packages p WHERE p.selected_version_id = v.id)
+			AND NOT EXISTS (SELECT 1 FROM packages p WHERE v.id IN (p.selected_version_id, p.stable_version_id))
 			AND NOT EXISTS (
 				SELECT 1 FROM profiles t JOIN commits c ON c.sha = t.pinned_sha
 				WHERE c.position BETWEEN v.first_position AND v.last_position)

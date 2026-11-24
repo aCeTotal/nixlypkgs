@@ -21,7 +21,7 @@ var (
 	errNotQueueable   = rest.Conflict("not_queueable", "The version is building or already cached")
 	errNotCancellable = rest.Conflict("not_cancellable", "The version is neither queued nor building")
 	errNotDroppable   = rest.Conflict("not_droppable", "Cancel the build before deleting it from the cache")
-	errSelected       = rest.Conflict("selected", "The version is selected – choose another first")
+	errSelected       = rest.Conflict("selected", "The version is selected or stable – choose another first")
 )
 
 // Queue builds a version first.
@@ -69,7 +69,7 @@ func (p *Pool) Drop(ctx context.Context, id int64) error {
 	var attr string
 	var selected bool
 	err := p.db.QueryRow(ctx, `
-		SELECT p.attr, p.selected_version_id IS NOT DISTINCT FROM v.id
+		SELECT p.attr, coalesce(v.id IN (p.selected_version_id, p.stable_version_id), false)
 		FROM versions v JOIN packages p ON p.id = v.package_id WHERE v.id = $1`, id).Scan(&attr, &selected)
 	if err != nil {
 		return err

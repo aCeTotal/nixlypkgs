@@ -54,11 +54,11 @@ in {
 
   linux-nixlyos = kernels.generic;
   linux-nixlyos-v3 = kernels.v3;
-  linux-nixlyos-v4 = kernels.v4;
+  linux-nixlyos-server = kernels.server;
   linux-nixlyos-enterprise = kernels.enterprise;
   linuxPackages_nixlyos = import ./nvidia-latest.nix inputs final final.linux-nixlyos;
   linuxPackages_nixlyos_v3 = import ./nvidia-latest.nix inputs final final.linux-nixlyos-v3;
-  linuxPackages_nixlyos_v4 = import ./nvidia-latest.nix inputs final final.linux-nixlyos-v4;
+  linuxPackages_nixlyos_server = import ./nvidia-latest.nix inputs final final.linux-nixlyos-server;
   # In-tree drivers only.
   linuxPackages_nixlyos_enterprise = final.linuxPackagesFor final.linux-nixlyos-enterprise;
   linux-nixlyserver = import ../pkgs/linux-nixlyserver { inherit (final) lib linux; };

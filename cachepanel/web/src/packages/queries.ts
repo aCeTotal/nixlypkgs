@@ -15,6 +15,7 @@ export type PackageSummary = {
   evalError: string | null;
   expectedSeconds: number | null;
   selectedVersionId: number | null;
+  stableVersionId: number | null;
   versions: VersionSummary[];
 };
 

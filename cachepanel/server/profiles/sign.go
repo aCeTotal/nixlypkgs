@@ -14,7 +14,7 @@ import (
 )
 
 // signTree adds boot chain signatures.
-func (b *Rebuilder) signTree(ctx context.Context, archive []byte, toplevels []string) (string, []byte, error) {
+func (b *Rebuilder) signTree(ctx context.Context, source string, archive []byte, toplevels []string) (string, []byte, error) {
 	files, err := signing.Collect(toplevels)
 	if err != nil {
 		return "", nil, err
@@ -27,11 +27,13 @@ func (b *Rebuilder) signTree(ctx context.Context, archive []byte, toplevels []st
 	if err != nil {
 		return "", nil, err
 	}
-	hash, archived, err := Archive(append(tree, File{Path: "signing.nix", Content: signingNix(b.PublicURL, signed.Bundles)}))
+	hash, archived, err := Archive(append(tree, File{Path: signingFile, Content: signingNix(b.PublicURL, signed.Bundles)}))
 	if err != nil {
 		return "", nil, err
 	}
-	_, err = b.DB.Exec(ctx, `INSERT INTO trees (hash, archive, signed_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, hash, archived, signed.CA)
+	_, err = b.DB.Exec(ctx, `
+		INSERT INTO trees (hash, archive, signed_by, pins) SELECT $1, $2, $3, pins FROM trees WHERE hash = $4
+		ON CONFLICT DO NOTHING`, hash, archived, signed.CA, source)
 	return hash, archived, err
 }
 
