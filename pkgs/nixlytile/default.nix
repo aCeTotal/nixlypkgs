@@ -79,8 +79,8 @@ let
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "392b915f231046f63330bb4f00a61fa0fb811be4";
-    hash = "sha256-Y5GnLno7ocXhzYNBMbQrfFEJYNu18JSOwCMQnLcGRX4=";
+    rev = "35e585f99bed17c2c43ba1b5af0f1c2fcf57f35f";
+    hash = "sha256-3g/76dW0Ul761amUBXTBkBsDdIi2Yn+Da0PPBN91I28=";
   };
 
   gazeModel = name: hash: fetchurl {
@@ -149,7 +149,7 @@ in
 
 stdenv.mkDerivation {
   pname = "nixlytile";
-  version = "2026.11.21";
+  version = "2026.11.24";
 
   passthru.providedSessions = [ "nixlytile" ];
 
