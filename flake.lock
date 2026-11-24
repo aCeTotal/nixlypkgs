@@ -20,11 +20,11 @@
     "cachy-config": {
       "flake": false,
       "locked": {
-        "lastModified": 1788438288,
-        "narHash": "sha256-pUdwihFQ4nUWLVkk2jNC6G6WtDBOGiRotPxo5lmoxw8=",
+        "lastModified": 1795428611,
+        "narHash": "sha256-ctT4biE3VRqZsBgw17zByAFmpZjc5Mi2Te2+34kQNHs=",
         "owner": "CachyOS",
         "repo": "linux-cachyos",
-        "rev": "bf83c8e65c1e801fb6ed4734824dbee4a73031be",
+        "rev": "838424c35ce03a93ab31f22bb09fda09570eb92b",
         "type": "github"
       },
       "original": {
@@ -36,11 +36,11 @@
     "cachy-patches": {
       "flake": false,
       "locked": {
-        "lastModified": 1788203658,
-        "narHash": "sha256-mRiapdEyC+wy3gNH9UVDnyOQixpbKV3Yc9RhEL7dMr4=",
+        "lastModified": 1795021596,
+        "narHash": "sha256-9VuqP4xNOIlTooCYTvsyz+AqHjrhXCglYwJFd5aOELQ=",
         "owner": "CachyOS",
         "repo": "kernel-patches",
-        "rev": "c3555d2ea83e22259652d5ad4b42036fd57b94f4",
+        "rev": "664442dd1a913ef8838453828d26ae13b2e7334d",
         "type": "github"
       },
       "original": {
@@ -222,18 +222,31 @@
     "linux-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1788437658,
-        "narHash": "sha256-JJu02YuRudJozWrBQEi25psgTsjl7EQzipkdjddRtn4=",
+        "lastModified": 1794944583,
+        "narHash": "sha256-A653YJM30j1lmYvuPuTEWREvTzdv0YncFMStDneSO/o=",
         "owner": "CachyOS",
         "repo": "linux",
-        "rev": "e2f03349d0321aa61885daab8c5a63ff3a4402a9",
+        "rev": "1ac42d4fa557ecd640dd7283d1be49e1ad526492",
         "type": "github"
       },
       "original": {
         "owner": "CachyOS",
-        "ref": "cachyos-7.2.3-2",
+        "ref": "cachyos-7.3.5-2",
         "repo": "linux",
         "type": "github"
+      }
+    },
+    "linux-vanilla": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1795419864,
+        "narHash": "sha256-xzTpaALNqEWA6bPv/xwtnokSfIfQC7jaybbRkzv4pIM=",
+        "type": "tarball",
+        "url": "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.3.6.tar.xz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.3.6.tar.xz"
       }
     },
     "mnw": {
@@ -248,6 +261,22 @@
       "original": {
         "owner": "Gerg-L",
         "repo": "mnw",
+        "type": "github"
+      }
+    },
+    "msi-ec": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1794960943,
+        "narHash": "sha256-W9QpyPRMslstbKjLjtIfPfSCRj/hv7FcHQjjZ4z0RYo=",
+        "owner": "MControlSuite",
+        "repo": "msi-ec",
+        "rev": "b1bf9e3f9d0465934ffcfc4f02729725b0ee1973",
+        "type": "github"
+      },
+      "original": {
+        "owner": "MControlSuite",
+        "repo": "msi-ec",
         "type": "github"
       }
     },
@@ -283,19 +312,36 @@
         "type": "github"
       }
     },
+    "nixlyos-ca": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-rFRFhOWAwdSUCCtt1q5PZ2EtHjKurBdeF465YsoqRWo=",
+        "type": "file",
+        "url": "https://cache.aceclan.no/api/v1/ca.pem"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://cache.aceclan.no/api/v1/ca.pem"
+      }
+    },
     "nixlyos-kernel": {
       "inputs": {
         "cachy-config": "cachy-config",
         "cachy-patches": "cachy-patches",
         "linux-src": "linux-src",
-        "nixpkgs": "nixpkgs_3"
+        "linux-vanilla": "linux-vanilla",
+        "msi-ec": "msi-ec",
+        "nixlyos-ca": "nixlyos-ca",
+        "nixpkgs": "nixpkgs_3",
+        "xone": "xone",
+        "xpadneo": "xpadneo"
       },
       "locked": {
-        "lastModified": 1788807002,
-        "narHash": "sha256-Y4yYH5I8i1nuOStPWHROw/7zAf94MOydKh530QbjpYQ=",
+        "lastModified": 1795508074,
+        "narHash": "sha256-i1yvnn1oqAxgJEGIQ28YG7JMZpaPjx2uGdnBUmPk/8E=",
         "owner": "aCeTotal",
         "repo": "kernel_nixlyos",
-        "rev": "09a9b25fc93905a880b8caa72b06daeb5c5828a6",
+        "rev": "a1de1ed8b4581ceb6aa471e09277b02c8ad7cc6d",
         "type": "github"
       },
       "original": {
@@ -520,6 +566,40 @@
       "original": {
         "owner": "aCeTotal",
         "repo": "totalvim",
+        "type": "github"
+      }
+    },
+    "xone": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1773406182,
+        "narHash": "sha256-ENk/SOUzXbzXYhwN3AdbO2u/tWjf/Mn+V22A2ce21XU=",
+        "owner": "dlundqvist",
+        "repo": "xone",
+        "rev": "f2aa9fe01103d7600553b505b298ff0bd47ff280",
+        "type": "github"
+      },
+      "original": {
+        "owner": "dlundqvist",
+        "ref": "v0.5.8",
+        "repo": "xone",
+        "type": "github"
+      }
+    },
+    "xpadneo": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1792368754,
+        "narHash": "sha256-kquHB82LjfbXCZDlxyA61uDmyjecC2ZqZjxK/k32110=",
+        "owner": "atar-axis",
+        "repo": "xpadneo",
+        "rev": "e8f103a77f777c2c54536dd947969cf228699c13",
+        "type": "github"
+      },
+      "original": {
+        "owner": "atar-axis",
+        "ref": "v0.10.5",
+        "repo": "xpadneo",
         "type": "github"
       }
     }
