@@ -44,16 +44,13 @@ export function VersionCard({ pkg, version, newest }: VersionCardProps) {
               {stable && <BranchBadge branch="stable" />}
             </div>
             <p className="text-sm text-muted-foreground">
-              Commit <span className="font-mono">{shortSha(version.first.sha)}</span>
-              {version.first.sha !== version.last.sha && (
-                <>
-                  {" → "}
-                  <span className="font-mono">{shortSha(version.last.sha)}</span>
-                </>
-              )}
-              {" · "}
-              {version.last.subject}
+              From <span className="font-mono">{shortSha(version.first.sha)}</span> · {version.first.subject}
             </p>
+            {version.first.sha !== version.last.sha && (
+              <p className="text-xs text-muted-foreground">
+                Unchanged through <span className="font-mono">{shortSha(version.last.sha)}</span>
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-1.5">
             {pkg.pinnable && version.state === "cached" && !selected && (
@@ -97,7 +94,7 @@ export function VersionCard({ pkg, version, newest }: VersionCardProps) {
         </div>
         {version.state === "building" && <BuildProgress versionId={version.id} />}
         <dl className="grid gap-3 text-sm sm:grid-cols-4">
-          <Fact label="Commit time" value={dateTime(version.last.time)} />
+          <Fact label="Commit time" value={dateTime(version.first.time)} />
           <Fact label="Built" value={version.finishedAt ? timeAgo(version.finishedAt) : "–"} />
           <Fact label="Build time" value={formatDuration(secondsBetween(version.startedAt, version.finishedAt))} />
           <Fact label="Size" value={formatBytes(version.closureBytes)} />

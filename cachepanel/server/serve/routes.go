@@ -147,7 +147,13 @@ func spa(root string) http.Handler {
 	server := http.FileServerFS(files)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
-		if _, err := fs.Stat(files, name); err != nil || name == "" {
+		_, err := fs.Stat(files, name)
+		// Chunks of an older build are gone.
+		if err != nil && strings.HasPrefix(name, "assets/") {
+			http.NotFound(w, r)
+			return
+		}
+		if err != nil || name == "" {
 			w.Header().Set("Cache-Control", "no-cache")
 			http.ServeFileFS(w, r, files, "index.html")
 			return

@@ -158,7 +158,8 @@ in
                                                 "gaming", "apps", "desktop", "htpc", "server", "hardware"], modules
         assert {m["slug"] for m in modules if m["required"]} == {"system", "security", "network", "user", "hardware"}
         assert all(m["lines"] == 1 and m["changedAt"] for m in modules), modules
-        assert get("/modules/gaming")["source"] == "{ ... }: { }\n"
+        assert get("/modules/gaming")["source"] == "{ ... }: { }\n" and get("/modules/gaming")["changedAt"]
+        assert status(f"{panel}/assets/index-of-an-older-build.js") == "404" and status(f"{panel}/modules") == "200"
         assert {u["name"] for u in get("/modules/system")["usedBy"]} == {"desktop", "htpc", "server"}
         server.fail("runuser -u postgres -- psql -d cachepanel -c 'SELECT 1 FROM modules'")
         problem = json.loads(send("/modules/validate", json.dumps({"source": "{ a = ; }"})))

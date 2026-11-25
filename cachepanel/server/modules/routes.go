@@ -167,6 +167,9 @@ func (m *Modules) get(w http.ResponseWriter, r *http.Request) error {
 	}
 	detail := Detail{Head: head, Source: blob.Text, History: history.Commits}
 	detail.Summary = Summary{Entry: entry, Position: index + 1, Lines: strings.Count(blob.Text, "\n"), UsedBy: usedBy(entry, uses)}
+	if len(history.Commits) > 0 {
+		detail.ChangedAt = &history.Commits[0].Time
+	}
 	return rest.WriteJSON(w, http.StatusOK, detail)
 }
 
