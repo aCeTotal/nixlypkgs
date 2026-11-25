@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -48,4 +50,23 @@ func getJSON(ctx context.Context, url string, into any) {
 	if res.StatusCode == http.StatusOK {
 		_ = json.NewDecoder(res.Body).Decode(into)
 	}
+}
+
+// followedBranch is the named branch, else the repository's default.
+func followedBranch(ctx context.Context, owner, repo, ref string) string {
+	if ref != "" && !commitHash.MatchString(ref) {
+		return ref
+	}
+	ctx, cancel := context.WithTimeout(ctx, aboutTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", "ls-remote", "--symref", "https://github.com/"+owner+"/"+repo, "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	head, _, _ := strings.Cut(string(out), "\t")
+	branch, found := strings.CutPrefix(head, "ref: refs/heads/")
+	if !found {
+		return ""
+	}
+	return branch
 }

@@ -17,7 +17,8 @@ export default defineConfig({
             { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
             { name: "tanstack", test: /node_modules[\\/]@tanstack[\\/]/ },
             { name: "radix", test: /node_modules[\\/](radix-ui|@radix-ui)[\\/]/ },
-            { name: "codemirror", test: /node_modules[\\/](@codemirror|@lezer)[\\/]/ },
+            // Languages stay out, loaded with their first file.
+            { name: "codemirror", test: /node_modules[\\/](@codemirror[\\/](state|view|language|commands|search|lint|autocomplete|merge)|@lezer[\\/](common|highlight|lr))[\\/]/ },
           ],
         },
       },

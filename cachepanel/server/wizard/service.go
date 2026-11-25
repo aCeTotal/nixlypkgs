@@ -210,14 +210,10 @@ func (s *Service) loadDraft(ctx context.Context, id int64) (Draft, report, error
 
 // files renders what a publish commits.
 func (s *Service) files(ctx context.Context, draft Draft) (map[string][]byte, error) {
-	source, err := recipe.Render(draft.Spec)
-	if err == nil {
-		source, err = recipe.Format(ctx, source)
-	}
+	files, err := recipe.Files(ctx, draft.Spec)
 	if err != nil {
 		return nil, err
 	}
-	files := map[string][]byte{"default.nix": []byte(source)}
 	for name, content := range draft.Files {
 		files[name] = content
 	}

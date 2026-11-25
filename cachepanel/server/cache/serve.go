@@ -12,7 +12,7 @@ var (
 	narPattern  = regexp.MustCompile(`^[0-9a-z]+\.nar(\.[a-z0-9]+)?$`)
 )
 
-// Mount serves the cache to nix clients.
+// Mount serves files by request path.
 func (c *Cache) Mount(r chi.Router) {
 	for _, route := range []struct {
 		pattern string
@@ -28,29 +28,27 @@ func (c *Cache) Mount(r chi.Router) {
 }
 
 func (c *Cache) info(w http.ResponseWriter, r *http.Request) {
-	c.serve(w, r, "nix-cache-info", "text/x-nix-cache-info")
+	c.serve(w, r, "text/x-nix-cache-info")
 }
 
 func (c *Cache) narinfoFile(w http.ResponseWriter, r *http.Request) {
-	hash := chi.URLParam(r, "hash")
-	if !hashPattern.MatchString(hash) {
+	if !hashPattern.MatchString(chi.URLParam(r, "hash")) {
 		http.NotFound(w, r)
 		return
 	}
-	c.serve(w, r, hash+narinfoSuffix, "text/x-nix-narinfo")
+	c.serve(w, r, "text/x-nix-narinfo")
 }
 
 func (c *Cache) nar(w http.ResponseWriter, r *http.Request) {
-	name := chi.URLParam(r, "name")
-	if !narPattern.MatchString(name) {
+	if !narPattern.MatchString(chi.URLParam(r, "name")) {
 		http.NotFound(w, r)
 		return
 	}
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	c.serve(w, r, "nar/"+name, "application/x-nix-nar")
+	c.serve(w, r, "application/x-nix-nar")
 }
 
-func (c *Cache) serve(w http.ResponseWriter, r *http.Request, name, kind string) {
+func (c *Cache) serve(w http.ResponseWriter, r *http.Request, kind string) {
 	w.Header().Set("Content-Type", kind)
-	http.ServeFileFS(w, r, c.files, name)
+	c.server.ServeHTTP(w, r)
 }

@@ -130,11 +130,8 @@ func (l *Lab) materialize(ctx context.Context, draft Draft) (string, error) {
 	if err := draft.Spec.Validate(); err != nil {
 		return "", err
 	}
-	source, err := recipe.Render(draft.Spec)
+	files, err := recipe.Files(ctx, draft.Spec)
 	if err != nil {
-		return "", err
-	}
-	if source, err = recipe.Format(ctx, source); err != nil {
 		return "", err
 	}
 	for _, src := range draft.Spec.Sources {
@@ -148,7 +145,6 @@ func (l *Lab) materialize(ctx context.Context, draft Draft) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	files := map[string][]byte{"default.nix": []byte(source)}
 	for name, content := range draft.Files {
 		files[name] = content
 	}

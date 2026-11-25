@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,6 +34,8 @@ const SetupMode = "setup"
 
 // ErrUnknownCA rejects foreign platform keys.
 var ErrUnknownCA = errors.New("the machine's platform key is not a NixlyOS CA")
+
+var errListSize = errors.New("a certificate is too large for an EFI signature list")
 
 const (
 	efiTime     = "2006-01-02 15:04:05"
@@ -90,7 +94,7 @@ func (s *Store) Firmware(ctx context.Context) ([]Database, error) {
 }
 
 // Update moves firmware to the active CA.
-func (s *Store) Update(ctx context.Context, from string, variable Variable) ([]byte, error) {
+func (s *Store) Update(ctx context.Context, from string, variable Variable) (_ []byte, err error) {
 	signer, err := s.signer(ctx, from)
 	if err != nil {
 		return nil, err
@@ -105,14 +109,18 @@ func (s *Store) Update(ctx context.Context, from string, variable Variable) ([]b
 			continue
 		}
 		for _, cert := range database.Certs {
-			list = append(list, signatureList(cert)...)
+			entry, err := signatureList(cert)
+			if err != nil {
+				return nil, err
+			}
+			list = append(list, entry...)
 		}
 	}
 	work, err := os.MkdirTemp("", "nixly-firmware-*")
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(work)
+	defer func() { err = errors.Join(err, os.RemoveAll(work)) }()
 	in, out := filepath.Join(work, "list.esl"), filepath.Join(work, "update.auth")
 	if err := os.WriteFile(in, list, 0o600); err != nil {
 		return nil, err
@@ -125,7 +133,7 @@ func (s *Store) Update(ctx context.Context, from string, variable Variable) ([]b
 		string(variable), in, out); err != nil {
 		return nil, err
 	}
-	return os.ReadFile(out)
+	return fs.ReadFile(os.DirFS(work), filepath.Base(out))
 }
 
 // Setup mode self-signs.
@@ -159,7 +167,8 @@ func (s *Store) previous(ctx context.Context) (*CA, error) {
 
 // GPU option ROMs need Microsoft's keys.
 func (s *Store) microsoft(variable string) ([]Cert, error) {
-	paths, err := filepath.Glob(filepath.Join(s.microsoftDir, variable, "*.der"))
+	files := os.DirFS(s.microsoftDir)
+	paths, err := fs.Glob(files, variable+"/*.der")
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +177,7 @@ func (s *Store) microsoft(variable string) ([]Cert, error) {
 	}
 	certs := make([]Cert, len(paths))
 	for i, path := range paths {
-		der, err := os.ReadFile(path)
+		der, err := fs.ReadFile(files, path)
 		if err != nil {
 			return nil, err
 		}
@@ -187,14 +196,19 @@ func nixlyCert(ca CA) Cert {
 }
 
 // signatureList is one EFI_SIGNATURE_LIST.
-func signatureList(cert Cert) []byte {
-	list := make([]byte, listHeader+ownerLength+len(cert.der))
+func signatureList(cert Cert) ([]byte, error) {
+	size := listHeader + ownerLength + len(cert.der)
+	// EFI stores sizes as UINT32.
+	if size > math.MaxUint32 {
+		return nil, errListSize
+	}
+	list := make([]byte, size)
 	copy(list, x509Type[:])
-	binary.LittleEndian.PutUint32(list[16:], uint32(len(list)))
-	binary.LittleEndian.PutUint32(list[24:], uint32(ownerLength+len(cert.der)))
+	binary.LittleEndian.PutUint32(list[16:], uint32(size))
+	binary.LittleEndian.PutUint32(list[24:], uint32(size-listHeader))
 	copy(list[listHeader:], cert.guid[:])
 	copy(list[listHeader+ownerLength:], cert.der)
-	return list
+	return list, nil
 }
 
 // guid encodes the mixed-endian EFI layout.

@@ -26,13 +26,15 @@ var (
 	errExists   = rest.Conflict("module_exists", "A module already has that file name")
 )
 
-// Modules are the NixOS modules profiles import, kept in the source.
+// Modules are the source's NixOS modules.
 type Modules struct {
 	DB   *pgxpool.Pool
 	Hub  *realtime.Hub
 	Repo *source.Repo
 	// Poke starts evaluating a new commit.
 	Poke func()
+	// Used checks profile imports at rev.
+	Used func(ctx context.Context, rev, slug string) (bool, error)
 }
 
 func (m *Modules) Mount(r chi.Router) {
@@ -45,14 +47,14 @@ func (m *Modules) Mount(r chi.Router) {
 	r.Get("/modules/{slug}/revisions/{sha}", rest.Handle(m.revision))
 }
 
-// User is a profile that imports a module.
+// User is an importing profile.
 type User struct {
 	Name       string `json:"name"`
 	Title      string `json:"title"`
 	CheckState string `json:"checkState"`
 }
 
-// Summary is a module in the list.
+// Summary is a listed module.
 type Summary struct {
 	Entry
 	Position  int        `json:"position"`
@@ -66,7 +68,7 @@ type profileUse struct {
 	Chosen []string
 }
 
-// uses lists every profile with its chosen modules.
+// uses lists profiles' chosen modules.
 func (m *Modules) uses(ctx context.Context) ([]profileUse, error) {
 	rows, err := m.DB.Query(ctx, `
 		SELECT p.name, p.title, p.check_state::text, coalesce(array_agg(pm.slug) FILTER (WHERE pm.slug IS NOT NULL), '{}')
@@ -128,7 +130,7 @@ func (m *Modules) list(w http.ResponseWriter, r *http.Request) error {
 	return rest.WriteJSON(w, http.StatusOK, map[string]any{"head": head, "modules": summaries})
 }
 
-// Detail is one module with its source and history.
+// Detail is a module with history.
 type Detail struct {
 	Summary
 	Head    string          `json:"head"`
@@ -177,11 +179,12 @@ func (m *Modules) revision(w http.ResponseWriter, r *http.Request) error {
 	return rest.WriteJSON(w, http.StatusOK, map[string]string{"source": blob.Text})
 }
 
-// draft is a module change on top of Base.
+// draft is a module change.
 type draft struct {
 	Entry
-	Base   string `json:"base"`
-	Source string `json:"source"`
+	Base    string `json:"base"`
+	Message string `json:"message"`
+	Source  string `json:"source"`
 }
 
 func (d draft) validate(ctx context.Context) error {
@@ -210,7 +213,7 @@ func (m *Modules) create(w http.ResponseWriter, r *http.Request) error {
 	if find(entries, req.Slug) >= 0 {
 		return errExists
 	}
-	change, err := moduleEdit(req, append(entries, req.Entry), "modules: add "+req.Slug)
+	change, err := moduleEdit(req, append(entries, req.Entry))
 	if err != nil {
 		return err
 	}
@@ -235,18 +238,24 @@ func (m *Modules) update(w http.ResponseWriter, r *http.Request) error {
 		return rest.NotFound()
 	}
 	entries[index] = req.Entry
-	change, err := moduleEdit(req, entries, "modules: update "+req.Slug)
+	change, err := moduleEdit(req, entries)
 	if err != nil {
 		return err
 	}
 	return m.committed(w, r, change)
 }
 
-// remove keeps modules any profile still needs.
+// remove keeps modules still used.
 func (m *Modules) remove(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
-	base := r.URL.Query().Get("base")
-	entries, err := Catalogue(ctx, m.Repo, base)
+	var req struct {
+		Base    string `json:"base"`
+		Message string `json:"message"`
+	}
+	if err := rest.Decode(r, &req); err != nil {
+		return err
+	}
+	entries, err := Catalogue(ctx, m.Repo, req.Base)
 	if err != nil {
 		return err
 	}
@@ -258,8 +267,8 @@ func (m *Modules) remove(w http.ResponseWriter, r *http.Request) error {
 	if entry.Required {
 		return errRequired
 	}
-	var used bool
-	if err := m.DB.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM profile_modules WHERE slug = $1)`, entry.Slug).Scan(&used); err != nil {
+	used, err := m.Used(ctx, req.Base, entry.Slug)
+	if err != nil {
 		return err
 	}
 	if used {
@@ -269,17 +278,17 @@ func (m *Modules) remove(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	edit := source.Edit{Base: base, Message: "modules: remove " + entry.Slug, Changes: []source.FileChange{
+	edit := source.Edit{Base: req.Base, Message: req.Message, Changes: []source.FileChange{
 		{Path: entry.Path()},
 		{Path: catalogueFile, Content: &catalogue},
 	}}
 	return m.committed(w, r, edit)
 }
 
-// moduleEdit writes a module and the catalogue together.
-func moduleEdit(req draft, entries []Entry, message string) (source.Edit, error) {
+// moduleEdit writes module and catalogue.
+func moduleEdit(req draft, entries []Entry) (source.Edit, error) {
 	catalogue, err := encode(entries)
-	return source.Edit{Base: req.Base, Message: message, Changes: []source.FileChange{
+	return source.Edit{Base: req.Base, Message: req.Message, Changes: []source.FileChange{
 		{Path: req.Path(), Content: &req.Source},
 		{Path: catalogueFile, Content: &catalogue},
 	}}, err

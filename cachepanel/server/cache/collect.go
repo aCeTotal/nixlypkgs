@@ -134,7 +134,7 @@ func (c *Cache) reach(roots []string) (map[string]bool, map[string]bool, error) 
 
 // narinfo reads a path's NAR and references.
 func (c *Cache) narinfo(hash string) (nar string, references []string, err error) {
-	file, err := os.Open(filepath.Join(c.dir, hash+narinfoSuffix))
+	file, err := c.files.Open(hash + narinfoSuffix)
 	if err != nil {
 		return "", nil, err
 	}

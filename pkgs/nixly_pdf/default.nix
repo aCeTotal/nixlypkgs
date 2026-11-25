@@ -19,6 +19,7 @@
 }:
 
 let
+  source = lib.importJSON ./source.json;
   fontsRev = "5174b3333331c966c38f4355d50b03ca1c1df2f9";
 
   signatureFonts = linkFarm "nixly-pdf-signature-fonts" (map
@@ -57,13 +58,12 @@ let
 in
 stdenv.mkDerivation {
   pname = "nixly-pdf";
-  version = "2026.11.17";
+  inherit (source) version;
 
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixly_pdf";
-    rev = "5f0ddcfe8ed2d314b7e82c67e802467747e44da4";
-    hash = "sha256-q5JkD+qaso3sG31kzx/JfEwiMJmRTYSezh1POnmmA04=";
+    inherit (source) rev hash;
   };
 
   strictDeps = true;

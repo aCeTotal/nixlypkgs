@@ -5,8 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"io/fs"
 	"os"
-	"path/filepath"
+	"path"
 )
 
 // ErrUntrusted means kernels lack the CA.
@@ -15,7 +16,11 @@ var ErrUntrusted = errors.New("the kernel does not trust the active NixlyOS CA y
 // Trusts checks kernels embed the CA.
 func Trusts(ca CA, toplevels []string) error {
 	for _, toplevel := range toplevels {
-		data, err := os.ReadFile(filepath.Join(toplevel, "nixlyos-ca.pem"))
+		rel, err := inStore(toplevel)
+		if err != nil {
+			return err
+		}
+		data, err := fs.ReadFile(os.DirFS(storeDir), path.Join(rel, "nixlyos-ca.pem"))
 		if err != nil {
 			return ErrUntrusted
 		}

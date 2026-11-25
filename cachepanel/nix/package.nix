@@ -15,8 +15,10 @@ buildGoModule {
 
   # Nix itself comes from the host.
   postInstall = ''
+    install -Dm755 source/pre-receive.sh $out/share/cachepanel/hooks/pre-receive
     wrapProgram $out/bin/cachepanel \
       --set-default CACHEPANEL_WEB_ROOT ${web} \
+      --set-default CACHEPANEL_HOOKS $out/share/cachepanel/hooks \
       --prefix PATH : ${lib.makeBinPath [ git nix-eval-jobs nixfmt openssh ]}
   '';
 

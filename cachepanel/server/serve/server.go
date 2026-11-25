@@ -18,6 +18,7 @@ import (
 	"cachepanel/cache"
 	"cachepanel/config"
 	"cachepanel/database"
+	"cachepanel/editor"
 	"cachepanel/profiles"
 	"cachepanel/realtime"
 	"cachepanel/release"
@@ -25,6 +26,7 @@ import (
 	"cachepanel/signing"
 	"cachepanel/source"
 	"cachepanel/update"
+	"cachepanel/upstream"
 	"cachepanel/watcher"
 	"cachepanel/wizard"
 )
@@ -78,17 +80,20 @@ func Run(ctx context.Context, cfg config.Config) error {
 	if err := recipes.Recover(ctx); err != nil {
 		return err
 	}
-	clones, err := origin.Handler()
+	tracker := upstream.New(db, hub, origin, filepath.Join(cfg.StateDir, "upstream"), follow.Poke)
+	completions, err := editor.NewIndex(db, mirror, filepath.Join(cfg.StateDir, "editor"))
 	if err != nil {
 		return err
 	}
 	panel := &app{
 		cfg: cfg, db: db, hub: hub, auth: auth.NewService(db), mirror: mirror, releases: releases, rebuilder: rebuilder,
 		pool: pool, watcher: follow, recipes: recipes, uploads: lab.Uploads, cache: store,
-		trust:  &signing.Routes{Store: signer, Hub: hub},
-		source: &source.Routes{Repo: origin, Keys: source.Keys{DB: db}, Hub: hub, Poke: follow.Poke, Remote: cfg.SSHRemote},
-		clones: clones,
-		update: &update.Updater{DB: db, Hub: hub, Watcher: follow, Dir: cfg.UpdateDir},
+		trust:   &signing.Routes{Store: signer, Hub: hub},
+		source:  &source.Routes{Repo: origin, Keys: source.Keys{DB: db}, Hub: hub, Poke: follow.Poke, Remote: cfg.SSHRemote},
+		clones:  origin.Handler(),
+		update:  &update.Updater{DB: db, Hub: hub, Watcher: follow, Dir: cfg.UpdateDir},
+		editor:  completions,
+		tracker: tracker,
 	}
 
 	group, ctx := errgroup.WithContext(ctx)
@@ -102,6 +107,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 			workers.Go(func() error { return rebuilder.Run(ctx) })
 			workers.Go(func() error { return store.Run(ctx, liveRoots(pool, rebuilder)) })
 			workers.Go(func() error { return panel.update.Run(ctx) })
+			workers.Go(func() error { return tracker.Run(ctx) })
 			return workers.Wait()
 		})
 	})

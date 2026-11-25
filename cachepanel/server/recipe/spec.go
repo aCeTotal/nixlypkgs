@@ -55,6 +55,11 @@ type Source struct {
 	Hash  string     `json:"hash,omitempty"`
 	// History keeps .git for builds that ask it.
 	History bool `json:"history,omitempty"`
+	// Branch or Tags keep it current.
+	Branch string  `json:"branch,omitempty"`
+	Tags   *string `json:"tags,omitempty"`
+	// Commit is what a tag Rev names.
+	Commit string `json:"commit,omitempty"`
 }
 
 type Meta struct {

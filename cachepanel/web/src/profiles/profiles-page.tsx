@@ -23,7 +23,7 @@ export function ProfilesPage() {
       <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
         {profiles.map((profile) => (
           <Link
-            key={profile.id}
+            key={profile.name}
             to="/profiles/$name"
             params={{ name: profile.name }}
             className="group relative overflow-hidden rounded-xl border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"

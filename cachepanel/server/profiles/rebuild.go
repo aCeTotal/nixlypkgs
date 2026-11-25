@@ -77,16 +77,20 @@ func (b *Rebuilder) Run(ctx context.Context) error {
 }
 
 func (b *Rebuilder) rebuild(ctx context.Context) error {
-	specs, err := loadSpecs(ctx, b.DB)
-	if err != nil {
-		return err
-	}
 	ready, err := loadReady(ctx, b.DB)
 	if err != nil {
 		return err
 	}
+	synced, err := b.syncProfiles(ctx, ready)
+	if err != nil {
+		return err
+	}
+	specs, err := loadSpecs(ctx, b.DB)
+	if err != nil {
+		return err
+	}
 	pins := map[string]map[string]Pin{}
-	changed := false
+	changed := synced
 	for _, spec := range specs {
 		rev := ready
 		if spec.Pinned != "" {

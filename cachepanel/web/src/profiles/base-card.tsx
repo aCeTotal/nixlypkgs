@@ -1,5 +1,6 @@
-import { ArrowRight, CircleCheck, FileMinus, FilePen, FilePlus, GitCommitVertical, type LucideIcon } from "lucide-react";
+import { ArrowRight, CircleCheck, DatabaseZap, FileMinus, FilePen, FilePlus, GitCommitVertical, type LucideIcon } from "lucide-react";
 import { useState } from "react";
+import { formatBytes } from "@/format/bytes";
 import { shortSha } from "@/format/sha";
 import { timeAgo } from "@/format/time";
 import { Button } from "@/ui/button";
@@ -81,6 +82,12 @@ function AwaitingRow({ profile }: { profile: AwaitingProfile }) {
         </div>
         <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(profile.testingAt)}</span>
       </div>
+      {profile.paths !== null && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <DatabaseZap className="size-3.5 text-primary" />
+          All {profile.paths.toLocaleString()} paths cached, {formatBytes(profile.bytes)}
+        </p>
+      )}
       {profile.baseRev === null && <p className="mt-2 text-xs text-muted-foreground">The whole setup, {profile.files.length} files.</p>}
       {profile.baseRev !== null && profile.files.length > 0 && (
         <div className="mt-2.5 flex flex-wrap gap-1.5">

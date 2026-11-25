@@ -91,10 +91,10 @@ func (s *Store) writeBundle(hashes []string, known map[string]signature) (string
 	if _, err := os.Stat(path); err == nil {
 		return name, nil
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return "", err
 	}
-	return name, os.WriteFile(path, archive.Bytes(), 0o644)
+	return name, os.WriteFile(path, archive.Bytes(), 0o600)
 }
 
 // BundlePath serves signatures to machines.

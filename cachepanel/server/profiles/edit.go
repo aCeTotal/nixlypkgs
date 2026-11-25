@@ -2,16 +2,21 @@ package profiles
 
 import (
 	"context"
+	"errors"
 	"net/http"
-	"os"
+	"reflect"
 	"regexp"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5"
 
+	"cachepanel/modules"
 	"cachepanel/realtime"
 	"cachepanel/rest"
+	"cachepanel/source"
 )
+
+// New profiles start on this kernel.
+const defaultKernel = "performance"
 
 var (
 	namePattern  = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
@@ -22,168 +27,186 @@ var (
 	errPlatform  = rest.Unprocessable("invalid_platform", "Unknown platform")
 	errPackage   = rest.Unprocessable("invalid_package", "Invalid package – use e.g. blender or python3Packages.numpy")
 	errPinnedRev = rest.Unprocessable("invalid_revision", "That revision is not evaluated")
+	errExists    = rest.Conflict("profile_exists", "A profile already has that ID")
+	errLast      = rest.Conflict("last_profile", "Keep at least one profile")
 )
 
-type identity struct {
-	Name        string `json:"name"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Platform    string `json:"platform"`
+// Routes commit profile edits.
+type Routes struct {
+	*Rebuilder
+	// Poke starts evaluating a new commit.
+	Poke func()
 }
 
-func (i identity) validate() error {
-	switch {
-	case !namePattern.MatchString(i.Name):
-		return errName
-	case len(i.Title) == 0 || len([]rune(i.Title)) > 80:
-		return errTitle
-	case !platforms[i.Platform]:
-		return errPlatform
+// change carries base and message.
+type change struct {
+	Base    string `json:"base"`
+	Message string `json:"message"`
+}
+
+// draft is a full profile edit.
+type draft struct {
+	Name string `json:"name"`
+	Profile
+	change
+}
+
+func (p *Routes) create(w http.ResponseWriter, r *http.Request) error {
+	var req struct {
+		Name        string `json:"name"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Platform    string `json:"platform"`
+		change
 	}
-	return nil
-}
-
-func (b *Rebuilder) create(w http.ResponseWriter, r *http.Request) error {
-	var req identity
 	if err := rest.Decode(r, &req); err != nil {
 		return err
 	}
-	if err := req.validate(); err != nil {
+	profile := Profile{Title: req.Title, Description: req.Description, Platform: req.Platform, Kernel: defaultKernel,
+		Modules: []string{}, Packages: []string{}}
+	if err := profile.validate(req.Name); err != nil {
 		return err
 	}
-	if _, err := b.DB.Exec(r.Context(), `INSERT INTO profiles (name, title, description, platform) VALUES ($1, $2, $3, $4)`,
-		req.Name, req.Title, req.Description, req.Platform); err != nil {
-		return err
-	}
-	b.changed(req.Name)
-	return rest.WriteJSON(w, http.StatusCreated, map[string]string{"name": req.Name})
+	return p.add(w, r, req.change, req.Name, profile)
 }
 
-type settings struct {
-	identity
-	Kernel         string            `json:"kernel"`
-	KernelSettings map[string]string `json:"kernelSettings"`
-	Pinned         *string           `json:"pinnedSha"`
-	Modules        []string          `json:"modules"`
-	Packages       []string          `json:"packages"`
-}
-
-func (s settings) validate() error {
-	if err := s.identity.validate(); err != nil {
-		return err
-	}
-	for _, pkg := range s.Packages {
-		if !attrPattern.MatchString(pkg) {
-			return errPackage
-		}
-	}
-	return nil
-}
-
-func (b *Rebuilder) update(w http.ResponseWriter, r *http.Request) error {
-	var req settings
-	if err := rest.Decode(r, &req); err != nil {
-		return err
-	}
-	if err := req.validate(); err != nil {
-		return err
-	}
-	entries, err := b.moduleCatalogue(r.Context())
-	if err != nil {
-		return err
-	}
-	if err := checkModules(entries, req.Modules); err != nil {
-		return err
-	}
-	err = pgx.BeginFunc(r.Context(), b.DB, func(tx pgx.Tx) error {
-		return save(r.Context(), tx, chi.URLParam(r, "name"), req)
-	})
-	if err != nil {
-		return err
-	}
-	b.changed(req.Name)
-	return rest.NoContent(w)
-}
-
-func save(ctx context.Context, tx pgx.Tx, current string, req settings) error {
-	if req.Pinned != nil {
-		var done bool
-		err := tx.QueryRow(ctx, `SELECT eval_state = 'done' FROM commits WHERE sha = $1`, *req.Pinned).Scan(&done)
-		if err != nil || !done {
-			return errPinnedRev
-		}
-	}
-	kernel, err := chooseKernel(ctx, tx, req)
-	if err != nil {
-		return err
-	}
-	var id int64
-	err = tx.QueryRow(ctx, `
-		UPDATE profiles SET name = $2, title = $3, description = $4, platform = $5, pinned_sha = $6,
-			packages = $7, kernel = $8, kernel_settings = $9, updated_at = now()
-		WHERE name = $1 RETURNING id`,
-		current, req.Name, req.Title, req.Description, req.Platform, req.Pinned, uniq(req.Packages), req.Kernel, kernel).Scan(&id)
-	if err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM profile_modules WHERE profile_id = $1 AND slug <> ALL($2)`, id, req.Modules); err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, `
-		INSERT INTO profile_modules (profile_id, slug) SELECT $1, unnest($2::text[])
-		ON CONFLICT DO NOTHING`, id, req.Modules)
-	return err
-}
-
-func (b *Rebuilder) clone(w http.ResponseWriter, r *http.Request) error {
+func (p *Routes) clone(w http.ResponseWriter, r *http.Request) error {
 	var req struct {
 		Name  string `json:"name"`
 		Title string `json:"title"`
+		change
 	}
 	if err := rest.Decode(r, &req); err != nil {
 		return err
 	}
-	if err := (identity{Name: req.Name, Title: req.Title, Platform: "desktop"}).validate(); err != nil {
-		return err
-	}
-	err := pgx.BeginFunc(r.Context(), b.DB, func(tx pgx.Tx) error {
-		var id int64
-		err := tx.QueryRow(r.Context(), `
-			INSERT INTO profiles (name, title, description, platform, pinned_sha, packages, kernel, kernel_settings)
-			SELECT $2, $3, description, platform, pinned_sha, packages, kernel, kernel_settings FROM profiles WHERE name = $1
-			RETURNING id`, chi.URLParam(r, "name"), req.Name, req.Title).Scan(&id)
-		if err != nil {
-			return err
-		}
-		_, err = tx.Exec(r.Context(), `
-			INSERT INTO profile_modules (profile_id, slug)
-			SELECT $1, slug FROM profile_modules WHERE profile_id = (SELECT id FROM profiles WHERE name = $2)`,
-			id, chi.URLParam(r, "name"))
-		return err
-	})
+	profile, err := p.profileAt(r.Context(), req.Base, chi.URLParam(r, "name"))
 	if err != nil {
 		return err
 	}
-	b.changed(req.Name)
-	return rest.WriteJSON(w, http.StatusCreated, map[string]string{"name": req.Name})
-}
-
-func (b *Rebuilder) remove(w http.ResponseWriter, r *http.Request) error {
-	var id int64
-	if err := b.DB.QueryRow(r.Context(), `DELETE FROM profiles WHERE name = $1 RETURNING id`, chi.URLParam(r, "name")).Scan(&id); err != nil {
+	profile.Title = req.Title
+	if err := profile.validate(req.Name); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(b.systemRoots(id)); err != nil {
-		return err
-	}
-	b.changed(chi.URLParam(r, "name"))
-	b.Published()
-	return rest.NoContent(w)
+	return p.add(w, r, req.change, req.Name, profile)
 }
 
-func (b *Rebuilder) changed(name string) {
-	b.Hub.Publish(realtime.ProfileChanged, map[string]string{"name": name})
-	b.Trigger()
+// add writes a new profile.
+func (p *Routes) add(w http.ResponseWriter, r *http.Request, req change, name string, profile Profile) error {
+	if err := p.free(r.Context(), req.Base, name); err != nil {
+		return err
+	}
+	text, err := profile.encode()
+	if err != nil {
+		return err
+	}
+	edit := source.Edit{Base: req.Base, Message: req.Message, Changes: []source.FileChange{{Path: profilePath(name), Content: &text}}}
+	return p.committed(w, r, edit, name)
+}
+
+func (p *Routes) update(w http.ResponseWriter, r *http.Request) error {
+	var req draft
+	if err := rest.Decode(r, &req); err != nil {
+		return err
+	}
+	if err := req.validate(req.Name); err != nil {
+		return err
+	}
+	current := chi.URLParam(r, "name")
+	before, err := p.profileAt(r.Context(), req.Base, current)
+	if err != nil {
+		return err
+	}
+	profile, err := p.settle(r.Context(), req.Base, req.Profile)
+	if err != nil {
+		return err
+	}
+	// Formatting alone is no change.
+	if req.Name == current && reflect.DeepEqual(profile.normalized(), before) {
+		return source.ErrUnchanged
+	}
+	text, err := profile.encode()
+	if err != nil {
+		return err
+	}
+	changes := []source.FileChange{{Path: profilePath(req.Name), Content: &text}}
+	if req.Name != current {
+		if err := p.free(r.Context(), req.Base, req.Name); err != nil {
+			return err
+		}
+		changes = append(changes, source.FileChange{Path: profilePath(current)})
+	}
+	return p.committed(w, r, source.Edit{Base: req.Base, Message: req.Message, Changes: changes}, req.Name)
+}
+
+// settle checks choices against catalogues.
+func (p *Routes) settle(ctx context.Context, base string, profile Profile) (Profile, error) {
+	entries, err := modules.Catalogue(ctx, p.Source, base)
+	if err != nil {
+		return Profile{}, err
+	}
+	if err := checkModules(entries, profile.Modules); err != nil {
+		return Profile{}, err
+	}
+	if profile.PinnedSha != nil {
+		var done bool
+		err := p.DB.QueryRow(ctx, `SELECT eval_state = 'done' FROM commits WHERE sha = $1`, *profile.PinnedSha).Scan(&done)
+		if err != nil || !done {
+			return Profile{}, errPinnedRev
+		}
+	}
+	profile.KernelSettings, err = chooseKernel(ctx, p.DB, profile)
+	return profile, err
+}
+
+func (p *Routes) remove(w http.ResponseWriter, r *http.Request) error {
+	var req change
+	if err := rest.Decode(r, &req); err != nil {
+		return err
+	}
+	name := chi.URLParam(r, "name")
+	kept, err := profilesAt(r.Context(), p.Source, req.Base)
+	if err != nil {
+		return err
+	}
+	if _, found := kept[name]; !found {
+		return rest.NotFound()
+	}
+	if len(kept) == 1 {
+		return errLast
+	}
+	edit := source.Edit{Base: req.Base, Message: req.Message, Changes: []source.FileChange{{Path: profilePath(name)}}}
+	return p.committed(w, r, edit, name)
+}
+
+// free refuses taken names.
+func (p *Routes) free(ctx context.Context, rev, name string) error {
+	_, err := p.Source.FileAt(ctx, rev, profilePath(name))
+	if err == nil {
+		return errExists
+	}
+	if errors.Is(err, source.ErrNoFile) {
+		return nil
+	}
+	return err
+}
+
+func (p *Routes) profileAt(ctx context.Context, rev, name string) (Profile, error) {
+	blob, err := p.Source.FileAt(ctx, rev, profilePath(name))
+	if err != nil {
+		return Profile{}, err
+	}
+	return decodeProfile(name, blob.Text)
+}
+
+func (p *Routes) committed(w http.ResponseWriter, r *http.Request, edit source.Edit, name string) error {
+	sha, err := p.Source.Commit(r.Context(), edit, p.Source.Author(r))
+	if err != nil {
+		return err
+	}
+	p.Poke()
+	p.Hub.Publish(realtime.ProfileChanged, map[string]string{"name": name})
+	p.Hub.Publish(realtime.SourceChanged, map[string]string{"sha": sha})
+	return rest.WriteJSON(w, http.StatusCreated, map[string]string{"sha": sha, "name": name})
 }
 
 // uniq keeps first occurrences.

@@ -12,11 +12,14 @@ func TestSignatureListLayout(t *testing.T) {
 		t.Fatalf("EFI_CERT_X509_GUID = % x, want % x", x509Type, want)
 	}
 	der := []byte("certificate")
-	list := signatureList(Cert{guid: microsoftOwner, der: der})
+	list, err := signatureList(Cert{guid: microsoftOwner, der: der})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if size := binary.LittleEndian.Uint32(list[16:]); int(size) != len(list) {
 		t.Errorf("SignatureListSize = %d, want %d", size, len(list))
 	}
-	if size := binary.LittleEndian.Uint32(list[24:]); size != ownerLength+uint32(len(der)) {
+	if size := binary.LittleEndian.Uint32(list[24:]); int(size) != ownerLength+len(der) {
 		t.Errorf("SignatureSize = %d, want %d", size, ownerLength+len(der))
 	}
 	if !bytes.Equal(list[listHeader:listHeader+ownerLength], microsoftOwner[:]) || !bytes.HasSuffix(list, der) {

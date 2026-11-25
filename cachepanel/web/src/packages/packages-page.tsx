@@ -1,6 +1,6 @@
-import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Lock, Search } from "lucide-react";
+import { GitBranch, Lock, Search } from "lucide-react";
 import { useDeferredValue, useState } from "react";
 import { formatDuration } from "@/format/duration";
 import { PageHeader } from "@/shell/page-header";
@@ -9,6 +9,7 @@ import { Input } from "@/ui/input";
 import { Switch } from "@/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/ui/toggle-group";
+import { upstreamQuery } from "@/upstream/queries";
 import { packagesQuery, setAutoBuild, type PackageSummary } from "./queries";
 import { VersionPills } from "./version-pills";
 
@@ -28,6 +29,8 @@ export function PackagesPage() {
   const [search, setSearch] = useState("");
   const query = useDeferredValue(search.trim().toLowerCase());
   const toggle = useMutation({ mutationFn: ({ attr, enabled }: { attr: string; enabled: boolean }) => setAutoBuild(attr, enabled) });
+  const { data: tracked = [] } = useQuery(upstreamQuery);
+  const follows = new Map(tracked.map((each) => [each.attr, `Follows ${each.follows} of ${each.url}`]));
   const shown = data.filter((pkg) => filters[filter].test(pkg) && pkg.attr.toLowerCase().includes(query));
   return (
     <div className="space-y-4">
@@ -67,6 +70,11 @@ export function PackagesPage() {
                   <Link to="/packages/$attr" params={{ attr: pkg.attr }} className="font-medium hover:text-primary hover:underline">
                     {pkg.attr}
                   </Link>
+                  {follows.has(pkg.attr) && (
+                    <GitBranch className="ml-1.5 inline size-3.5 text-primary" aria-label={follows.get(pkg.attr)}>
+                      <title>{follows.get(pkg.attr)}</title>
+                    </GitBranch>
+                  )}
                   <p className="truncate text-xs text-muted-foreground">{pkg.versions[0]?.name ?? "No versions"}</p>
                 </TableCell>
                 <TableCell>

@@ -1,9 +1,10 @@
 import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { ArrowLeft, Save, Undo2 } from "lucide-react";
+import { ArrowLeft, GitCommitVertical, History, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { FileBrowser } from "@/shell/file-browser";
 import { PageHeader } from "@/shell/page-header";
+import { CommitDialog } from "@/source/commit-dialog";
 import { Button } from "@/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/tabs";
 import { CheckBadge } from "./check-badge";
@@ -16,7 +17,7 @@ import { profileQuery, saveProfile, type ProfileDetail, type ProfileSettings } f
 
 const route = getRouteApi("/app/profiles/$name");
 
-function settingsOf({ profile, modules, packages }: ProfileDetail): ProfileSettings {
+function settingsOf({ profile, modules }: ProfileDetail): ProfileSettings {
   return {
     name: profile.name,
     title: profile.title,
@@ -26,14 +27,14 @@ function settingsOf({ profile, modules, packages }: ProfileDetail): ProfileSetti
     kernelSettings: profile.kernelSettings,
     pinnedSha: profile.pinnedSha,
     modules: modules.filter((module) => module.selected && !module.required).map((module) => module.slug),
-    packages,
+    packages: profile.packages,
   };
 }
 
 export function ProfilePage() {
   const { name } = route.useParams();
   const { data } = useSuspenseQuery(profileQuery(name));
-  return <ProfileEditor key={data.profile.updatedAt} detail={data} />;
+  return <ProfileEditor key={JSON.stringify(settingsOf(data))} detail={data} />;
 }
 
 // Edits stay local until saved.
@@ -41,10 +42,12 @@ function ProfileEditor({ detail }: { detail: ProfileDetail }) {
   const navigate = route.useNavigate();
   const initial = settingsOf(detail);
   const [draft, setDraft] = useState(initial);
+  const [committing, setCommitting] = useState(false);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const save = useMutation({
-    mutationFn: () => saveProfile(detail.profile.name, draft),
+    mutationFn: (message: string) => saveProfile(detail.profile.name, { ...draft, base: detail.head, message }),
     onSuccess: () => {
+      setCommitting(false);
       if (draft.name !== detail.profile.name) void navigate({ to: "/profiles/$name", params: { name: draft.name } });
     },
   });
@@ -60,7 +63,17 @@ function ProfileEditor({ detail }: { detail: ProfileDetail }) {
       <PageHeader
         title={detail.profile.title}
         description={<CheckBadge state={detail.profile.checkState} />}
-        actions={<ProfileActions profile={detail.profile} />}
+        actions={
+          <>
+            <Button asChild size="sm" variant="outline">
+              <Link to="/source" search={{ tab: "history", path: `nixlyos/profiles/${detail.profile.name}.json` }}>
+                <History />
+                History
+              </Link>
+            </Button>
+            <ProfileActions detail={detail} />
+          </>
+        }
       />
       <Tabs defaultValue="modules">
         <TabsList>
@@ -89,18 +102,27 @@ function ProfileEditor({ detail }: { detail: ProfileDetail }) {
       {dirty && (
         <div className="fixed inset-x-0 bottom-0 z-30 flex justify-center p-4">
           <div className="flex items-center gap-3 rounded-xl border bg-popover/95 px-4 py-3 shadow-xl backdrop-blur animate-in slide-in-from-bottom-4">
-            <span className="text-sm">Unsaved changes – checked automatically, then land in testing.</span>
+            <span className="text-sm">Unsaved changes – a commit on main, checked in testing before stable.</span>
             <Button variant="ghost" size="sm" onClick={() => setDraft(initial)}>
               <Undo2 />
               Discard
             </Button>
-            <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
-              <Save />
-              Save
+            <Button size="sm" onClick={() => setCommitting(true)} disabled={save.isPending}>
+              <GitCommitVertical />
+              Commit
             </Button>
           </div>
         </div>
       )}
+      <CommitDialog
+        open={committing}
+        onOpenChange={setCommitting}
+        title={`Commit ${detail.profile.title}`}
+        label="Commit"
+        suggestion={`profiles: update ${detail.profile.name}`}
+        pending={save.isPending}
+        onCommit={(message) => save.mutate(message)}
+      />
     </div>
   );
 }

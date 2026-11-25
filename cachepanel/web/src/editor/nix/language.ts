@@ -29,7 +29,9 @@ export const nixParser = parser.configure({
       },
     }),
     styleTags({
-      Identifier: t.propertyName,
+      Identifier: t.variableName,
+      "Bind/AttrPath/Identifier": t.definition(t.propertyName),
+      "Select/AttrPath/Identifier": t.propertyName,
       Boolean: t.bool,
       String: t.string,
       IndentedString: t.string,

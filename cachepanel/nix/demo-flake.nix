@@ -6,6 +6,9 @@
       # Dev stacks may lend packages.
       packageSet = builtins.getFlake (builtins.getEnv "CACHEPANEL_DEMO_PACKAGES");
       revision = builtins.readFile ./revision;
+      # A derivation the panel keeps in step with its upstream.
+      tracked = builtins.fromJSON (builtins.readFile ./pkgs/tracked-demo/source.json);
+      trackedSrc = builtins.fetchTree { type = "git"; inherit (tracked) url rev; narHash = tracked.hash; };
       demo = name: steps: derivation {
         inherit name system;
         builder = "/bin/sh";
@@ -39,10 +42,17 @@
           builder = "/bin/sh";
           args = [ "-c" "echo steady > $out" ];
         };
-      };
+      } // (if builtins.pathExists ./pkgs/tracked-demo/source.json then {
+        tracked-demo = derivation {
+          name = "tracked-demo-${tracked.version}";
+          inherit system;
+          builder = "/bin/sh";
+          args = [ "-c" "while read -r line; do echo \"$line\"; done < ${trackedSrc}/value > $out" ];
+        };
+      } else { });
 
       lib.nixlyos = {
-        pinnable = _: [ "hello-demo" "clock-demo" ];
+        pinnable = _: [ "hello-demo" "clock-demo" ] ++ (if builtins.pathExists ./pkgs/tracked-demo/source.json then [ "tracked-demo" ] else [ ]);
         kernels = _: {
           performance = {
             title = "Performance";
@@ -58,6 +68,12 @@
         };
         pkgs = system: packageSet.lib.nixlyos.pkgs system;
         nixpkgs = system: packageSet.lib.nixlyos.nixpkgs system;
+        editor = system: {
+          options = [ { name = "nixlyos.demo.enable"; type = "boolean"; description = "Turns the demo on."; } ];
+          packages = builtins.attrNames self.packages.${system};
+          lib = [ "mkIf" "mkOption" ];
+          builtins = builtins.attrNames builtins;
+        };
       };
     };
 }

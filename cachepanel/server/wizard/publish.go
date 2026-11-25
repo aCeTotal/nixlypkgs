@@ -34,19 +34,26 @@ type Publisher struct {
 	Branch string
 }
 
+// Publication is one recipe commit.
+type Publication struct {
+	Attr    string
+	Message string
+	Files   map[string][]byte
+}
+
 // Publish writes pkgs/<attr> and pushes one commit.
-func (p *Publisher) Publish(ctx context.Context, attr, version string, files map[string][]byte) (string, error) {
+func (p *Publisher) Publish(ctx context.Context, pub Publication) (string, error) {
 	var err error
 	for range pushAttempts {
 		var sha string
-		if sha, err = p.attempt(ctx, attr, version, files); err == nil {
+		if sha, err = p.attempt(ctx, pub); err == nil {
 			return sha, nil
 		}
 	}
 	return "", err
 }
 
-func (p *Publisher) attempt(ctx context.Context, attr, version string, files map[string][]byte) (string, error) {
+func (p *Publisher) attempt(ctx context.Context, pub Publication) (string, error) {
 	head, err := p.Mirror.Fetch(ctx)
 	if err != nil {
 		return "", err
@@ -62,12 +69,12 @@ func (p *Publisher) attempt(ctx context.Context, attr, version string, files map
 	if _, err := p.git(ctx, dir, "checkout", "--quiet", head); err != nil {
 		return "", err
 	}
-	if err := writePackage(dir, attr, files); err != nil {
+	if err := writePackage(dir, pub.Attr, pub.Files); err != nil {
 		return "", err
 	}
 	steps := [][]string{
-		{"add", "-A", "pkgs/" + attr, recipesList},
-		{"-c", "user.name=" + authorName, "-c", "user.email=" + authorEmail, "commit", "--quiet", "-m", attr + ": " + version},
+		{"add", "-A", "pkgs/" + pub.Attr, recipesList},
+		{"-c", "user.name=" + authorName, "-c", "user.email=" + authorEmail, "commit", "--quiet", "-m", pub.Message},
 		{"push", "--quiet", p.Remote, "HEAD:refs/heads/" + p.Branch},
 	}
 	for _, step := range steps {

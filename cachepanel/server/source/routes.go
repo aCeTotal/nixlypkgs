@@ -26,6 +26,7 @@ func (s *Routes) Mount(r chi.Router) {
 	r.Post("/source/keys", rest.Handle(s.add))
 	r.Delete("/source/keys/{id}", rest.Handle(s.remove))
 	r.Get("/source/tree", rest.Handle(s.tree))
+	r.Get("/source/files", rest.Handle(s.paths))
 	r.Get("/source/file", rest.Handle(s.file))
 	r.Get("/source/log", rest.Handle(s.log))
 	r.Get("/source/commits/{sha}", rest.Handle(s.show))
@@ -164,4 +165,12 @@ func (s *Routes) updateInputs(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return s.committed(w, sha)
+}
+
+func (s *Routes) paths(w http.ResponseWriter, r *http.Request) error {
+	paths, err := s.Repo.Paths(r.Context())
+	if err != nil {
+		return err
+	}
+	return rest.WriteJSON(w, http.StatusOK, paths)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,19 +26,21 @@ type Cache struct {
 	dir     string
 	key     string
 	files   fs.FS
+	server  http.Handler
 	lock    sync.RWMutex
 	request chan struct{}
 }
 
 // Open prepares dir; key may be empty for unsigned caches.
 func Open(dir, key string) (*Cache, error) {
-	if err := os.MkdirAll(filepath.Join(dir, "nar"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "nar"), 0o750); err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "nix-cache-info"), []byte(cacheInfo), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "nix-cache-info"), []byte(cacheInfo), 0o600); err != nil {
 		return nil, err
 	}
-	return &Cache{dir: dir, key: key, files: os.DirFS(dir), request: make(chan struct{}, 1)}, nil
+	files := os.DirFS(dir)
+	return &Cache{dir: dir, key: key, files: files, server: http.FileServerFS(files), request: make(chan struct{}, 1)}, nil
 }
 
 // Push copies closures in, signed.

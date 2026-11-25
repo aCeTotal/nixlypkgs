@@ -10,8 +10,9 @@ export type KernelSetting = { title: string; description: string; kind: SettingK
 
 export type KernelOffer = { title: string; description: string; settings: Record<string, KernelSetting> };
 
+// Progress arrives once testing has it.
 export type ProfileSummary = {
-  id: number;
+  id: number | null;
   name: string;
   title: string;
   description: string;
@@ -19,6 +20,8 @@ export type ProfileSummary = {
   kernel: string;
   kernelSettings: Record<string, string>;
   pinnedSha: string | null;
+  modules: string[];
+  packages: string[];
   packageCount: number;
   moduleCount: number;
   candidateTree: string | null;
@@ -32,7 +35,10 @@ export type ProfileSummary = {
   checkState: CheckState;
   checkError: string | null;
   checkedAt: string | null;
-  updatedAt: string;
+  testingPaths: number | null;
+  testingBytes: number | null;
+  stablePaths: number | null;
+  stableBytes: number | null;
 };
 
 export type ProfileModule = {
@@ -45,10 +51,13 @@ export type ProfileModule = {
 
 export type ProfileDetail = {
   profile: ProfileSummary;
+  head: string;
   modules: ProfileModule[];
-  packages: string[];
   files: { path: string; content: string }[];
 };
+
+// Where a commit starts and why.
+export type Change = { base: string; message: string };
 
 export type ProfileSettings = {
   name: string;
@@ -74,15 +83,17 @@ export const kernelsQuery = queryOptions({ queryKey: ["kernels"], queryFn: () =>
 export const profileQuery = (name: string) =>
   queryOptions({ queryKey: ["profile", name], queryFn: () => api<ProfileDetail>(`/profiles/${name}`) });
 
-export const createProfile = (body: { name: string; title: string; description: string; platform: Platform }) =>
-  api<{ name: string }>("/profiles", { method: "POST", body });
+type Committed = { sha: string; name: string };
 
-export const saveProfile = (name: string, body: ProfileSettings) => api(`/profiles/${name}`, { method: "PUT", body });
+export const createProfile = (body: Change & { name: string; title: string; description: string; platform: Platform }) =>
+  api<Committed>("/profiles", { method: "POST", body });
 
-export const cloneProfile = (name: string, body: { name: string; title: string }) =>
-  api<{ name: string }>(`/profiles/${name}/clone`, { method: "POST", body });
+export const saveProfile = (name: string, body: Change & ProfileSettings) => api<Committed>(`/profiles/${name}`, { method: "PUT", body });
 
-export const deleteProfile = (name: string) => api(`/profiles/${name}`, { method: "DELETE" });
+export const cloneProfile = (name: string, body: Change & { name: string; title: string }) =>
+  api<Committed>(`/profiles/${name}/clone`, { method: "POST", body });
+
+export const deleteProfile = (name: string, body: Change) => api<Committed>(`/profiles/${name}`, { method: "DELETE", body });
 
 export const recheckProfile = (name: string) => api(`/profiles/${name}/check`, { method: "POST" });
 
@@ -98,6 +109,8 @@ export type AwaitingProfile = {
   testingAt: string;
   baseRev: string | null;
   files: { path: string; change: FileChange }[];
+  paths: number | null;
+  bytes: number | null;
 };
 
 export type AwaitingDerivation = {

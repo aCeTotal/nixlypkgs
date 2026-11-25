@@ -3,12 +3,14 @@ package source
 import (
 	"bufio"
 	"context"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// FilesAt reads many files at one commit in one git run.
+// FilesAt reads files in one run.
 func (r *Repo) FilesAt(ctx context.Context, rev string, paths []string) (map[string]string, error) {
 	var specs strings.Builder
 	for _, path := range paths {
@@ -22,7 +24,7 @@ func (r *Repo) FilesAt(ctx context.Context, rev string, paths []string) (map[str
 	for _, path := range paths {
 		header, rest, _ := strings.Cut(out, "\n")
 		fields := strings.Fields(header)
-		// Missing paths answer "<spec> missing" and nothing else.
+		// Missing paths print only "missing".
 		if len(fields) != 3 {
 			out = rest
 			continue
@@ -35,7 +37,7 @@ func (r *Repo) FilesAt(ctx context.Context, rev string, paths []string) (map[str
 	return files, nil
 }
 
-// LastChanged finds when each path last changed on main.
+// LastChanged dates each path's change.
 func (r *Repo) LastChanged(ctx context.Context, paths []string) (map[string]time.Time, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -61,8 +63,54 @@ func (r *Repo) LastChanged(ctx context.Context, paths []string) (map[string]time
 			changed[line] = when
 		}
 	}
-	// Stopping early ends git; its exit status says nothing.
+	// Early stop kills git harmlessly.
 	cancel()
 	_ = cmd.Wait()
 	return changed, lines.Err()
+}
+
+// Paths lists every file on main.
+func (r *Repo) Paths(ctx context.Context) ([]string, error) {
+	head, err := r.Head(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out, err := r.read(ctx, "ls-tree", "-r", "-z", "--name-only", head)
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(strings.TrimSuffix(out, "\x00"), "\x00"), nil
+}
+
+// FolderAt reads dir's files at rev.
+func (r *Repo) FolderAt(ctx context.Context, rev, dir string) (map[string]string, error) {
+	out, err := r.read(ctx, "ls-tree", "-z", "--name-only", rev, dir+"/")
+	if err != nil || out == "" {
+		return map[string]string{}, err
+	}
+	return r.FilesAt(ctx, rev, strings.Split(strings.TrimSuffix(out, "\x00"), "\x00"))
+}
+
+// FilesNamed reads dir/<child>/name by child.
+func (r *Repo) FilesNamed(ctx context.Context, rev, dir, name string) (map[string]string, error) {
+	out, err := r.read(ctx, "ls-tree", "-r", "-z", "--name-only", rev, dir+"/")
+	if err != nil {
+		return nil, err
+	}
+	paths := map[string]string{}
+	for path := range strings.SplitSeq(strings.TrimSuffix(out, "\x00"), "\x00") {
+		child, file, nested := strings.Cut(strings.TrimPrefix(path, dir+"/"), "/")
+		if nested && file == name {
+			paths[path] = child
+		}
+	}
+	files, err := r.FilesAt(ctx, rev, slices.Collect(maps.Keys(paths)))
+	if err != nil {
+		return nil, err
+	}
+	named := make(map[string]string, len(files))
+	for path, text := range files {
+		named[paths[path]] = text
+	}
+	return named, nil
 }

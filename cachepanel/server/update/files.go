@@ -8,20 +8,20 @@ import (
 	"time"
 )
 
-// The root updater shares these with the panel.
+// Shared with the root updater.
 const (
 	requestFile = "request.json"
 	statusFile  = "status.json"
 	idleFile    = "idle"
 )
 
-// Request asks root for one panel build.
+// Request asks root for a build.
 type Request struct {
 	Rev    string `json:"rev"`
 	Target string `json:"target"`
 }
 
-// Phase is what the root updater is doing.
+// Phase is the updater's step.
 type Phase string
 
 const (
@@ -33,7 +33,7 @@ const (
 	Superseded Phase = "superseded"
 )
 
-// Status is written by the root updater.
+// Status comes from the updater.
 type Status struct {
 	Phase  Phase     `json:"phase"`
 	Rev    string    `json:"rev"`
@@ -42,21 +42,22 @@ type Status struct {
 	Log    string    `json:"log"`
 }
 
-func readJSON(path string, target any) (bool, error) {
-	body, err := os.ReadFile(path)
+// readJSON skips missing files.
+func readJSON(dir, name string, target any) error {
+	body, err := fs.ReadFile(os.DirFS(dir), name)
 	if errors.Is(err, fs.ErrNotExist) {
-		return false, nil
+		return nil
 	}
 	if err != nil {
-		return false, err
+		return err
 	}
-	return true, json.Unmarshal(body, target)
+	return json.Unmarshal(body, target)
 }
 
 // writeAtomic never leaves half a file.
 func writeAtomic(path string, body []byte) error {
 	partial := path + ".partial"
-	if err := os.WriteFile(partial, body, 0o644); err != nil {
+	if err := os.WriteFile(partial, body, 0o600); err != nil {
 		return err
 	}
 	return os.Rename(partial, path)

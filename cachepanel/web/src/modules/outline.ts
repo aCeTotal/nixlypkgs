@@ -1,4 +1,4 @@
-import { nixParser as parser } from "./nix/language";
+import { nixParser as parser } from "@/editor/nix/language";
 
 type Node = ReturnType<typeof parser.parse>["topNode"];
 

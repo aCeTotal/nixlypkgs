@@ -1,0 +1,12 @@
+{
+  "title": "Server",
+  "description": "Headless machines on the NixlyOS base",
+  "platform": "server",
+  "kernel": "server",
+  "kernelSettings": {},
+  "pinnedSha": null,
+  "modules": [
+    "server"
+  ],
+  "packages": []
+}

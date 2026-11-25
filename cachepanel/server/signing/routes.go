@@ -2,6 +2,7 @@ package signing
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -89,8 +90,8 @@ func (t *Routes) update(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/octet-stream")
-	_, err = w.Write(update)
-	return err
+	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(update))
+	return nil
 }
 
 func (t *Routes) create(w http.ResponseWriter, r *http.Request) error {

@@ -44,6 +44,7 @@ func Open(ctx context.Context, cfg config.Config) (*Repo, error) {
 		{"receive.denyNonFastForwards", "true"},
 		{"receive.denyDeletes", "true"},
 		{"uploadpack.allowReachableSHA1InWant", "true"},
+		{"core.hooksPath", cfg.Hooks},
 	}
 	for _, setting := range settings {
 		if err := git(ctx, "-C", r.dir, "config", setting[0], setting[1]); err != nil {
@@ -95,16 +96,22 @@ type call struct {
 }
 
 func (r *Repo) run(ctx context.Context, c call) (string, error) {
+	var out strings.Builder
+	err := r.stream(ctx, &out, c)
+	return out.String(), err
+}
+
+// stream runs git with its output going to w.
+func (r *Repo) stream(ctx context.Context, w io.Writer, c call) error {
 	cmd := r.command(ctx, c.args...)
-	cmd.Stdin = c.stdin
+	cmd.Stdin, cmd.Stdout = c.stdin, w
 	cmd.Env = append(os.Environ(), c.env...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("git %s: %w: %s", c.args[0], err, strings.TrimSpace(stderr.String()))
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git %s: %w: %s", c.args[0], err, strings.TrimSpace(stderr.String()))
 	}
-	return string(out), nil
+	return nil
 }
 
 func (r *Repo) read(ctx context.Context, args ...string) (string, error) {

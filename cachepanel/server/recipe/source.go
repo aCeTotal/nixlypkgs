@@ -35,6 +35,9 @@ func (w *writer) fetcher(src Source, slot int) string {
 	add := func(key, value string) {
 		fields = append(fields, key+" = "+nixexpr.String(value)+";")
 	}
+	call := func(name string) string {
+		return w.use(name) + " {\n  " + strings.Join(fields, "\n  ") + "\n}"
+	}
 	var fn string
 	switch src.Kind {
 	case File:
@@ -46,6 +49,10 @@ func (w *writer) fetcher(src Source, slot int) string {
 		}
 		add("owner", src.Owner)
 		add("repo", src.Repo)
+		if w.pinned {
+			fields = append(fields, "inherit (source) rev hash;")
+			return call(fn)
+		}
 		add(revKey(src.Rev), src.Rev)
 	case Git:
 		fn = "fetchgit"
@@ -65,7 +72,7 @@ func (w *writer) fetcher(src Source, slot int) string {
 	if src.History {
 		fields = append(fields, "leaveDotGit = true;", "deepClone = true;")
 	}
-	return w.use(fn) + " {\n  " + strings.Join(fields, "\n  ") + "\n}"
+	return call(fn)
 }
 
 func revKey(rev string) string {

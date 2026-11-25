@@ -10,24 +10,33 @@ the package wizard. The panel knows profiles, never individual machines.
   a signed file cache the panel serves itself (`cache.dir`, put it on a big disk); the Nix store is only
   build space. Older versions are garbage collected. Any version can be selected, rebuilt, cancelled or
   deleted, with live progress and logs.
+- **Upstream** – a derivation with `pkgs/<attr>/source.json` follows its repository: every commit on a
+  branch, or the newest numeric tag. Each minute the panel pins what moved (rev, hash, version and vendored
+  hashes such as `cargoHash`) in one commit on main, listing the upstream commits. Testing builds it; each
+  derivation still reaches stable only when you approve it, and a newer pin replaces one still waiting.
 - **Profiles** – Desktop, HTPC, Server and your own. A profile is the required modules plus its chosen
   ones, packages from nixpkgs stable (nixlypkgs on top), a nixlypkgs revision and a kernel from the
   source's catalogue with its own settings: tick rate, idle ticks, preemption, huge pages, TCP and the
   scheduler. Only tick changes rebuild the kernel. The hardware module picks drivers on each machine.
-  Machines pull their profile's release with ETags; trees are content-addressed and CDN-cacheable.
+  Each is `nixlyos/profiles/<name>.json` in the source, so every edit is a commit with a message, from
+  the panel or over SSH. Machines pull their profile's release with ETags; trees are content-addressed
+  and CDN-cacheable.
 - **Modules** – every NixlyOS module is a file in `nixlyos/modules`, listed in `catalogue.json` in import
   order; saving commits it and its history is git's. A matrix shows which profile uses what, and the
   editor has an outline of each module's sections, search, folding and inline syntax errors.
 - **Testing** – every change to a profile is evaluated *and built* on all reference hardware before it
-  reaches the **testing** branch. **Stable**, which machines follow by default, moves only when you
-  approve testing on its own page, for every profile at once. Machines only ever receive tested releases.
+  reaches the **testing** branch. Each release passes only once every path of its systems, nixpkgs
+  included, has a narinfo in the panel's cache; the panel records the count and size. **Stable**, which
+  machines follow by default, moves only when you approve testing on its own page, for every profile at
+  once, and its check proves the cache again. Machines only ever receive tested, fully cached releases.
 - **Trust** – the NixlyOS CA lives on the server, its key readable by the panel alone. Releases that pass
   are signed (kernels, modules, systemd-boot), firmware key updates come signed from the panel, and the
   Easy Anti-Cheat bundle holds the CA and the policy Epic reviews.
 - **Package wizard** – new nixlypkgs packages from a link, an upload, a GitHub repo or a PKGBUILD from
   Arch or the AUR. It finds the build system and dependencies, test-builds in the sandbox, fixes what
   the log explains (hashes, missing libraries, tools, headers, toolchains) and commits the result to
-  `pkgs/<attr>`. PKGBUILDs run through `buildArchPackage`, a makepkg emulation in Nix.
+  `pkgs/<attr>`; a GitHub package gets its `source.json` and follows its releases or branch from then on.
+  PKGBUILDs run through `buildArchPackage`, a makepkg emulation in Nix.
 
 ## Run locally
 

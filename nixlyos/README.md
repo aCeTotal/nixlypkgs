@@ -17,8 +17,9 @@ tree — only `~/.local/nixlyos`:
 
 ## The panel decides
 
-Every NixlyOS module lives in the Nixly panel's database (`../cachepanel`),
-not in this repo. A machine follows a *profile* (desktop, htpc, server, ...):
+Every module lives in `modules/` and every profile in `profiles/<name>.json`;
+the Nixly panel (`../cachepanel`) hosts this repo and turns each panel or SSH
+edit into a commit. A machine follows a *profile* (desktop, htpc, server, ...):
 the panel publishes the nixlypkgs revision together with a profile tree that
 holds the required modules, the modules the profile selected and its extra
 packages. The hardware module picks CPU, GPU and guest support from
@@ -58,8 +59,8 @@ the release itself, so the fast path can never activate a stale system.
 
 ## Workflow
 
-1. Change modules, kernels or packages in the panel, or here (commit on `main`,
-   optionally `scripts/bump-inputs.sh` first) and push.
+1. Change profiles, modules, kernels or packages in the panel, or here (commit
+   on `main`, optionally `scripts/bump-inputs.sh` first) and push to the panel.
 2. The panel builds it, tests every profile on `reference/profiles` and puts
    it in testing; approve it in the panel to make it stable.
 3. `nixlyos-update` on any machine picks up its profile's release on its branch.
@@ -71,6 +72,7 @@ lib/mk-system.nix   mkNixlySystem: machine data + profile tree -> complete NixOS
 lib/kernel.nix      the profile's kernel from ../kernel/catalogue.nix, with its settings
 lib/signing.nix     applies the panel's signatures to modules, kernel and systemd-boot
 modules/            the NixlyOS modules profiles import, in catalogue.json order
+profiles/           one JSON per profile: modules, packages, kernel and its settings
 reference/          hardware profiles every profile is tested on
 scripts/            detect-hw, update, stage, panel, secureboot, user-config:
                     nixlyos-* commands via scripts/overlay.nix; bump-inputs (maintainer)

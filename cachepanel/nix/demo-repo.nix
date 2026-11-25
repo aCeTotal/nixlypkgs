@@ -27,6 +27,19 @@ writeShellApplication {
       echo "[$entries]" > "$dir/nixlyos/modules/catalogue.json"
     }
 
+    # The seeded profiles, as the source keeps them.
+    profiles() {
+      mkdir -p "$dir/nixlyos/profiles"
+      while read -r name title platform modules; do
+        printf '{"title":"%s","description":"","platform":"%s","kernel":"performance","kernelSettings":{},"pinnedSha":null,"modules":%s,"packages":[]}\n' \
+          "$title" "$platform" "$modules" > "$dir/nixlyos/profiles/$name.json"
+      done <<EOF
+    desktop Desktop desktop ["apps","audio","desktop","gaming","session"]
+    htpc HTPC htpc ["apps","audio","gaming","htpc","session"]
+    server Server server ["server"]
+    EOF
+    }
+
     case "''${2:-init}" in
       init)
         [ -d "$dir/.git" ] && exit 0
@@ -34,6 +47,7 @@ writeShellApplication {
         install -m 0644 ${./demo-flake.nix} "$dir/flake.nix"
         git -C "$dir" init --quiet --initial-branch=main
         modules
+        profiles
         for revision in 1 2 3 4; do commit "$revision"; done
         ;;
       bump)

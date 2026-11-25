@@ -1,18 +1,18 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { FileQuestion, GitCommitVertical, History, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { Eye, FileQuestion, GitCommitVertical, History, Sparkles, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { useRef, useState, type Ref } from "react";
 import { toast } from "sonner";
 import { shortSha } from "@/format/sha";
-import { NixEditor } from "@/modules/nix-editor";
-import { useSyntaxCheck } from "@/modules/use-syntax-check";
-import { ConfirmButton } from "@/shell/confirm-button";
+import { CodeEditor, type CodeEditorHandle } from "@/editor/code-editor";
+import { isNix } from "@/editor/languages";
+import { useSyntaxCheck } from "@/editor/use-syntax-check";
+
 import { Button } from "@/ui/button";
 import { Skeleton } from "@/ui/skeleton";
+import { CommitButton } from "./commit-button";
 import { CommitDialog } from "./commit-dialog";
 import { commitChanges, fileQuery, treeQuery, type FileChange } from "./queries";
 
-// Plain text for anything but Nix.
-const plain = [] as const;
 
 type FileEditorProps = {
   path: string;
@@ -44,6 +44,8 @@ function Editing({ path, create, latest, head, onCommitted, onHistory }: Editing
   const [start, setStart] = useState(latest);
   const [draft, setDraft] = useState(latest);
   const [committing, setCommitting] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const editor = useRef<CodeEditorHandle>(null);
   const dirty = create || draft !== start;
   // Follow main until the first keystroke.
   if (!dirty && latest !== start) {
@@ -60,7 +62,6 @@ function Editing({ path, create, latest, head, onCommitted, onHistory }: Editing
       onCommitted(changes[0].content === null ? "" : path);
     },
   });
-  const isNix = path.endsWith(".nix");
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -68,6 +69,16 @@ function Editing({ path, create, latest, head, onCommitted, onHistory }: Editing
           {path}
           {dirty && <span className="ml-2 text-xs text-warning-foreground">{create ? "new file" : "edited"}</span>}
         </p>
+        {isNix(path) && (
+          <Button size="sm" variant="outline" onClick={() => editor.current?.format()} title="Format with nixfmt (Shift+Alt+F)">
+            <Sparkles />
+            Format
+          </Button>
+        )}
+        <Button size="sm" variant={reviewing ? "secondary" : "outline"} onClick={() => setReviewing(!reviewing)} disabled={!dirty}>
+          <Eye />
+          Changes
+        </Button>
         {!create && (
           <Button size="sm" variant="outline" onClick={onHistory}>
             <History />
@@ -75,13 +86,15 @@ function Editing({ path, create, latest, head, onCommitted, onHistory }: Editing
           </Button>
         )}
         {!create && (
-          <ConfirmButton
-            label="Delete"
+          <CommitButton
             icon={Trash2}
-            title={`Delete ${path}?`}
-            description="The deletion is a commit like any other: testing builds it and it can be reverted."
-            onConfirm={() => save.mutate({ message: `Delete ${path}`, changes: [{ path, content: null }] })}
-            disabled={save.isPending}
+            variant="destructive"
+            destructive
+            title={`Delete ${path}`}
+            label="Delete"
+            suggestion={`Delete ${path}`}
+            pending={save.isPending}
+            onCommit={(message) => save.mutate({ message, changes: [{ path, content: null }] })}
           />
         )}
         <Button size="sm" onClick={() => setCommitting(true)} disabled={!dirty || save.isPending}>
@@ -102,29 +115,46 @@ function Editing({ path, create, latest, head, onCommitted, onHistory }: Editing
         </div>
       )}
       <div className="min-h-0 flex-1">
-        {isNix ? (
-          <NixSource value={draft} onChange={setDraft} onSave={() => setCommitting(true)} />
-        ) : (
-          <NixEditor value={draft} onChange={setDraft} onSave={() => setCommitting(true)} language={plain} />
-        )}
+        <SourceEditor
+          path={path}
+          value={draft}
+          original={reviewing && dirty ? start : undefined}
+          onChange={setDraft}
+          onSave={() => setCommitting(true)}
+          ref={editor}
+        />
       </div>
       <CommitDialog
         open={committing}
+        title={create ? `Add ${path}` : `Commit ${path}`}
+        label="Commit"
         suggestion={`${create ? "Add" : "Update"} ${path}`}
         pending={save.isPending}
         onOpenChange={setCommitting}
+        changes={{ path, original: start, current: draft }}
         onCommit={(message) => save.mutate({ message, changes: [{ path, content: draft }] })}
       />
     </div>
   );
 }
 
-type SourceProps = { value: string; onChange: (value: string) => void; onSave: () => void };
+type SourceProps = {
+  path: string;
+  value: string;
+  original: string | undefined;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  ref: Ref<CodeEditorHandle>;
+};
 
-// Nix files show syntax errors as you type.
-function NixSource({ value, onChange, onSave }: SourceProps) {
-  const { problem } = useSyntaxCheck(value);
-  return <NixEditor value={value} onChange={onChange} onSave={onSave} problem={problem} />;
+function SourceEditor(props: SourceProps) {
+  return isNix(props.path) ? <NixSource {...props} /> : <CodeEditor {...props} />;
+}
+
+// Nix syntax errors while typing.
+function NixSource(props: SourceProps) {
+  const { problem } = useSyntaxCheck(props.value);
+  return <CodeEditor {...props} problem={problem} />;
 }
 
 function Notice({ icon: Icon, text }: { icon: LucideIcon; text: string }) {

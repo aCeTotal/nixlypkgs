@@ -6,92 +6,165 @@ import (
 	"compress/gzip"
 	"errors"
 	"io"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 
-	"cachepanel/database"
 	"cachepanel/modules"
 	"cachepanel/realtime"
 	"cachepanel/rest"
 )
 
 func (b *Rebuilder) Mount(r chi.Router) {
-	r.Get("/profiles", rest.Handle(b.list))
-	r.Post("/profiles", rest.Handle(b.create))
-	r.Get("/profiles/{name}", rest.Handle(b.get))
-	r.Put("/profiles/{name}", rest.Handle(b.update))
-	r.Delete("/profiles/{name}", rest.Handle(b.remove))
-	r.Post("/profiles/{name}/clone", rest.Handle(b.clone))
 	r.Post("/profiles/{name}/check", rest.Handle(b.recheck))
 	r.Get("/approval", rest.Handle(b.pending))
 	r.Post("/approval", rest.Handle(b.approve))
 	r.Get("/kernels", rest.Handle(b.kernels))
 }
 
-const summary = `
-	p.id, p.name, p.title, p.description, p.platform, p.kernel, p.kernel_settings AS "kernelSettings", p.pinned_sha AS "pinnedSha",
-	cardinality(p.packages) AS "packageCount",
-	(SELECT count(*) FROM profile_modules pm WHERE pm.profile_id = p.id AND pm.slug = ANY($1::text[])) + $2::int AS "moduleCount",
-	p.candidate_tree AS "candidateTree", p.candidate_rev AS "candidateRev",
-	p.testing_tree AS "testingTree", p.testing_rev AS "testingRev", p.testing_at AS "testingAt",
-	p.stable_tree AS "stableTree", p.stable_rev AS "stableRev", p.stable_at AS "stableAt",
-	p.check_state AS "checkState", p.check_error AS "checkError", p.checked_at AS "checkedAt", p.updated_at AS "updatedAt"`
-
-func (b *Rebuilder) list(w http.ResponseWriter, r *http.Request) error {
-	entries, err := b.moduleCatalogue(r.Context())
-	if err != nil {
-		return err
-	}
-	optional := modules.Optional(entries)
-	body, err := database.JSON(r.Context(), b.DB, `
-		SELECT coalesce(json_agg(row_to_json(p) ORDER BY p.id), '[]') FROM (SELECT `+summary+` FROM profiles p) p`,
-		optional, len(entries)-len(optional))
-	if err != nil {
-		return err
-	}
-	return rest.WriteRaw(w, body)
+func (p *Routes) Mount(r chi.Router) {
+	r.Get("/profiles", rest.Handle(p.list))
+	r.Post("/profiles", rest.Handle(p.create))
+	r.Get("/profiles/{name}", rest.Handle(p.get))
+	r.Put("/profiles/{name}", rest.Handle(p.update))
+	r.Delete("/profiles/{name}", rest.Handle(p.remove))
+	r.Post("/profiles/{name}/clone", rest.Handle(p.clone))
 }
 
-// ProfileModule is a catalogue module and whether the profile imports it.
+// progress is a profile's rollout.
+type progress struct {
+	ID            *int64     `json:"id"`
+	CandidateTree *string    `json:"candidateTree"`
+	CandidateRev  *string    `json:"candidateRev"`
+	TestingTree   *string    `json:"testingTree"`
+	TestingRev    *string    `json:"testingRev"`
+	TestingAt     *time.Time `json:"testingAt"`
+	StableTree    *string    `json:"stableTree"`
+	StableRev     *string    `json:"stableRev"`
+	StableAt      *time.Time `json:"stableAt"`
+	CheckState    string     `json:"checkState"`
+	CheckError    *string    `json:"checkError"`
+	CheckedAt     *time.Time `json:"checkedAt"`
+	// Cache holdings per branch.
+	TestingPaths *int   `json:"testingPaths"`
+	TestingBytes *int64 `json:"testingBytes"`
+	StablePaths  *int   `json:"stablePaths"`
+	StableBytes  *int64 `json:"stableBytes"`
+}
+
+const progressColumns = `p.name, p.id, p.candidate_tree, p.candidate_rev, p.testing_tree, p.testing_rev, p.testing_at,
+	p.stable_tree, p.stable_rev, p.stable_at, p.check_state::text, p.check_error, p.checked_at,
+	p.testing_paths, p.testing_bytes, p.stable_paths, p.stable_bytes`
+
+func (s *progress) fields(name *string) []any {
+	return []any{name, &s.ID, &s.CandidateTree, &s.CandidateRev, &s.TestingTree, &s.TestingRev, &s.TestingAt,
+		&s.StableTree, &s.StableRev, &s.StableAt, &s.CheckState, &s.CheckError, &s.CheckedAt,
+		&s.TestingPaths, &s.TestingBytes, &s.StablePaths, &s.StableBytes}
+}
+
+// Summary is a profile with progress.
+type Summary struct {
+	Name string `json:"name"`
+	Profile
+	PackageCount int `json:"packageCount"`
+	ModuleCount  int `json:"moduleCount"`
+	progress
+}
+
+// Untracked profiles await testing.
+func summarize(name string, profile Profile, tracked progress, required int) Summary {
+	if tracked.CheckState == "" {
+		tracked.CheckState = "pending"
+	}
+	return Summary{Name: name, Profile: profile, PackageCount: len(profile.Packages),
+		ModuleCount: required + len(profile.Modules), progress: tracked}
+}
+
+func (p *Routes) list(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+	head, err := p.Source.Head(ctx)
+	if err != nil {
+		return err
+	}
+	kept, err := profilesAt(ctx, p.Source, head)
+	if err != nil {
+		return err
+	}
+	entries, err := modules.Catalogue(ctx, p.Source, head)
+	if err != nil {
+		return err
+	}
+	rows, err := p.DB.Query(ctx, `SELECT `+progressColumns+` FROM profiles p`)
+	if err != nil {
+		return err
+	}
+	tracked := map[string]progress{}
+	var name string
+	var next progress
+	if _, err := pgx.ForEachRow(rows, next.fields(&name), func() error {
+		tracked[name] = next
+		return nil
+	}); err != nil {
+		return err
+	}
+	required := len(entries) - len(modules.Optional(entries))
+	summaries := make([]Summary, 0, len(kept))
+	for _, name := range slices.Sorted(maps.Keys(kept)) {
+		summaries = append(summaries, summarize(name, kept[name], tracked[name], required))
+	}
+	return rest.WriteJSON(w, http.StatusOK, summaries)
+}
+
+// ProfileModule is a module choice.
 type ProfileModule struct {
 	modules.Entry
 	Selected bool `json:"selected"`
 }
 
-func (b *Rebuilder) get(w http.ResponseWriter, r *http.Request) error {
-	entries, err := b.moduleCatalogue(r.Context())
+// Detail is an editable profile.
+type Detail struct {
+	Profile Summary         `json:"profile"`
+	Head    string          `json:"head"`
+	Modules []ProfileModule `json:"modules"`
+	Files   []File          `json:"files"`
+}
+
+func (p *Routes) get(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+	name := chi.URLParam(r, "name")
+	head, err := p.Source.Head(ctx)
 	if err != nil {
 		return err
 	}
-	optional := modules.Optional(entries)
-	var detail struct {
-		Profile map[string]any  `json:"profile"`
-		Modules []ProfileModule `json:"modules"`
-		Pkgs    []string        `json:"packages"`
-		Files   []File          `json:"files"`
+	profile, err := p.profileAt(ctx, head, name)
+	if err != nil {
+		return err
 	}
-	var chosen []string
+	entries, err := modules.Catalogue(ctx, p.Source, head)
+	if err != nil {
+		return err
+	}
+	var tracked progress
 	var archive []byte
-	err = b.DB.QueryRow(r.Context(), `
-		SELECT row_to_json(s), p.packages,
-			coalesce((SELECT array_agg(pm.slug) FROM profile_modules pm WHERE pm.profile_id = p.id), '{}'),
-			tr.archive
-		FROM profiles p
-			JOIN LATERAL (SELECT `+summary+`) s ON true
-			LEFT JOIN trees tr ON tr.hash = p.candidate_tree
-		WHERE p.name = $3`, optional, len(entries)-len(optional), chi.URLParam(r, "name")).
-		Scan(&detail.Profile, &detail.Pkgs, &chosen, &archive)
-	if err != nil {
+	err = p.DB.QueryRow(ctx, `SELECT `+progressColumns+`, tr.archive FROM profiles p LEFT JOIN trees tr ON tr.hash = p.candidate_tree
+		WHERE p.name = $1`, name).Scan(append(tracked.fields(new(string)), &archive)...)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
-	detail.Modules = make([]ProfileModule, len(entries))
+	detail := Detail{Head: head, Modules: make([]ProfileModule, len(entries))}
+	required := 0
 	for i, entry := range entries {
-		detail.Modules[i] = ProfileModule{Entry: entry, Selected: entry.Required || slices.Contains(chosen, entry.Slug)}
+		detail.Modules[i] = ProfileModule{Entry: entry, Selected: entry.Required || slices.Contains(profile.Modules, entry.Slug)}
+		if entry.Required {
+			required++
+		}
 	}
+	detail.Profile = summarize(name, profile, tracked, required)
 	if detail.Files, err = readArchive(archive); err != nil {
 		return err
 	}

@@ -39,7 +39,11 @@ func Render(s Spec) (string, error) {
 		return "", fmt.Errorf("unknown build method %q", s.Builder)
 	}
 	w := newWriter()
+	w.pinned = tracked(s)
 	render(w, s)
+	if w.pinned {
+		return w.header() + "let\n  source = lib.importJSON ./" + upstreamFile + ";\nin\n" + w.b.String(), nil
+	}
 	return w.header() + w.b.String(), nil
 }
 
@@ -70,5 +74,18 @@ func with(list []string, required ...string) []string {
 
 func (w *writer) head(s Spec) {
 	w.str("pname", s.Pname)
+	if w.pinned {
+		w.printf("  inherit (source) version;\n")
+		return
+	}
 	w.str("version", s.Version)
+}
+
+// vendorHash pins what the build vendors.
+func (w *writer) vendorHash(name string, s Spec) {
+	if w.pinned {
+		w.printf("  inherit (source) %s;\n", name)
+		return
+	}
+	w.str(name, hashOr(s.VendorHash, VendorSlot))
 }

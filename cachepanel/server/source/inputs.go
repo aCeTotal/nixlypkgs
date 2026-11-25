@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,10 +39,11 @@ type Inputs struct {
 	Inputs []Input `json:"inputs"`
 }
 
-// InputUpdate locks newer inputs; none means all.
+// InputUpdate locks newer inputs.
 type InputUpdate struct {
-	Base   string   `json:"base"`
-	Inputs []string `json:"inputs"`
+	Base    string   `json:"base"`
+	Inputs  []string `json:"inputs"`
+	Message string   `json:"message"`
 }
 
 type lockRef struct {
@@ -83,7 +85,7 @@ func (r *Repo) Inputs(ctx context.Context) (Inputs, error) {
 	inputs := []Input{}
 	for name, target := range parsed.Nodes["root"].Inputs {
 		var node string
-		// Follows are arrays; only direct inputs update.
+		// Only direct inputs update.
 		if json.Unmarshal(target, &node) != nil {
 			continue
 		}
@@ -105,14 +107,14 @@ func describe(name string, original, locked lockRef) Input {
 	return input
 }
 
-// UpdateInputs commits a newer lock on top of main.
+// UpdateInputs commits a newer lock.
 func (r *Repo) UpdateInputs(ctx context.Context, update InputUpdate, author Author) (string, error) {
+	if !validMessage(update.Message) {
+		return "", errMessage
+	}
 	current, err := r.Inputs(ctx)
 	if err != nil {
 		return "", err
-	}
-	if current.Head != update.Base {
-		return "", errMoved
 	}
 	for _, name := range update.Inputs {
 		if !slices.ContainsFunc(current.Inputs, func(input Input) bool { return input.Name == name }) {
@@ -124,39 +126,51 @@ func (r *Repo) UpdateInputs(ctx context.Context, update InputUpdate, author Auth
 		return "", err
 	}
 	defer func() { _ = os.RemoveAll(work) }()
-	for _, name := range []string{"flake.nix", lockFile} {
-		blob, err := r.FileAt(ctx, update.Base, name)
-		if errors.Is(err, ErrNoFile) {
-			continue
-		}
-		if err != nil {
-			return "", err
-		}
-		if err := os.WriteFile(filepath.Join(work, name), []byte(blob.Text), 0o600); err != nil {
-			return "", err
-		}
-	}
-	locked, err := lockNewer(ctx, work, update.Inputs)
+	flake, err := r.copyOut(ctx, update.Base, work, "flake.nix")
 	if err != nil {
 		return "", err
 	}
-	what := "every input"
-	if len(update.Inputs) > 0 {
-		what = strings.Join(update.Inputs, ", ")
+	if _, err := r.copyOut(ctx, update.Base, work, lockFile); err != nil && !errors.Is(err, ErrNoFile) {
+		return "", err
 	}
-	edit := Edit{Base: update.Base, Message: "flake.lock: update " + what, Changes: []FileChange{{Path: lockFile, Content: &locked}}}
+	locked, updates, err := lockNewer(ctx, work, update.Inputs)
+	if err != nil {
+		return "", err
+	}
+	message := strings.TrimSpace(update.Message)
+	if len(updates) > 0 {
+		message += "\n\n" + strings.Join(updates, "\n")
+	}
+	// flake.nix rides along for conflicts.
+	edit := Edit{Base: update.Base, Message: message, Changes: []FileChange{{Path: "flake.nix", Content: &flake}, {Path: lockFile, Content: &locked}}}
 	return r.Commit(ctx, edit, author)
 }
 
-// lockNewer runs nix flake update beside a copy of the flake.
-func lockNewer(ctx context.Context, work string, inputs []string) (string, error) {
+// copyOut writes a rev's file.
+func (r *Repo) copyOut(ctx context.Context, rev, dir, name string) (string, error) {
+	blob, err := r.FileAt(ctx, rev, name)
+	if err != nil {
+		return "", err
+	}
+	return blob.Text, os.WriteFile(filepath.Join(dir, name), []byte(blob.Text), 0o600)
+}
+
+// lockNewer updates a flake copy.
+func lockNewer(ctx context.Context, work string, inputs []string) (string, []string, error) {
 	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "nix", append([]string{"flake", "update"}, inputs...)...)
 	cmd.Dir = work
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("nix flake update: %w: %s", err, strings.TrimSpace(string(out)))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", nil, fmt.Errorf("nix flake update: %w: %s", err, strings.TrimSpace(string(out)))
 	}
-	locked, err := os.ReadFile(filepath.Join(work, lockFile))
-	return string(locked), err
+	updates := []string{}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		if strings.Contains(line, "Updated input") || strings.Contains(line, "Added input") {
+			updates = append(updates, strings.TrimSpace(line))
+		}
+	}
+	locked, err := fs.ReadFile(os.DirFS(work), lockFile)
+	return string(locked), updates, err
 }

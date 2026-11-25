@@ -10,7 +10,7 @@ const statuses: Record<FileDiff["status"], { label: string; tone: string }> = {
   T: { label: "type changed", tone: "bg-muted text-muted-foreground" },
 };
 
-// Hunk headers, additions and removals by first character.
+// Line kinds by first character.
 const lineTones: Record<string, string> = {
   "@": "bg-muted/60 text-muted-foreground",
   "+": "bg-success-soft text-success",

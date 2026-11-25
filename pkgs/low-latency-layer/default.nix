@@ -7,15 +7,17 @@
 , vulkan-utility-libraries
 }:
 
+let
+  source = lib.importJSON ./source.json;
+in
 stdenv.mkDerivation rec {
   pname = "low-latency-layer";
-  version = "0.2.0";
+  inherit (source) version;
 
   src = fetchFromGitHub {
     owner = "Korthos-Software";
     repo = "low_latency_layer";
-    rev = "v${version}";
-    hash = "sha256-mnGAH0m19wOkWEowpcPRHXQSc6HGYW+CFYxjPF2onk4=";
+    inherit (source) rev hash;
   };
 
   nativeBuildInputs = [ cmake ];

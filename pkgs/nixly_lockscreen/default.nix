@@ -20,6 +20,7 @@
 }:
 
 let
+  source = lib.importJSON ./source.json;
   runtimeLibs = [
     wayland
     libxkbcommon
@@ -37,16 +38,15 @@ let
 in
 rustPlatform.buildRustPackage {
   pname = "nixly_lockscreen";
-  version = "0.1.0";
+  inherit (source) version;
 
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixly_lockscreen";
-    rev = "4f7f55259da43aa702b665e85e6968682b3c703b";
-    hash = "sha256-4qr2oOnadu2aTlnD8m6UGqpZqhBG9iDnMVlqOxI/6sE=";
+    inherit (source) rev hash;
   };
 
-  cargoHash = "sha256-iW+2iVpjFUbtMzJ2ERlDOM9u7M4vxaGhrpYPmQhvWhY=";
+  inherit (source) cargoHash;
 
   nativeBuildInputs = [
     pkg-config

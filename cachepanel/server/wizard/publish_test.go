@@ -39,7 +39,7 @@ func TestPublish(t *testing.T) {
 	}
 	publisher := &Publisher{Mirror: mirror, Remote: remote, Branch: "main"}
 	files := map[string][]byte{"default.nix": []byte("{ }\n"), "PKGBUILD": []byte("pkgname=demo\n")}
-	sha, err := publisher.Publish(t.Context(), "demo", "1.0", files)
+	sha, err := publisher.Publish(t.Context(), Publication{Attr: "demo", Message: "demo: 1.0", Files: files})
 	if err != nil {
 		t.Fatal(err)
 	}

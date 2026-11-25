@@ -3,6 +3,7 @@ package signing
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -110,7 +111,7 @@ func (s *Store) record(ctx context.Context, ca CA, files []File, signatures [][]
 }
 
 // signFile mirrors sign-file and sbsign.
-func (s *Store) signFile(ctx context.Context, ca CA, file File) ([]byte, error) {
+func (s *Store) signFile(ctx context.Context, ca CA, file File) (_ []byte, err error) {
 	cert, err := s.certPath(ca)
 	if err != nil {
 		return nil, err
@@ -123,7 +124,7 @@ func (s *Store) signFile(ctx context.Context, ca CA, file File) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer os.Remove(out.Name())
+	defer func() { err = errors.Join(err, os.Remove(out.Name())) }()
 	if err := out.Close(); err != nil {
 		return nil, err
 	}
@@ -138,7 +139,7 @@ func (s *Store) certPath(ca CA) (string, error) {
 	if _, err := os.Stat(path); err == nil {
 		return path, nil
 	}
-	return path, os.WriteFile(path, []byte(ca.CertPEM), 0o644)
+	return path, os.WriteFile(path, []byte(ca.CertPEM), 0o600)
 }
 
 func run(ctx context.Context, name string, args ...string) ([]byte, error) {

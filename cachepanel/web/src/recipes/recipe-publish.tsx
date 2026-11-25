@@ -3,7 +3,7 @@ import { GitCommitVertical, Rocket } from "lucide-react";
 import { toast } from "sonner";
 import { shortSha } from "@/format/sha";
 import { FileBrowser } from "@/shell/file-browser";
-import { Button } from "@/ui/button";
+import { CommitButton } from "@/source/commit-button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { publishRecipe, type RecipeDetail } from "./queries";
 
@@ -16,7 +16,7 @@ const flow = [
 
 export function RecipePublish({ recipe, dirty }: { recipe: RecipeDetail; dirty: boolean }) {
   const publish = useMutation({
-    mutationFn: () => publishRecipe(recipe.id),
+    mutationFn: (message: string) => publishRecipe(recipe.id, message),
     onSuccess: ({ sha }) => toast.success(`Published as ${shortSha(sha)}`),
   });
   const tested = recipe.state === "ready" || recipe.state === "published";
@@ -30,10 +30,15 @@ export function RecipePublish({ recipe, dirty }: { recipe: RecipeDetail; dirty: 
               {tested ? "The test build passed. Publish when you are happy." : "Publishing opens once a test build has passed."}
             </CardDescription>
           <CardAction>
-            <Button onClick={() => publish.mutate()} disabled={!tested || dirty || publish.isPending}>
-            <Rocket />
-            {recipe.state === "published" ? "Publish again" : "Publish"}
-          </Button>
+            <CommitButton
+              icon={Rocket}
+              title={`Publish ${recipe.spec?.attr ?? "the recipe"}`}
+              label={recipe.state === "published" ? "Publish again" : "Publish"}
+              suggestion={`${recipe.spec?.attr ?? "recipe"}: ${recipe.spec?.version ?? "new"}`}
+              pending={publish.isPending}
+              disabled={!tested || dirty}
+              onCommit={(message) => publish.mutate(message)}
+            />
           </CardAction>
         </CardHeader>
         <CardContent className="space-y-3">

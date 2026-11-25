@@ -23,16 +23,32 @@ func seeded(t *testing.T) *Repo {
 	if err := os.WriteFile(filepath.Join(seed, "pkgs/demo/default.nix"), []byte("{ }\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(seed, "run.sh"), []byte("echo one\n"), 0o700); err != nil {
+	if err := os.WriteFile(filepath.Join(seed, "run.sh"), []byte("echo one\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	run(t, seed, "add", "-A")
+	run(t, seed, "update-index", "--chmod=+x", "run.sh")
 	run(t, seed, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--quiet", "-m", "start")
-	r, err := Open(t.Context(), config.Config{StateDir: t.TempDir(), SourceSeed: seed, Branch: "main", PublicURL: "https://panel.test"})
+	cfg := config.Config{StateDir: t.TempDir(), SourceSeed: seed, Branch: "main", PublicURL: "https://panel.test", Hooks: hooks(t)}
+	r, err := Open(t.Context(), cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return r
+}
+
+// hooks links the packaged pre-receive hook.
+func hooks(t *testing.T) string {
+	t.Helper()
+	script, err := filepath.Abs("pre-receive.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.Symlink(script, filepath.Join(dir, "pre-receive")); err != nil {
+		t.Fatal(err)
+	}
+	return dir
 }
 
 func text(value string) *string {
@@ -69,8 +85,12 @@ func TestCommitEditsCreatesAndDeletes(t *testing.T) {
 	if _, err := r.Commit(t.Context(), edit, tester); !errors.Is(err, errMoved) {
 		t.Fatalf("stale base: %v", err)
 	}
+	elsewhere := Edit{Base: base, Message: "elsewhere", Changes: []FileChange{{Path: "docs/notes.md", Content: text("hi\n")}}}
+	if _, err := r.Commit(t.Context(), elsewhere, tester); err != nil {
+		t.Fatalf("an unrelated move refused: %v", err)
+	}
 	same := Edit{Base: sha, Message: "again", Changes: []FileChange{{Path: "run.sh", Content: text("echo two\n")}}}
-	if _, err := r.Commit(t.Context(), same, tester); !errors.Is(err, errUnchanged) {
+	if _, err := r.Commit(t.Context(), same, tester); !errors.Is(err, ErrUnchanged) {
 		t.Fatalf("no-op: %v", err)
 	}
 	folder := Edit{Base: sha, Message: "clobber", Changes: []FileChange{{Path: "pkgs", Content: text("x")}}}
@@ -90,7 +110,7 @@ func TestRevertAndHistory(t *testing.T) {
 	if err != nil || details.Parent != base || len(details.Files) != 1 || !strings.Contains(details.Files[0].Patch, "+echo two") {
 		t.Fatalf("show = %+v, %v", details, err)
 	}
-	reverted, err := r.Revert(t.Context(), Reversal{Base: changed, Commit: changed}, tester)
+	reverted, err := r.Revert(t.Context(), Reversal{Base: changed, Commit: changed, Message: "Undo two"}, tester)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +121,7 @@ func TestRevertAndHistory(t *testing.T) {
 	if err != nil || len(page.Commits) != 3 || page.Commits[0].SHA != reverted || page.More {
 		t.Fatalf("log = %+v, %v", page, err)
 	}
-	if _, err := r.Revert(t.Context(), Reversal{Base: reverted, Commit: base}, tester); !errors.Is(err, errRoot) {
+	if _, err := r.Revert(t.Context(), Reversal{Base: reverted, Commit: base, Message: "Undo start"}, tester); !errors.Is(err, errRoot) {
 		t.Fatalf("root revert: %v", err)
 	}
 	listing, err := r.Tree(t.Context(), "")
@@ -126,5 +146,13 @@ func TestBatchReadsAndLastChanged(t *testing.T) {
 	changed, err := r.LastChanged(t.Context(), []string{"run.sh", "pkgs/demo/default.nix"})
 	if err != nil || len(changed) != 2 || changed["run.sh"].Before(changed["pkgs/demo/default.nix"]) {
 		t.Fatalf("changed = %v, %v", changed, err)
+	}
+}
+
+func TestRevertNeedsMessage(t *testing.T) {
+	r := seeded(t)
+	base, _ := r.Head(t.Context())
+	if _, err := r.Revert(t.Context(), Reversal{Base: base, Commit: base, Message: "  "}, tester); !errors.Is(err, errMessage) {
+		t.Fatalf("blank revert: %v", err)
 	}
 }

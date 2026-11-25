@@ -10,15 +10,17 @@
 , xdg-utils
 }:
 
+let
+  source = lib.importJSON ./source.json;
+in
 stdenv.mkDerivation rec {
   pname = "nixlymediaserver";
-  version = "2026.08.23";
+  inherit (source) version;
 
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlymediaserver";
-    rev = "f088a144a35a9582944640b0ade6fea9989589bf";
-    hash = "sha256-ey9xYSsJIT80kDnxnUjMiVRo/O6YG/ZPKvI70PYr3AY=";
+    inherit (source) rev hash;
   };
 
   nativeBuildInputs = [

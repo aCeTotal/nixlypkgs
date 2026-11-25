@@ -1,0 +1,9 @@
+[
+  "session"
+  "audio"
+  "gaming"
+  "apps"
+  "desktop"
+  "htpc"
+  "server"
+]

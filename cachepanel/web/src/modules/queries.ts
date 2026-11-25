@@ -16,10 +16,8 @@ export type ModuleSummary = ModuleEntry & {
 
 export type ModuleDetail = ModuleSummary & { head: string; source: string; history: SourceCommit[] };
 
-export type ModuleDraft = ModuleEntry & { base: string; source: string };
+export type ModuleDraft = ModuleEntry & { base: string; source: string; message: string };
 
-// Empty error means valid Nix.
-export type SyntaxProblem = { error: string; line?: number; column?: number };
 
 export const modulesQuery = queryOptions({
   queryKey: ["modules"],
@@ -35,7 +33,6 @@ export const createModule = (body: ModuleDraft) => api<{ sha: string }>("/module
 
 export const saveModule = (body: ModuleDraft) => api<{ sha: string }>(`/modules/${body.slug}`, { method: "PUT", body });
 
-export const deleteModule = (slug: string, base: string) => api(`/modules/${slug}?base=${base}`, { method: "DELETE" });
+export const deleteModule = (slug: string, base: string, message: string) =>
+  api(`/modules/${slug}`, { method: "DELETE", body: { base, message } });
 
-export const validateSource = (source: string, signal?: AbortSignal) =>
-  api<SyntaxProblem>("/modules/validate", { method: "POST", body: { source }, signal });

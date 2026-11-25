@@ -3,8 +3,8 @@ import { Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { shortSha } from "@/format/sha";
 import { dateTime } from "@/format/time";
-import { ConfirmButton } from "@/shell/confirm-button";
 import { Skeleton } from "@/ui/skeleton";
+import { CommitButton } from "./commit-button";
 import { DiffView } from "./diff-view";
 import { commitQuery, revertCommit, treeQuery } from "./queries";
 
@@ -12,7 +12,7 @@ export function CommitView({ sha, onPath }: { sha: string; onPath: (path: string
   const { data } = useQuery(commitQuery(sha));
   const head = useQuery(treeQuery("")).data?.head;
   const revert = useMutation({
-    mutationFn: () => revertCommit(sha, head ?? ""),
+    mutationFn: (message: string) => revertCommit(sha, head ?? "", message),
     onSuccess: (result) => toast.success(`Reverted in ${shortSha(result.sha)}; testing builds it next`),
   });
   if (!data) return <Skeleton className="h-64" />;
@@ -32,13 +32,15 @@ export function CommitView({ sha, onPath }: { sha: string; onPath: (path: string
           </p>
         </div>
         {data.parent && (
-          <ConfirmButton
-            label="Revert"
+          <CommitButton
             icon={Undo2}
-            title="Revert this commit?"
-            description="A new commit undoes it on main. Testing builds that commit like any other."
-            onConfirm={() => revert.mutate()}
-            disabled={!head || revert.isPending}
+            variant="outline"
+            title={`Revert ${shortSha(sha)}`}
+            label="Revert"
+            suggestion={`Revert "${data.subject}"`}
+            pending={revert.isPending}
+            disabled={!head}
+            onCommit={(message) => revert.mutate(message)}
           />
         )}
       </div>

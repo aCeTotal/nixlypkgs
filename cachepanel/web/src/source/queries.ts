@@ -42,8 +42,8 @@ export const commitQuery = (sha: string) =>
 export const commitChanges = (body: { base: string; message: string; changes: FileChange[] }) =>
   api<{ sha: string }>("/source/commits", { method: "POST", body });
 
-export const revertCommit = (sha: string, base: string) =>
-  api<{ sha: string }>(`/source/commits/${sha}/revert`, { method: "POST", body: { base } });
+export const revertCommit = (sha: string, base: string, message: string) =>
+  api<{ sha: string }>(`/source/commits/${sha}/revert`, { method: "POST", body: { base, message } });
 
 export const addKey = (body: { name: string; publicKey: string }) => api<PushKey>("/source/keys", { method: "POST", body });
 
@@ -56,5 +56,5 @@ export const inputsQuery = queryOptions({
   queryFn: () => api<{ head: string; inputs: FlakeInput[] }>("/source/inputs"),
 });
 
-export const updateInputs = (base: string, inputs: string[]) =>
-  api<{ sha: string }>("/source/inputs/update", { method: "POST", body: { base, inputs } });
+export const updateInputs = (base: string, inputs: string[], message: string) =>
+  api<{ sha: string }>("/source/inputs/update", { method: "POST", body: { base, inputs, message } });

@@ -1,13 +1,17 @@
 import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { ArrowLeft, CircleCheck, CircleX, History, ListTree, Lock, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, CircleCheck, CircleX, History, ListTree, Lock, Save, Sparkles, Trash2 } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { CodeEditor, type CodeEditorHandle } from "@/editor/code-editor";
+import { useSyntaxCheck, type SyntaxState } from "@/editor/use-syntax-check";
 import { shortSha } from "@/format/sha";
 import { dateTime, timeAgo } from "@/format/time";
 import { CheckBadge } from "@/profiles/check-badge";
-import { ConfirmButton } from "@/shell/confirm-button";
+
 import { PageHeader } from "@/shell/page-header";
+import { CommitButton } from "@/source/commit-button";
+import { CommitDialog } from "@/source/commit-dialog";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
@@ -16,10 +20,8 @@ import { Input } from "@/ui/input";
 import { Spinner } from "@/ui/spinner";
 import { Switch } from "@/ui/switch";
 import { ModuleOutline } from "./module-outline";
-import { NixEditor, type NixEditorHandle } from "./nix-editor";
 import { activePath, outline, type OutlineItem } from "./outline";
 import { deleteModule, moduleQuery, revisionSource, saveModule, type ModuleDetail, type ModuleDraft } from "./queries";
-import { useSyntaxCheck, type SyntaxState } from "./use-syntax-check";
 
 const route = getRouteApi("/app/modules/$slug");
 
@@ -30,7 +32,7 @@ export function ModulePage() {
 }
 
 // The base comes from main when saving.
-type Draft = Omit<ModuleDraft, "base">;
+type Draft = Omit<ModuleDraft, "base" | "message">;
 
 function draftOf(module: ModuleDetail): Draft {
   return { slug: module.slug, title: module.title, description: module.description, source: module.source, required: module.required };
@@ -38,7 +40,7 @@ function draftOf(module: ModuleDetail): Draft {
 
 function ModuleEditor({ module }: { module: ModuleDetail }) {
   const navigate = route.useNavigate();
-  const editor = useRef<NixEditorHandle>(null);
+  const editor = useRef<CodeEditorHandle>(null);
   const initial = useMemo(() => draftOf(module), [module]);
   const [draft, setDraft] = useState(initial);
   const [base, setBase] = useState(initial);
@@ -54,16 +56,20 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const valid = syntax.problem.error === "";
   const save = useMutation({
-    mutationFn: () => saveModule({ ...draft, base: module.head }),
+    mutationFn: (message: string) => saveModule({ ...draft, base: module.head, message }),
     onSuccess: ({ sha }) => toast.success(`Committed ${shortSha(sha)}; profiles using it are checked in testing`),
   });
-  const remove = useMutation({ mutationFn: () => deleteModule(module.slug, module.head), onSuccess: () => navigate({ to: "/modules" }) });
+  const remove = useMutation({
+    mutationFn: (message: string) => deleteModule(module.slug, module.head, message),
+    onSuccess: () => navigate({ to: "/modules" }),
+  });
+  const [committing, setCommitting] = useState(false);
   const restore = useMutation({
     mutationFn: (sha: string) => revisionSource(module.slug, sha),
     onSuccess: ({ source }) => setDraft((current) => ({ ...current, source })),
   });
   const trySave = () => {
-    if (dirty && valid && !save.isPending) save.mutate();
+    if (dirty && valid && !save.isPending) setCommitting(true);
   };
 
   useEffect(() => {
@@ -97,17 +103,24 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
         }
         actions={
           <>
-            <ConfirmButton
-              label="Delete"
+            <CommitButton
               icon={Trash2}
-              title={`Delete ${module.title}?`}
-              description="Only modules no profile uses can be deleted."
-              onConfirm={() => remove.mutate()}
+              variant="destructive"
+              destructive
+              title={`Delete ${module.title}`}
+              label="Delete"
+              suggestion={`modules: remove ${module.slug}`}
+              pending={remove.isPending}
               disabled={module.required || module.usedBy.length > 0}
+              onCommit={(message) => remove.mutate(message)}
             />
+            <Button variant="outline" onClick={() => editor.current?.format()} title="Format with nixfmt (Shift+Alt+F)">
+              <Sparkles />
+              Format
+            </Button>
             <Button onClick={trySave} disabled={!dirty || !valid || save.isPending}>
               <Save />
-              Save
+              Commit
             </Button>
           </>
         }
@@ -126,7 +139,8 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
         </Card>
         <div className="flex min-w-0 flex-col gap-2">
           <div className="h-[70vh] lg:h-[calc(100dvh-17.5rem)] lg:min-h-[30rem]">
-            <NixEditor
+            <CodeEditor
+              path={`nixlyos/modules/${module.slug}.nix`}
               ref={editor}
               value={draft.source}
               problem={syntax.problem}
@@ -208,6 +222,19 @@ function ModuleEditor({ module }: { module: ModuleDetail }) {
           </Card>
         </div>
       </div>
+      <CommitDialog
+        open={committing}
+        onOpenChange={setCommitting}
+        title={`Commit ${module.slug}.nix`}
+        label="Commit"
+        suggestion={`modules: update ${module.slug}`}
+        pending={save.isPending}
+        changes={{ path: `nixlyos/modules/${module.slug}.nix`, original: initial.source, current: draft.source }}
+        onCommit={(message) => {
+          setCommitting(false);
+          save.mutate(message);
+        }}
+      />
     </div>
   );
 }
@@ -238,8 +265,8 @@ function StatusBar({ syntax, dirty, onJump }: { syntax: SyntaxState; dirty: bool
           Syntax error{problem.line ? ` on line ${problem.line}` : ""}
         </button>
       )}
-      <span>{dirty ? "Unsaved changes" : "Saved"}</span>
-      <span className="ml-auto hidden sm:inline">Ctrl+S saves · Ctrl+F finds · Ctrl+Shift+[ folds</span>
+      <span>{dirty ? "Uncommitted changes" : "Committed"}</span>
+      <span className="ml-auto hidden sm:inline">Ctrl+S commits · Ctrl+F finds · Ctrl+Shift+[ folds</span>
     </div>
   );
 }

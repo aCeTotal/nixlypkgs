@@ -3,6 +3,7 @@ package wizard
 import (
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -16,6 +17,7 @@ var (
 	errBusy      = rest.Conflict("recipe_busy", "The recipe is being imported or built")
 	errNotTested = rest.Conflict("not_tested", "The recipe must build without errors before it is published")
 	errAttrTaken = rest.Conflict("attr_taken", "nixpkgs already has a package with this name; choose another")
+	errMessage   = rest.Unprocessable("invalid_message", "Describe the change in a message")
 )
 
 func (s *Service) Mount(r chi.Router) {
@@ -197,6 +199,15 @@ func (s *Service) publish(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	var req struct {
+		Message string `json:"message"`
+	}
+	if err := rest.Decode(r, &req); err != nil {
+		return err
+	}
+	if strings.TrimSpace(req.Message) == "" {
+		return errMessage
+	}
 	var state State
 	if err := s.db.QueryRow(r.Context(), `SELECT state FROM recipes WHERE id = $1`, id).Scan(&state); err != nil {
 		return err
@@ -212,7 +223,7 @@ func (s *Service) publish(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	sha, err := s.publisher.Publish(r.Context(), draft.Spec.Attr, draft.Spec.Version, files)
+	sha, err := s.publisher.Publish(r.Context(), Publication{Attr: draft.Spec.Attr, Message: req.Message, Files: files})
 	if err != nil {
 		return rest.Conflict("publish_failed", err.Error())
 	}

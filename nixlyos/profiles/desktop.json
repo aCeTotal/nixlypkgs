@@ -1,0 +1,18 @@
+{
+  "title": "Desktop",
+  "description": "Workstations and laptops",
+  "platform": "desktop",
+  "kernel": "performance",
+  "kernelSettings": {
+    "hugepages": "madvise"
+  },
+  "pinnedSha": null,
+  "modules": [
+    "apps",
+    "audio",
+    "desktop",
+    "gaming",
+    "session"
+  ],
+  "packages": []
+}

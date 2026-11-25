@@ -1,14 +1,16 @@
 { lib, stdenv, fetchFromGitHub, meson, ninja, pkg-config, qt6 }:
 
+let
+  source = lib.importJSON ./source.json;
+in
 stdenv.mkDerivation {
   pname = "nixlykalk";
-  version = "0.0.1";
+  inherit (source) version;
 
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixly_kalk";
-    rev = "427c803777d39858ec08a8b275687bedb4d8d292";
-    hash = "sha256-kPDQByqTNMuH920l7o0bmQkmrnvctruYUgmgOGd85pI=";
+    inherit (source) rev hash;
   };
 
   strictDeps = true;

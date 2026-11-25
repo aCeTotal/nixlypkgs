@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/ui/card";
 import { FileEditor } from "./file-editor";
 import { FileTree } from "./file-tree";
 import { NewFileDialog } from "./new-file-dialog";
+import { QuickOpen } from "./quick-open";
 
 type FilesViewProps = {
   path: string;
@@ -23,7 +24,11 @@ export function FilesView({ path, create, onOpen, onCreate, onHistory }: FilesVi
               <FolderGit2 className="size-3.5" />
               main
             </span>
-            <NewFileDialog folder={folder} onCreate={onCreate} />
+            <span className="flex items-center gap-1">
+              <span className="hidden text-[0.65rem] text-muted-foreground xl:inline">Ctrl+P</span>
+              <NewFileDialog folder={folder} onCreate={onCreate} />
+            </span>
+            <QuickOpen onOpen={onOpen} />
           </div>
           <div className="overflow-y-auto p-1">
             <FileTree selected={path} onSelect={onOpen} />

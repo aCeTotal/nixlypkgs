@@ -1,0 +1,18 @@
+{
+  "title": "HTPC",
+  "description": "Living-room box with Steam, GeForce NOW and media",
+  "platform": "htpc",
+  "kernel": "performance",
+  "kernelSettings": {
+    "hugepages": "madvise"
+  },
+  "pinnedSha": null,
+  "modules": [
+    "apps",
+    "audio",
+    "gaming",
+    "htpc",
+    "session"
+  ],
+  "packages": []
+}

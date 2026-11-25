@@ -19,8 +19,9 @@ export function NewModuleDialog() {
   const head = useQuery(modulesQuery).data?.head ?? "";
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
+  const [message, setMessage] = useState("");
   const create = useMutation({
-    mutationFn: () => createModule({ base: head, slug, title, description: "", source: template, required: false }),
+    mutationFn: () => createModule({ base: head, slug, title, description: "", source: template, required: false, message: message.trim() }),
     onSuccess: () => navigate({ to: "/modules/$slug", params: { slug } }),
   });
   const submit = (event: FormEvent) => {
@@ -58,9 +59,19 @@ export function NewModuleDialog() {
               <FieldLabel htmlFor="new-module-slug">File name</FieldLabel>
               <Input id="new-module-slug" required className="font-mono" pattern="[a-z0-9][a-z0-9\-]{0,62}" value={slug} onChange={(event) => setSlug(event.target.value)} />
             </Field>
+            <Field>
+              <FieldLabel htmlFor="new-module-message">Commit message</FieldLabel>
+              <Input
+                id="new-module-message"
+                required
+                placeholder={`modules: add ${slug || "<file name>"}`}
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+              />
+            </Field>
           </FieldGroup>
           <DialogFooter>
-            <Button type="submit" disabled={create.isPending}>
+            <Button type="submit" disabled={!message.trim() || create.isPending}>
               Create
             </Button>
           </DialogFooter>

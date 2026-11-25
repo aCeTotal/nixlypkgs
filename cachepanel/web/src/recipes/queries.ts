@@ -125,7 +125,8 @@ export const saveRecipe = (id: number, body: { spec: Spec; files?: Record<string
 
 export const recipeAction = (id: number, action: "build" | "stop") => api(`/recipes/${id}/${action}`, { method: "POST" });
 
-export const publishRecipe = (id: number) => api<{ sha: string }>(`/recipes/${id}/publish`, { method: "POST" });
+export const publishRecipe = (id: number, message: string) =>
+  api<{ sha: string }>(`/recipes/${id}/publish`, { method: "POST", body: { message } });
 
 export const deleteRecipe = (id: number) => api(`/recipes/${id}`, { method: "DELETE" });
 

@@ -22,17 +22,18 @@ const (
 type Event string
 
 const (
-	BuildProgress  Event = "build.progress"
-	VersionChanged Event = "version.changed"
-	PackageChanged Event = "package.changed"
-	CommitChanged  Event = "commit.changed"
-	WatcherChanged Event = "watcher.changed"
-	ProfileChanged Event = "profile.changed"
-	TrustChanged   Event = "trust.changed"
-	SourceChanged  Event = "source.changed"
-	UpdateChanged  Event = "update.changed"
-	ModuleChanged  Event = "module.changed"
-	RecipeChanged  Event = "recipe.changed"
+	BuildProgress   Event = "build.progress"
+	VersionChanged  Event = "version.changed"
+	PackageChanged  Event = "package.changed"
+	CommitChanged   Event = "commit.changed"
+	WatcherChanged  Event = "watcher.changed"
+	ProfileChanged  Event = "profile.changed"
+	TrustChanged    Event = "trust.changed"
+	SourceChanged   Event = "source.changed"
+	UpdateChanged   Event = "update.changed"
+	ModuleChanged   Event = "module.changed"
+	RecipeChanged   Event = "recipe.changed"
+	UpstreamChanged Event = "upstream.changed"
 )
 
 type frame struct {

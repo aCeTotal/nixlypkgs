@@ -24,6 +24,8 @@ type Config struct {
 	SSHRemote string
 	// SSHCommand is the forced git-serve wrapper.
 	SSHCommand string
+	// Hooks guard pushes to the source.
+	Hooks string
 	// CacheDir holds the signed binary cache.
 	CacheDir string
 	CacheKey string
@@ -48,6 +50,7 @@ func Load() (Config, error) {
 		PublicURL:      envOr("CACHEPANEL_PUBLIC_URL", "http://127.0.0.1:8686"),
 		SSHRemote:      os.Getenv("CACHEPANEL_SSH_REMOTE"),
 		SSHCommand:     os.Getenv("CACHEPANEL_SSH_COMMAND"),
+		Hooks:          os.Getenv("CACHEPANEL_HOOKS"),
 		CacheDir:       os.Getenv("CACHEPANEL_CACHE_DIR"),
 		CacheKey:       os.Getenv("CACHEPANEL_CACHE_KEY"),
 		UpdateDir:      os.Getenv("CACHEPANEL_UPDATE_DIR"),

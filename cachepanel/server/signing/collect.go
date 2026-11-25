@@ -3,8 +3,10 @@ package signing
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,12 +25,12 @@ func Collect(toplevels []string) ([]File, error) {
 			return err
 		}
 		seen[real] = true
-		pkg, err := packageOf(real)
+		rel, err := inStore(real)
 		if err != nil {
 			return err
 		}
-		hash, err := hashFile(real)
-		files = append(files, File{Path: real, Hash: hash, Kind: kind, Package: pkg})
+		hash, err := hashFile(rel)
+		files = append(files, File{Path: real, Hash: hash, Kind: kind, Package: strings.SplitN(rel, "/", 2)[0]})
 		return err
 	}
 	for _, toplevel := range toplevels {
@@ -50,13 +52,13 @@ func Collect(toplevels []string) ([]File, error) {
 	return files, nil
 }
 
-// packageOf names a file's store path.
-func packageOf(path string) (string, error) {
+// inStore is a path relative to the store.
+func inStore(path string) (string, error) {
 	rel, err := filepath.Rel(storeDir, path)
-	if err != nil || strings.HasPrefix(rel, "..") {
+	if err != nil || !fs.ValidPath(rel) {
 		return "", fmt.Errorf("%s is outside %s", path, storeDir)
 	}
-	return strings.SplitN(rel, string(filepath.Separator), 2)[0], nil
+	return rel, nil
 }
 
 // walk follows the symlinked module tree.
@@ -83,12 +85,13 @@ func walk(dir string, visit func(string) error) error {
 	return nil
 }
 
-func hashFile(path string) (string, error) {
-	file, err := os.Open(path)
+// hashFile digests a file in the store.
+func hashFile(rel string) (_ string, err error) {
+	file, err := os.DirFS(storeDir).Open(rel)
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { err = errors.Join(err, file.Close()) }()
 	sum := sha256.New()
 	if _, err := io.Copy(sum, file); err != nil {
 		return "", err

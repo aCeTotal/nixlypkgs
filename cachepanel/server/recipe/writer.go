@@ -13,6 +13,8 @@ import (
 type writer struct {
 	b    strings.Builder
 	args map[string]bool
+	// pinned reads rev, hashes and version from source.json.
+	pinned bool
 }
 
 func newWriter() *writer {

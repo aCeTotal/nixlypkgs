@@ -18,6 +18,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"cachepanel/cache"
 	"cachepanel/evaluate"
 	"cachepanel/realtime"
 )
@@ -47,7 +48,9 @@ var lanes = []lane{
 			UPDATE profiles SET stable_check_state = $4::check_state, stable_check_error = nullif($5, ''),
 				stable_tree = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN $6 ELSE stable_tree END,
 				stable_rev = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN base_rev ELSE stable_rev END,
-				stable_at = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN now() ELSE stable_at END
+				stable_at = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN now() ELSE stable_at END,
+				stable_paths = CASE WHEN $4::check_state = 'passed' THEN $7 ELSE stable_paths END,
+				stable_bytes = CASE WHEN $4::check_state = 'passed' THEN $8 ELSE stable_bytes END
 			WHERE id = $1 AND stable_candidate_tree = $2 AND base_rev = $3 AND stable_check_state = 'running'`,
 	},
 	{
@@ -62,7 +65,9 @@ var lanes = []lane{
 			UPDATE profiles SET check_state = $4::check_state, check_error = nullif($5, ''), checked_at = now(),
 				testing_tree = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN $6 ELSE testing_tree END,
 				testing_rev = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN candidate_rev ELSE testing_rev END,
-				testing_at = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN now() ELSE testing_at END
+				testing_at = CASE WHEN $4::check_state IN ('passed', 'skipped') THEN now() ELSE testing_at END,
+				testing_paths = CASE WHEN $4::check_state = 'passed' THEN $7 ELSE testing_paths END,
+				testing_bytes = CASE WHEN $4::check_state = 'passed' THEN $8 ELSE testing_bytes END
 			WHERE id = $1 AND candidate_tree = $2 AND candidate_rev = $3 AND check_state = 'running'`,
 	},
 }
@@ -118,7 +123,7 @@ func (b *Rebuilder) claim(ctx context.Context, queue *lane) (pendingCheck, bool,
 
 func (b *Rebuilder) runCheck(ctx context.Context, next pendingCheck) {
 	b.Hub.Publish(realtime.ProfileChanged, map[string]int64{"id": next.id})
-	tree, err := b.verify(ctx, next)
+	tree, coverage, err := b.verify(ctx, next)
 	if ctx.Err() != nil {
 		return
 	}
@@ -132,14 +137,23 @@ func (b *Rebuilder) runCheck(ctx context.Context, next pendingCheck) {
 	if len(message) > maxCheckError {
 		message = message[len(message)-maxCheckError:]
 	}
-	if err := b.recordCheck(ctx, next, tree, state, message); err != nil {
+	if err := b.recordCheck(ctx, next, outcome{tree: tree, state: state, message: message, coverage: coverage}); err != nil {
 		slog.Error("record type check", "type", next.id, "error", err)
 	}
 }
 
 // recordCheck promotes signed trees.
-func (b *Rebuilder) recordCheck(ctx context.Context, next pendingCheck, tree, state, message string) error {
-	tag, err := b.DB.Exec(ctx, next.lane.record, next.id, next.tree, next.rev, state, message, tree)
+// outcome is what a check found.
+type outcome struct {
+	tree     string
+	state    string
+	message  string
+	coverage cache.Coverage
+}
+
+func (b *Rebuilder) recordCheck(ctx context.Context, next pendingCheck, found outcome) error {
+	tag, err := b.DB.Exec(ctx, next.lane.record, next.id, next.tree, next.rev, found.state, found.message, found.tree,
+		found.coverage.Paths, found.coverage.Bytes)
 	if err != nil || tag.RowsAffected() == 0 {
 		return err
 	}
@@ -193,40 +207,41 @@ func extract(root *os.Root, reader io.Reader, header *tar.Header) error {
 }
 
 // verify builds, signs and rebuilds.
-func (b *Rebuilder) verify(ctx context.Context, next pendingCheck) (string, error) {
+func (b *Rebuilder) verify(ctx context.Context, next pendingCheck) (string, cache.Coverage, error) {
 	work := filepath.Join(b.ChecksDir, next.tree)
 	defer func() { _ = os.RemoveAll(work) }()
 	flakeRef := b.Mirror.FlakeRef(next.rev)
 	hardware, err := evaluate.References(ctx, flakeRef)
 	if err != nil {
-		return next.tree, err
+		return next.tree, cache.Coverage{}, err
 	}
 	drvPaths, err := evaluateTree(ctx, next.archive, filepath.Join(work, "unsigned"), flakeRef, hardware)
 	if err != nil {
-		return "", err
+		return "", cache.Coverage{}, err
 	}
 	unsigned, err := buildSystems(ctx, filepath.Join(work, "roots", "system"), drvPaths)
 	if err != nil {
-		return "", err
+		return "", cache.Coverage{}, err
 	}
 	tree, archive, err := b.signTree(ctx, next.tree, next.archive, unsigned)
 	if err != nil {
-		return "", err
+		return "", cache.Coverage{}, err
 	}
 	drvPaths, err = evaluateTree(ctx, archive, filepath.Join(work, "signed"), flakeRef, hardware)
 	if err != nil {
-		return "", err
+		return "", cache.Coverage{}, err
 	}
 	roots := b.systemRoots(next.id)
 	key := releaseKey(tree, next.rev)
-	if err := b.cacheSystems(ctx, filepath.Join(roots, key), drvPaths); err != nil {
-		return "", err
+	coverage, err := b.cacheSystems(ctx, filepath.Join(roots, key), drvPaths)
+	if err != nil {
+		return "", coverage, err
 	}
 	released, err := b.released(ctx, next.id)
 	if err != nil {
-		return "", err
+		return "", coverage, err
 	}
-	return tree, keepOnly(roots, append(released, key))
+	return tree, coverage, keepOnly(roots, append(released, key))
 }
 
 func evaluateTree(ctx context.Context, archive []byte, dir, flakeRef string, hardware []string) ([]string, error) {

@@ -8,6 +8,7 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card, CardContent } from "@/ui/card";
 import { Switch } from "@/ui/switch";
+import { UpstreamCard } from "@/upstream/upstream-card";
 import { packageQuery, setAutoBuild } from "./queries";
 import { VersionCard } from "./version-card";
 
@@ -59,6 +60,7 @@ export function PackagePage() {
           </div>
         </CardContent>
       </Card>
+      <UpstreamCard attr={pkg.attr} />
       <div className="space-y-4">
         {pkg.versions.map((version, index) => (
           <VersionCard key={version.id} pkg={pkg} version={version} newest={index === 0} />

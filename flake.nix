@@ -107,6 +107,8 @@
             let stable = stableFor system; in
             builtins.filter (name: stable ? ${name} && (stable.${name}.outputs or [ "out" ]) == [ "out" ])
               (builtins.attrNames self.packages.${system});
+          # What the panel's editor completes.
+          editor = import ./nixlyos/lib/editor.nix { inherit self; inherit (nixpkgs) lib; };
           # Kernels and the settings each offers.
           kernels = _:
             let

@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldGroup, FieldLabel } from "@/ui/field";
 import { Input } from "@/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { treeQuery } from "@/source/queries";
 import { createProfile, platformLabels, type Platform } from "./queries";
 
 export function NewProfileDialog() {
@@ -15,8 +16,10 @@ export function NewProfileDialog() {
   const [title, setTitle] = useState("");
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState<Platform>("desktop");
+  const [message, setMessage] = useState("");
+  const head = useQuery({ ...treeQuery(""), enabled: open }).data?.head ?? "";
   const create = useMutation({
-    mutationFn: () => createProfile({ name, title, description: "", platform }),
+    mutationFn: () => createProfile({ name, title, description: "", platform, base: head, message: message.trim() }),
     onSuccess: (created) => navigate({ to: "/profiles/$name", params: { name: created.name } }),
   });
   const submit = (event: FormEvent) => {
@@ -35,7 +38,7 @@ export function NewProfileDialog() {
         <form onSubmit={submit} className="space-y-6">
           <DialogHeader>
             <DialogTitle>New profile</DialogTitle>
-            <DialogDescription>Starts with the platform's default modules. Adjust modules and packages afterwards.</DialogDescription>
+            <DialogDescription>Starts with the required modules. A commit on main, checked in testing before stable.</DialogDescription>
           </DialogHeader>
           <FieldGroup>
             <Field>
@@ -69,10 +72,20 @@ export function NewProfileDialog() {
                 </SelectContent>
               </Select>
             </Field>
+            <Field>
+              <FieldLabel htmlFor="profile-message">Commit message</FieldLabel>
+              <Input
+                id="profile-message"
+                required
+                placeholder={`profiles: add ${name || "<id>"}`}
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+              />
+            </Field>
           </FieldGroup>
           <DialogFooter>
-            <Button type="submit" disabled={create.isPending}>
-              Opprett
+            <Button type="submit" disabled={!head || !message.trim() || create.isPending}>
+              Create
             </Button>
           </DialogFooter>
         </form>

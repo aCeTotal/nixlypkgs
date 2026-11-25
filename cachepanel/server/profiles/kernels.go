@@ -9,10 +9,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"cachepanel/database"
 	"cachepanel/rest"
 )
 
-// The newest commit that knew its kernels.
+// Newest commit with kernels.
 const newestCatalogue = `SELECT kernels FROM commits WHERE kernels IS NOT NULL ORDER BY position DESC LIMIT 1`
 
 var (
@@ -21,14 +22,14 @@ var (
 	errCatalogue = rest.Conflict("no_kernel_catalogue", "The source has not offered any kernels yet")
 )
 
-// Offer is one kernel in the source's catalogue.
+// Offer is one catalogue kernel.
 type Offer struct {
 	Title       string             `json:"title"`
 	Description string             `json:"description"`
 	Settings    map[string]Setting `json:"settings"`
 }
 
-// Setting is one value a profile may change.
+// Setting is one tunable value.
 type Setting struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
@@ -37,16 +38,16 @@ type Setting struct {
 	Default     string   `json:"default"`
 }
 
-func catalogue(ctx context.Context, tx pgx.Tx) (map[string]Offer, error) {
+func catalogue(ctx context.Context, db database.Querier) (map[string]Offer, error) {
 	var offers map[string]Offer
-	err := tx.QueryRow(ctx, newestCatalogue).Scan(&offers)
+	err := db.QueryRow(ctx, newestCatalogue).Scan(&offers)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, errCatalogue
 	}
 	return offers, err
 }
 
-// changed keeps values that differ from the kernel's own.
+// changed keeps non-default values.
 func (o Offer) changed(settings map[string]string) (map[string]string, error) {
 	kept := map[string]string{}
 	for knob, value := range settings {
@@ -61,17 +62,17 @@ func (o Offer) changed(settings map[string]string) (map[string]string, error) {
 	return kept, nil
 }
 
-// chooseKernel checks a profile's kernel against the catalogue.
-func chooseKernel(ctx context.Context, tx pgx.Tx, req settings) (map[string]string, error) {
-	offers, err := catalogue(ctx, tx)
+// chooseKernel validates against the catalogue.
+func chooseKernel(ctx context.Context, db database.Querier, profile Profile) (map[string]string, error) {
+	offers, err := catalogue(ctx, db)
 	if err != nil {
 		return nil, err
 	}
-	offer, found := offers[req.Kernel]
+	offer, found := offers[profile.Kernel]
 	if !found {
 		return nil, errKernel
 	}
-	return offer.changed(req.KernelSettings)
+	return offer.changed(profile.KernelSettings)
 }
 
 func (b *Rebuilder) kernels(w http.ResponseWriter, r *http.Request) error {

@@ -19,6 +19,7 @@ import (
 	"cachepanel/client"
 	"cachepanel/commits"
 	"cachepanel/config"
+	"cachepanel/editor"
 	"cachepanel/modules"
 	"cachepanel/overview"
 	"cachepanel/packages"
@@ -30,6 +31,7 @@ import (
 	"cachepanel/signing"
 	"cachepanel/source"
 	"cachepanel/update"
+	"cachepanel/upstream"
 	"cachepanel/watcher"
 	"cachepanel/wizard"
 )
@@ -59,6 +61,8 @@ type app struct {
 	source    *source.Routes
 	clones    http.Handler
 	update    *update.Updater
+	editor    *editor.Index
+	tracker   *upstream.Tracker
 }
 
 func (a *app) routes() http.Handler {
@@ -75,6 +79,7 @@ func (a *app) routes() http.Handler {
 	r.With(a.auth.Authenticate).Get("/api/ws", a.hub.ServeWS)
 	a.cache.Mount(r)
 	r.Handle("/source.git/*", a.clones)
+	a.editor.MountIndex(r.With(a.auth.Authenticate))
 
 	compressed := r.With(middleware.Compress(compressionLevel))
 	compressed.With(logWrites).Mount("/api/auth", a.auth.Routes())
@@ -84,13 +89,16 @@ func (a *app) routes() http.Handler {
 		overview.New(a.db, a.watcher, a.pool, a.cfg.CacheDir).Mount(api)
 		packages.New(a.db, a.hub, a.pool, a.rebuilder.Trigger).Mount(api)
 		commits.New(a.db, a.watcher.Poke).Mount(api)
-		(&modules.Modules{DB: a.db, Hub: a.hub, Repo: a.source.Repo, Poke: a.watcher.Poke}).Mount(api)
+		(&modules.Modules{DB: a.db, Hub: a.hub, Repo: a.source.Repo, Poke: a.watcher.Poke, Used: a.rebuilder.ModuleUsed}).Mount(api)
 		a.rebuilder.Mount(api)
+		(&profiles.Routes{Rebuilder: a.rebuilder, Poke: a.watcher.Poke}).Mount(api)
 		a.watcher.Mount(api)
 		a.recipes.Mount(api)
 		a.trust.Mount(api)
 		a.source.Mount(api)
 		a.update.Mount(api)
+		a.tracker.Mount(api)
+		editor.Mount(api)
 	})
 	if a.cfg.WebRoot != "" {
 		compressed.Handle("/*", spa(a.cfg.WebRoot))

@@ -18,14 +18,16 @@ import (
 
 const (
 	maxChanges = 100
+	// robotName signs the panel's own commits.
+	robotName  = "nixly-panel"
 	maxMessage = 10 << 10
-	// A missing object deletes an index entry.
+	// Missing objects delete index entries.
 	deletion = "0 0000000000000000000000000000000000000000"
 )
 
 var (
 	errMoved     = rest.Conflict("source_moved", "main moved on since you opened this; reload and make your change again")
-	errUnchanged = rest.Unprocessable("unchanged", "Nothing would change")
+	ErrUnchanged = rest.Unprocessable("unchanged", "Nothing would change")
 	errMessage   = rest.Unprocessable("invalid_message", "Describe the change in a message")
 	errChanges   = rest.Unprocessable("invalid_changes", "Change between one and 100 files of at most 1 MiB")
 	errFolder    = rest.Unprocessable("is_folder", "A folder has that path")
@@ -33,23 +35,24 @@ var (
 	errConflict  = rest.Conflict("revert_conflict", "Later changes touch the same lines; revert it by hand")
 )
 
-// FileChange writes a file, or deletes it when Content is nil.
+// FileChange writes, or deletes when nil.
 type FileChange struct {
 	Path    string  `json:"path"`
 	Content *string `json:"content"`
 }
 
-// Edit is one commit made in the panel.
+// Edit is one panel commit.
 type Edit struct {
 	Base    string       `json:"base"`
 	Message string       `json:"message"`
 	Changes []FileChange `json:"changes"`
 }
 
-// Reversal undoes one commit on top of Base.
+// Reversal undoes one commit.
 type Reversal struct {
-	Base   string `json:"base"`
-	Commit string `json:"-"`
+	Base    string `json:"base"`
+	Commit  string `json:"-"`
+	Message string `json:"message"`
 }
 
 // Author signs panel commits.
@@ -69,7 +72,7 @@ func (e Edit) validate() error {
 	if !shaPattern.MatchString(e.Base) {
 		return errMoved
 	}
-	if strings.TrimSpace(e.Message) == "" || len(e.Message) > maxMessage {
+	if !validMessage(e.Message) {
 		return errMessage
 	}
 	if len(e.Changes) == 0 || len(e.Changes) > maxChanges {
@@ -86,21 +89,52 @@ func (e Edit) validate() error {
 	return nil
 }
 
-// Commit writes an edit as a fast-forward of main.
+// Commit writes an edit on main.
 func (r *Repo) Commit(ctx context.Context, edit Edit, author Author) (string, error) {
 	if err := edit.validate(); err != nil {
 		return "", err
 	}
-	if err := r.expect(ctx, edit.Base); err != nil {
+	head, err := r.onto(ctx, edit)
+	if err != nil {
 		return "", err
 	}
+	tree, err := r.writeTree(ctx, head, edit)
+	if err != nil {
+		return "", err
+	}
+	return r.advance(ctx, head, tree, edit.Message+"\n", author)
+}
+
+// Export writes changed main into dir.
+func (r *Repo) Export(ctx context.Context, base string, changes []FileChange, dir string) error {
+	edit := Edit{Base: base, Changes: changes}
+	head, err := r.onto(ctx, edit)
+	if err != nil {
+		return err
+	}
+	tree, err := r.writeTree(ctx, head, edit)
+	if err != nil {
+		return err
+	}
+	index := []string{"GIT_INDEX_FILE=" + filepath.Join(dir, ".git-export-index")}
+	if _, err := r.run(ctx, call{args: []string{"read-tree", tree}, env: index}); err != nil {
+		return err
+	}
+	if _, err := r.run(ctx, call{args: []string{"--work-tree=" + dir, "checkout-index", "--all", "--force"}, env: index}); err != nil {
+		return err
+	}
+	return os.Remove(filepath.Join(dir, ".git-export-index"))
+}
+
+// writeTree applies an edit to head.
+func (r *Repo) writeTree(ctx context.Context, head string, edit Edit) (string, error) {
 	work, err := os.MkdirTemp("", "source-edit-")
 	if err != nil {
 		return "", err
 	}
 	defer func() { _ = os.RemoveAll(work) }()
 	index := []string{"GIT_INDEX_FILE=" + filepath.Join(work, "index")}
-	if _, err := r.run(ctx, call{args: []string{"read-tree", edit.Base}, env: index}); err != nil {
+	if _, err := r.run(ctx, call{args: []string{"read-tree", head}, env: index}); err != nil {
 		return "", err
 	}
 	entries, err := r.entries(ctx, edit, work)
@@ -111,10 +145,7 @@ func (r *Repo) Commit(ctx context.Context, edit Edit, author Author) (string, er
 		return "", err
 	}
 	tree, err := r.run(ctx, call{args: []string{"write-tree"}, env: index})
-	if err != nil {
-		return "", err
-	}
-	return r.advance(ctx, edit.Base, strings.TrimSpace(tree), edit.Message+"\n", author)
+	return strings.TrimSpace(tree), err
 }
 
 // entries turns changes into --index-info records.
@@ -185,8 +216,11 @@ func (r *Repo) modes(ctx context.Context, edit Edit) (map[string]string, error) 
 	return modes, nil
 }
 
-// Revert undoes a commit on top of main.
+// Revert undoes a commit on main.
 func (r *Repo) Revert(ctx context.Context, undo Reversal, author Author) (string, error) {
+	if !validMessage(undo.Message) {
+		return "", errMessage
+	}
 	if !shaPattern.MatchString(undo.Commit) {
 		return "", rest.NotFound()
 	}
@@ -207,7 +241,7 @@ func (r *Repo) Revert(ctx context.Context, undo Reversal, author Author) (string
 	if err != nil {
 		return "", err
 	}
-	message := fmt.Sprintf("Revert %q\n\nThis reverts commit %s.\n", details.Subject, undo.Commit)
+	message := fmt.Sprintf("%s\n\nThis reverts %s (%s).\n", strings.TrimSpace(undo.Message), undo.Commit, details.Subject)
 	return r.advance(ctx, undo.Base, strings.Fields(tree)[0], message, author)
 }
 
@@ -223,14 +257,14 @@ func (r *Repo) expect(ctx context.Context, base string) error {
 	return nil
 }
 
-// advance commits a tree and moves main only from base.
+// advance moves main only from base.
 func (r *Repo) advance(ctx context.Context, base, tree, message string, author Author) (string, error) {
 	current, err := r.read(ctx, "rev-parse", base+"^{tree}")
 	if err != nil {
 		return "", err
 	}
 	if strings.TrimSpace(current) == tree {
-		return "", errUnchanged
+		return "", ErrUnchanged
 	}
 	out, err := r.run(ctx, call{args: []string{"commit-tree", tree, "-p", base, "-F", "-"}, stdin: strings.NewReader(message), env: author.env()})
 	if err != nil {
@@ -245,10 +279,40 @@ func (r *Repo) advance(ctx context.Context, base, tree, message string, author A
 
 // Author signs as the signed-in user.
 func (r *Repo) Author(req *http.Request) Author {
-	name := auth.From(req.Context()).Username
+	return r.signature(auth.From(req.Context()).Username)
+}
+
+// Robot signs the panel's own commits.
+func (r *Repo) Robot() Author {
+	return r.signature(robotName)
+}
+
+func (r *Repo) signature(name string) Author {
 	host := "localhost"
 	if parsed, err := url.Parse(r.public); err == nil {
 		host = parsed.Hostname()
 	}
 	return Author{Name: name, Email: name + "@" + host}
+}
+
+// validMessage refuses blank and oversized messages.
+func validMessage(message string) bool {
+	return strings.TrimSpace(message) != "" && len(message) <= maxMessage
+}
+
+// onto refuses edits to moved paths.
+func (r *Repo) onto(ctx context.Context, edit Edit) (string, error) {
+	head, err := r.Head(ctx)
+	if err != nil || head == edit.Base {
+		return head, err
+	}
+	args := []string{"diff", "--quiet", edit.Base, head, "--"}
+	for _, change := range edit.Changes {
+		args = append(args, change.Path)
+	}
+	err = r.command(ctx, args...).Run()
+	if _, moved := errors.AsType[*exec.ExitError](err); moved {
+		return "", errMoved
+	}
+	return head, err
 }

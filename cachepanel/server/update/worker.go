@@ -19,12 +19,12 @@ import (
 
 const tick = 15 * time.Second
 
-// Updater asks root to rebuild the panel once the server is idle.
+// Updater rebuilds the panel when idle.
 type Updater struct {
 	DB      *pgxpool.Pool
 	Hub     *realtime.Hub
 	Watcher *watcher.Watcher
-	// Dir is shared with the root updater; empty disables updates.
+	// Dir is shared; empty disables.
 	Dir string
 
 	mu     sync.Mutex
@@ -63,14 +63,14 @@ func (u *Updater) step(ctx context.Context, self string) error {
 		return err
 	}
 	var status Status
-	if _, err := readJSON(filepath.Join(u.Dir, statusFile), &status); err != nil {
+	if err := readJSON(u.Dir, statusFile, &status); err != nil {
 		return err
 	}
 	u.remember(idle, status)
 	return u.request(ctx, self, status)
 }
 
-// quiet means nothing a restart would kill.
+// quiet means safe to restart.
 func (u *Updater) quiet(ctx context.Context) (bool, error) {
 	if phase := u.Watcher.Status().Phase; phase != watcher.Idle && phase != watcher.Paused {
 		return false, nil
@@ -83,7 +83,7 @@ func (u *Updater) quiet(ctx context.Context) (bool, error) {
 	return quiet, err
 }
 
-// markIdle keeps a fresh file while idle.
+// markIdle refreshes the idle file.
 func (u *Updater) markIdle(idle bool) error {
 	path := filepath.Join(u.Dir, idleFile)
 	if idle {
@@ -121,7 +121,7 @@ func (u *Updater) request(ctx context.Context, self string, status Status) error
 	path := filepath.Join(u.Dir, requestFile)
 	want := Request{Rev: target.Rev, Target: target.Out}
 	var current Request
-	if _, err := readJSON(path, &current); err != nil || current == want {
+	if err := readJSON(u.Dir, requestFile, &current); err != nil || current == want {
 		return err
 	}
 	body, err := json.Marshal(want)

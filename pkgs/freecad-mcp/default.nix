@@ -1,15 +1,17 @@
 { lib, python3Packages, fetchFromGitHub, freecad }:
 
+let
+  source = lib.importJSON ./source.json;
+in
 python3Packages.buildPythonApplication rec {
   pname = "freecad-mcp";
-  version = "0.1.28";
+  inherit (source) version;
   pyproject = true;
 
   src = fetchFromGitHub {
     owner = "neka-nat";
     repo = "freecad-mcp";
-    tag = "v${version}";
-    hash = "sha256-dryocwUb26S1+msUTZDUYGoyizxKuAeqMiTqyD8/ybo=";
+    inherit (source) rev hash;
   };
 
   # GUI side listens from launch.

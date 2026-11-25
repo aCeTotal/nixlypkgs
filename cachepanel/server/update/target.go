@@ -19,7 +19,7 @@ type Target struct {
 	Out string `json:"out"`
 }
 
-// newest follows the newest evaluated commit only.
+// newest follows the newest commit.
 func newest(ctx context.Context, db *pgxpool.Pool) (Target, bool, error) {
 	var t Target
 	err := db.QueryRow(ctx, `
@@ -47,7 +47,7 @@ func running() (string, error) {
 	return storePath(resolved), nil
 }
 
-// storePath trims a file to its store entry.
+// storePath trims to the store entry.
 func storePath(path string) string {
 	parts := strings.SplitN(path, "/", 5)
 	if len(parts) < 4 || parts[1] != "nix" || parts[2] != "store" {

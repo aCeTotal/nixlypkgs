@@ -10,15 +10,17 @@
 , hwdata
 }:
 
+let
+  source = lib.importJSON ./source.json;
+in
 stdenv.mkDerivation {
   pname = "nixlycc";
-  version = "0.2";
+  inherit (source) version;
 
   src = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlycc";
-    rev = "da0210afeaf51aec493680867a1b1e82954e44c7";
-    hash = "sha256-Y4KluXkKPaTMjgNUVMGjB3apXmkz0VRjYx7HO/ZS9ro=";
+    inherit (source) rev hash;
   };
 
   nativeBuildInputs = [

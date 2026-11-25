@@ -37,7 +37,7 @@ func parseKey(line string) (publicKey, error) {
 		return publicKey{}, errKey
 	}
 	size := binary.BigEndian.Uint32(blob)
-	if uint64(size) > uint64(len(blob)-4) || string(blob[4:4+size]) != fields[0] {
+	if int64(size) > int64(len(blob)-4) || string(blob[4:4+size]) != fields[0] {
 		return publicKey{}, errKey
 	}
 	sum := sha256.Sum256(blob)

@@ -1,5 +1,6 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, DatabaseZap } from "lucide-react";
 import type { ReactNode } from "react";
+import { formatBytes } from "@/format/bytes";
 import { shortSha } from "@/format/sha";
 import { dateTime, timeAgo } from "@/format/time";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
@@ -13,15 +14,21 @@ function released(at: string | null, never: string) {
   return at ? `${dateTime(at)} (${timeAgo(at)})` : never;
 }
 
-type ReleaseProps = { label: ReactNode; tree: string | null; rev: string | null; note: string };
+type ReleaseProps = { label: ReactNode; tree: string | null; rev: string | null; note: string; paths?: number | null; bytes?: number | null };
 
-function Release({ label, tree, rev, note }: ReleaseProps) {
+function Release({ label, tree, rev, note, paths, bytes }: ReleaseProps) {
   return (
     <div className="rounded-lg border p-4">
       <div className="text-sm text-muted-foreground">{label}</div>
       <p className="mt-1 font-mono text-sm">nixlypkgs {shortSha(rev)}</p>
       <p className="font-mono text-xs text-muted-foreground">tree {shortSha(tree)}</p>
       <p className="mt-2 text-xs text-muted-foreground">{note}</p>
+      {paths != null && (
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" title="Every path of the system is in the panel's cache">
+          <DatabaseZap className="size-3.5 text-primary" />
+          {paths.toLocaleString()} paths · {formatBytes(bytes)} cached
+        </p>
+      )}
     </div>
   );
 }
@@ -51,12 +58,16 @@ export function ProfileStatus({ profile }: { profile: ProfileSummary }) {
               tree={profile.testingTree}
               rev={profile.testingRev}
               note={released(profile.testingAt, "Nothing checked yet")}
+              paths={profile.testingPaths}
+              bytes={profile.testingBytes}
             />
             <Release
               label={<BranchBadge branch="stable" />}
               tree={profile.stableTree}
               rev={profile.stableRev}
               note={released(profile.stableAt, "Not approved yet")}
+              paths={profile.stablePaths}
+              bytes={profile.stableBytes}
             />
           </div>
         </CardContent>

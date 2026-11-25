@@ -76,11 +76,11 @@
 }:
 
 let
+  source = lib.importJSON ./source.json;
   nixlytileSrc = fetchFromGitHub {
     owner = "aCeTotal";
     repo = "nixlytile";
-    rev = "35e585f99bed17c2c43ba1b5af0f1c2fcf57f35f";
-    hash = "sha256-3g/76dW0Ul761amUBXTBkBsDdIi2Yn+Da0PPBN91I28=";
+    inherit (source) rev hash;
   };
 
   gazeModel = name: hash: fetchurl {
@@ -149,7 +149,7 @@ in
 
 stdenv.mkDerivation {
   pname = "nixlytile";
-  version = "2026.11.24";
+  inherit (source) version;
 
   passthru.providedSessions = [ "nixlytile" ];
 

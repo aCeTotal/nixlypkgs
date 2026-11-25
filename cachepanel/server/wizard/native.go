@@ -98,8 +98,12 @@ func (l *Lab) fromGitHub(ctx context.Context, flake, owner, repo, ref string) (D
 	}
 	source := recipe.Source{Kind: recipe.GitHub, Owner: owner, Repo: repo, Rev: fetched.Rev, Hash: fetched.Hash}
 	version := dateVersion(fetched.Modified)
+	// Releases follow newer tags, everything else its branch.
 	if match := tagVersion.FindStringSubmatch(ref); match != nil && ref != fetched.Rev {
-		source.Rev, version = ref, match[1]
+		prefix := strings.TrimSuffix(ref, match[1])
+		source.Rev, source.Commit, source.Tags, version = ref, fetched.Rev, &prefix, match[1]
+	} else {
+		source.Branch = followedBranch(ctx, owner, repo, ref)
 	}
 	pname := attrName(strings.ToLower(repo))
 	spec := recipe.Spec{Attr: pname, Pname: pname, Version: version, Sources: []recipe.Source{source},

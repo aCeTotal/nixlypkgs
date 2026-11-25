@@ -42,6 +42,9 @@ type awaiting struct {
 	TestingAt   time.Time     `json:"testingAt"`
 	BaseRev     *string       `json:"baseRev"`
 	Files       []changedFile `json:"files"`
+	// Testing's cache holdings.
+	Paths *int   `json:"paths"`
+	Bytes *int64 `json:"bytes"`
 }
 
 // derivation awaits stable approval.
@@ -107,7 +110,8 @@ func (b *Rebuilder) pending(w http.ResponseWriter, r *http.Request) error {
 
 func (b *Rebuilder) awaiting(ctx context.Context) ([]awaiting, error) {
 	rows, err := b.DB.Query(ctx, `
-		SELECT p.id, p.name, p.title, p.platform, p.testing_tree, p.testing_rev, p.testing_at, p.base_rev, tt.archive, bt.archive
+		SELECT p.id, p.name, p.title, p.platform, p.testing_tree, p.testing_rev, p.testing_at, p.base_rev, tt.archive, bt.archive,
+			p.testing_paths, p.testing_bytes
 		FROM profiles p
 			JOIN trees tt ON tt.hash = p.testing_tree
 			LEFT JOIN trees bt ON bt.hash = p.base_tree
@@ -119,7 +123,7 @@ func (b *Rebuilder) awaiting(ctx context.Context) ([]awaiting, error) {
 	var next awaiting
 	var testing, base []byte
 	_, err = pgx.ForEachRow(rows, []any{&next.ID, &next.Name, &next.Title, &next.Platform, &next.TestingTree, &next.TestingRev,
-		&next.TestingAt, &next.BaseRev, &testing, &base}, func() error {
+		&next.TestingAt, &next.BaseRev, &testing, &base, &next.Paths, &next.Bytes}, func() error {
 		files, err := changes(base, testing)
 		next.Files = files
 		if next.BaseRev == nil || *next.BaseRev != next.TestingRev || len(files) > 0 {
@@ -165,9 +169,10 @@ func changes(base, testing []byte) ([]changedFile, error) {
 	return diff, nil
 }
 
+// derivations offers newest testing versions.
 func (b *Rebuilder) derivations(ctx context.Context) ([]derivation, error) {
 	rows, err := b.DB.Query(ctx, `
-		SELECT DISTINCT pk.attr, tv.id, tv.name, tv.finished_at, sv.id, sv.name
+		SELECT DISTINCT ON (pk.attr) pk.attr, tv.id, tv.name, tv.finished_at, sv.id, sv.name
 		FROM profiles p
 			JOIN trees t ON t.hash = p.testing_tree
 			CROSS JOIN LATERAL jsonb_each_text(t.pins) AS pin(attr, version)
@@ -175,7 +180,7 @@ func (b *Rebuilder) derivations(ctx context.Context) ([]derivation, error) {
 			JOIN versions tv ON tv.id = pin.version::bigint
 			LEFT JOIN versions sv ON sv.id = pk.stable_version_id
 		WHERE tv.id IS DISTINCT FROM pk.stable_version_id
-		ORDER BY pk.attr, tv.id`)
+		ORDER BY pk.attr, tv.id DESC`)
 	if err != nil {
 		return nil, err
 	}

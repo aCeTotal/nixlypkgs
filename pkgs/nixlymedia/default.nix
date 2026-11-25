@@ -19,6 +19,7 @@
 }:
 
 let
+  source = lib.importJSON ./source.json;
   # A/V drift corrected at 4 ms.
   mpv = mpv-unwrapped.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [ ./mpv-av-drift.patch ];
@@ -40,17 +41,16 @@ let
 in
 rustPlatform.buildRustPackage rec {
   pname = "nixlymedia";
-  version = "2026.11.08";
+  inherit (source) version;
 
   src = fetchFromGitHub {
-    name = "nixlymedia-src-3da8f09";
+    name = "nixlymedia-src-${builtins.substring 0 7 source.rev}";
     owner = "aCeTotal";
     repo = "nixlymedia";
-    rev = "3da8f093ef98117138d992cd0c6bfdf79b499612";
-    hash = "sha256-IcaeY1UkpgmSwGF1anwIOUjWqEJOd6psP1F8zieOOko=";
+    inherit (source) rev hash;
   };
 
-  cargoHash = "sha256-kFugkS8x1TOVTwJ4gC1cVj3g3/6uDcE3vwh/2iSAcMI=";
+  inherit (source) cargoHash;
 
   nativeBuildInputs = [
     pkg-config

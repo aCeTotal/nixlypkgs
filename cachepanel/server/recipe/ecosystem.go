@@ -5,7 +5,7 @@ func cargo(w *writer, s Spec) {
 	w.head(s)
 	w.src(s)
 	w.str("sourceRoot", s.Root)
-	w.str("cargoHash", hashOr(s.VendorHash, VendorSlot))
+	w.vendorHash("cargoHash", s)
 	w.attrs("nativeBuildInputs", s.Native)
 	w.attrs("buildInputs", s.Inputs)
 	w.printf("  doCheck = false;\n")
@@ -21,7 +21,7 @@ func goModule(w *writer, s Spec) {
 	if s.Vendored {
 		w.printf("  vendorHash = null;\n")
 	} else {
-		w.str("vendorHash", hashOr(s.VendorHash, VendorSlot))
+		w.vendorHash("vendorHash", s)
 	}
 	w.strings("subPackages", s.SubPackages)
 	w.attrs("nativeBuildInputs", s.Native)
@@ -53,7 +53,7 @@ func npm(w *writer, s Spec) {
 	w.head(s)
 	w.src(s)
 	w.str("sourceRoot", s.Root)
-	w.str("npmDepsHash", hashOr(s.VendorHash, VendorSlot))
+	w.vendorHash("npmDepsHash", s)
 	w.flag("dontNpmBuild", s.NoBuild)
 	w.attrs("nativeBuildInputs", s.Native)
 	w.attrs("buildInputs", s.Inputs)

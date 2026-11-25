@@ -6,12 +6,13 @@ import { invalidateSoon, onEvent } from "./realtime";
 const invalidations: Record<string, (data: Record<string, unknown>) => unknown[][]> = {
   "version.changed": (data) => [["overview"], ["packages"], ["package", data.attr], ["build-log", data.id], ["profiles"]],
   "package.changed": (data) => [["overview"], ["packages"], ["package", data.attr], ["profiles"], ["kernels"]],
-  "commit.changed": () => [["commits"], ["overview"]],
+  "commit.changed": () => [["commits"], ["overview"], ["source"], ["profiles"], ["profile"], ["modules"], ["module"]],
   "watcher.changed": () => [["overview"]],
   "profile.changed": () => [["profiles"], ["profile"], ["commits"], ["trust"], ["packages"], ["package"]],
   "trust.changed": () => [["trust"]],
-  "source.changed": () => [["source"]],
+  "source.changed": () => [["source"], ["profiles"], ["profile"], ["modules"], ["module"]],
   "update.changed": () => [["update"]],
+  "upstream.changed": () => [["upstream"]],
   "module.changed": () => [["modules"], ["module"], ["profile"]],
   "recipe.changed": (data) => [["recipes"], ["recipe", data.id]],
 };

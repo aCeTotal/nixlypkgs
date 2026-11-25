@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"cachepanel/cache"
 	"cachepanel/logtail"
 )
 
@@ -45,30 +47,41 @@ func buildSystems(ctx context.Context, link string, drvPaths []string) ([]string
 	return strings.Fields(toplevels.String()), nil
 }
 
-// cacheSystems builds, records and pushes toplevels.
-func (b *Rebuilder) cacheSystems(ctx context.Context, dir string, drvPaths []string) error {
+// cacheSystems builds, pushes and verifies toplevels.
+func (b *Rebuilder) cacheSystems(ctx context.Context, dir string, drvPaths []string) (cache.Coverage, error) {
 	pending := filepath.Join(dir, "pending")
 	defer func() { _ = os.RemoveAll(pending) }()
 	toplevels, err := buildSystems(ctx, filepath.Join(pending, "system"), drvPaths)
 	if err != nil {
-		return err
+		return cache.Coverage{}, err
 	}
 	// Roots first, so collection keeps them.
-	if err := os.WriteFile(filepath.Join(dir, systemsFile), []byte(strings.Join(toplevels, "\n")), 0o640); err != nil {
-		return err
+	if err := os.WriteFile(filepath.Join(dir, systemsFile), []byte(strings.Join(toplevels, "\n")), 0o600); err != nil {
+		return cache.Coverage{}, err
 	}
-	return b.Cache.Push(ctx, toplevels...)
+	if err := b.Cache.Push(ctx, toplevels...); err != nil {
+		return cache.Coverage{}, err
+	}
+	coverage, err := b.Cache.Cover(ctx, toplevels...)
+	if err != nil {
+		return cache.Coverage{}, err
+	}
+	if len(coverage.Missing) > 0 {
+		return coverage, fmt.Errorf("%d of %d paths are not in the cache, among them %s", len(coverage.Missing), coverage.Paths, coverage.Missing[0])
+	}
+	return coverage, nil
 }
 
 // Released lists systems the cache keeps.
 func (b *Rebuilder) Released() ([]string, error) {
-	files, err := filepath.Glob(filepath.Join(b.ChecksDir, "roots", "*", "*", systemsFile))
+	checks := os.DirFS(b.ChecksDir)
+	files, err := fs.Glob(checks, "roots/*/*/"+systemsFile)
 	if err != nil {
 		return nil, err
 	}
 	var toplevels []string
 	for _, file := range files {
-		content, err := os.ReadFile(file)
+		content, err := fs.ReadFile(checks, file)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
